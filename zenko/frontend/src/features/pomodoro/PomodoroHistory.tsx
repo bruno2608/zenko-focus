@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import Card from '../../components/ui/Card';
-import { supabase } from '../../lib/supabase';
+
+import { getCurrentUser, supabase } from '../../lib/supabase';
 import { usePomodoroStore } from './store';
 
 export default function PomodoroHistory() {
@@ -10,25 +11,28 @@ export default function PomodoroHistory() {
   useEffect(() => {
     let active = true;
     (async () => {
-      const {
-        data: { user }
-      } = await supabase.auth.getUser();
+      const user = await getCurrentUser();
       if (!user) return;
-      const { data } = await supabase
-        .from('pomodoro_sessions')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('started_at', { ascending: false })
-        .limit(10);
-      if (data && active) {
-        setHistory(
-          data.map((session) => ({
-            id: session.id,
-            started_at: session.started_at,
-            duration: session.duration_minutes,
-            task_id: session.task_id ?? undefined
-          }))
-        );
+      try {
+        const { data, error } = await supabase
+          .from('pomodoro_sessions')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('started_at', { ascending: false })
+          .limit(10);
+        if (error) throw error;
+        if (data && active) {
+          setHistory(
+            data.map((session) => ({
+              id: session.id,
+              started_at: session.started_at,
+              duration: session.duration_minutes,
+              task_id: session.task_id ?? undefined
+            }))
+          );
+        }
+      } catch (error) {
+        console.warn('Não foi possível carregar o histórico de Pomodoros.', error);
       }
     })();
     return () => {

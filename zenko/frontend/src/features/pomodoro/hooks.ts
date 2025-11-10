@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabase';
 import { usePomodoroStore } from './store';
@@ -6,20 +6,7 @@ import { scheduleNotification } from '../../lib/notifications';
 import { useToastStore } from '../../components/ui/ToastProvider';
 import { fetchTasks } from '../tasks/api';
 import { Task } from '../tasks/types';
-
-function useUserId() {
-  const [userId, setUserId] = useState<string | null>(null);
-  useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => setUserId(data.user?.id ?? null));
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUserId(session?.user?.id ?? null);
-    });
-    return () => {
-      listener.subscription.unsubscribe();
-    };
-  }, []);
-  return userId;
-}
+import { useSupabaseUserId } from '../../hooks/useSupabaseUser';
 
 async function createSession(userId: string, duration: number, taskId?: string) {
   const { data, error } = await supabase
@@ -32,7 +19,7 @@ async function createSession(userId: string, duration: number, taskId?: string) 
 }
 
 export function usePomodoro() {
-  const userId = useUserId();
+  const userId = useSupabaseUserId();
   const duration = usePomodoroStore((state) => state.duration);
   const remaining = usePomodoroStore((state) => state.remaining);
   const status = usePomodoroStore((state) => state.status);

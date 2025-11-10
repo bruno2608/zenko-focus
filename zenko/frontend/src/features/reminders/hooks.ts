@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabase';
 import { useReminderStore } from './store';
@@ -6,18 +6,7 @@ import { useToastStore } from '../../components/ui/ToastProvider';
 import { createReminder, deleteReminder, fetchReminders, updateReminder } from './api';
 import { Reminder, ReminderPayload } from './types';
 import { scheduleNotification } from '../../lib/notifications';
-
-function useUserId() {
-  const [userId, setUserId] = useState<string | null>(null);
-  useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => setUserId(data.user?.id ?? null));
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUserId(session?.user?.id ?? null);
-    });
-    return () => listener.subscription.unsubscribe();
-  }, []);
-  return userId;
-}
+import { useSupabaseUserId } from '../../hooks/useSupabaseUser';
 
 function scheduleReminderNotification(reminder: Reminder) {
   const remindAt = new Date(reminder.remind_at).getTime();
@@ -28,7 +17,7 @@ function scheduleReminderNotification(reminder: Reminder) {
 }
 
 export function useReminders() {
-  const userId = useUserId();
+  const userId = useSupabaseUserId();
   const queryClient = useQueryClient();
   const setReminders = useReminderStore((state) => state.setReminders);
   const view = useReminderStore((state) => state.view);

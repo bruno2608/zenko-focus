@@ -1,27 +1,14 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useToastStore } from '../../components/ui/ToastProvider';
 import { useTasksStore } from './store';
 import { Task, TaskPayload, TaskStatus } from './types';
 import { createTask, deleteTask, fetchTasks, updateTask, updateTaskStatus } from './api';
-
-function useUserId() {
-  const [userId, setUserId] = useState<string | null>(null);
-  useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => setUserId(data.user?.id ?? null));
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUserId(session?.user?.id ?? null);
-    });
-    return () => {
-      listener.subscription.unsubscribe();
-    };
-  }, []);
-  return userId;
-}
+import { useSupabaseUserId } from '../../hooks/useSupabaseUser';
 
 export function useTasks() {
-  const userId = useUserId();
+  const userId = useSupabaseUserId();
   const setTasks = useTasksStore((state) => state.setTasks);
   const setFilter = useTasksStore((state) => state.setFilter);
   const filters = useTasksStore((state) => state.filters);

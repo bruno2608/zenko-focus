@@ -1,26 +1,16 @@
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, YAxis } from 'recharts';
 import Card from '../../components/ui/Card';
 import { supabase } from '../../lib/supabase';
 import { fetchKpis, fetchTaskStatusDistribution, fetchTasksCompletedByDay } from './api';
+import { useSupabaseUserId } from '../../hooks/useSupabaseUser';
 
 const COLORS = ['#38bdf8', '#94a3b8', '#22d3ee'];
 
-function useUserId() {
-  const [userId, setUserId] = useState<string | null>(null);
-  useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => setUserId(data.user?.id ?? null));
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUserId(session?.user?.id ?? null);
-    });
-    return () => listener.subscription.unsubscribe();
-  }, []);
-  return userId;
-}
-
 export default function DashboardPage() {
-  const userId = useUserId();
+  const userId = useSupabaseUserId();
+
   const queryClient = useQueryClient();
 
   const kpiQuery = useQuery({

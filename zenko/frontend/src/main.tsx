@@ -9,18 +9,38 @@ import { initNotifications } from './lib/notifications';
 
 const queryClient = new QueryClient();
 
-async function bootstrap() {
-  const {
-    data: { session }
-  } = await supabase.auth.getSession();
+declare global {
+  interface Window {
+    __ZENKO_BOOT_ERROR__?: string;
+  }
+}
 
-  if (!session) {
-    await supabase.auth.signInAnonymously();
+const rootElement = document.getElementById('root') as HTMLElement;
+const root = ReactDOM.createRoot(rootElement);
+
+async function bootstrap() {
+  try {
+    const {
+      data: { session }
+    } = await supabase.auth.getSession();
+
+    if (!session) {
+      await supabase.auth.signInAnonymously();
+    }
+  } catch (error) {
+    console.warn('Falha ao inicializar a autenticação anônima do Supabase.', error);
+    window.__ZENKO_BOOT_ERROR__ =
+      (error instanceof Error ? error.message : 'Falha ao conectar ao Supabase.') +
+      ' Alguns recursos permanecerão limitados até a configuração correta.';
   }
 
-  await initNotifications();
+  try {
+    await initNotifications();
+  } catch (error) {
+    console.warn('Não foi possível inicializar as notificações.', error);
+  }
 
-  ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
+  root.render(
     <React.StrictMode>
       <QueryClientProvider client={queryClient}>
         <BrowserRouter>
