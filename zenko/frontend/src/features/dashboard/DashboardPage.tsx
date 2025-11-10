@@ -10,6 +10,7 @@ const COLORS = ['#38bdf8', '#94a3b8', '#22d3ee'];
 
 export default function DashboardPage() {
   const userId = useSupabaseUserId();
+
   const queryClient = useQueryClient();
 
   const kpiQuery = useQuery({

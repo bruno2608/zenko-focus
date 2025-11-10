@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import Card from '../../components/ui/Card';
+
 import { getCurrentUser, supabase } from '../../lib/supabase';
 import { usePomodoroStore } from './store';
 
