@@ -6,6 +6,7 @@ import './index.css';
 import { isSupabaseConfigured, supabase } from './lib/supabase';
 import { initNotifications } from './lib/notifications';
 import { useConnectivityStore } from './store/connectivity';
+import { flush } from './lib/offlineSync';
 
 const queryClient = new QueryClient();
 
@@ -19,6 +20,65 @@ root.render(
     </QueryClientProvider>
   </React.StrictMode>
 );
+
+let pendingFlush: Promise<void> | null = null;
+
+async function synchronizeOfflineQueue() {
+  if (pendingFlush) {
+    return pendingFlush;
+  }
+  pendingFlush = (async () => {
+    try {
+      const result = await flush();
+      const userId = result.userId;
+      if (userId && result.applied.length > 0) {
+        const appliedTables = new Set(result.applied.map((mutation) => mutation.table));
+        if (appliedTables.has('tasks')) {
+          queryClient.invalidateQueries({ queryKey: ['tasks', userId] });
+          queryClient.invalidateQueries({ queryKey: ['dashboard', userId] });
+          queryClient.invalidateQueries({ queryKey: ['dashboard-status', userId] });
+          queryClient.invalidateQueries({ queryKey: ['dashboard-done', userId] });
+        }
+        if (appliedTables.has('reminders')) {
+          queryClient.invalidateQueries({ queryKey: ['reminders', userId] });
+          queryClient.invalidateQueries({ queryKey: ['dashboard', userId] });
+        }
+        if (appliedTables.has('pomodoro_sessions')) {
+          queryClient.invalidateQueries({ queryKey: ['dashboard', userId] });
+        }
+      }
+      if (result.pending.length > 0) {
+        useConnectivityStore
+          .getState()
+          .setStatus(
+            'limited',
+            'Não foi possível sincronizar todas as alterações offline. Tentaremos novamente em breve.'
+          );
+      }
+    } catch (error) {
+      console.warn('Erro ao sincronizar fila offline.', error);
+      useConnectivityStore
+        .getState()
+        .setStatus('limited', 'Não foi possível sincronizar as alterações offline.');
+    } finally {
+      pendingFlush = null;
+    }
+  })();
+  return pendingFlush;
+}
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('online', () => {
+    useConnectivityStore.getState().setStatus('online');
+    void synchronizeOfflineQueue();
+  });
+  window.addEventListener('offline', () => {
+    useConnectivityStore
+      .getState()
+      .setStatus('limited', 'Sem conexão com a internet. As alterações serão sincronizadas depois.');
+  });
+  (window as any).__zenkoFlushOfflineQueue = synchronizeOfflineQueue;
+}
 
 async function bootstrap() {
   const setConnectivityStatus = useConnectivityStore.getState().setStatus;
@@ -44,6 +104,7 @@ async function bootstrap() {
       }
 
       setConnectivityStatus('online');
+      await synchronizeOfflineQueue();
     } catch (error) {
       console.warn('Falha ao inicializar a autenticação anônima do Supabase.', error);
       const message = buildSupabaseErrorMessage(error);

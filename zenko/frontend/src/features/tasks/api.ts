@@ -1,12 +1,7 @@
 import { isOfflineMode, supabase } from '../../lib/supabase';
 import { generateId } from '../../lib/id';
-import {
-  OfflineStorageError,
-  readOffline,
-  removeOffline,
-  writeOffline,
-  type OfflineResource
-} from '../../lib/offline';
+import { readOffline, writeOffline } from '../../lib/offline';
+import { queueMutation } from '../../lib/offlineSync';
 import { Task, TaskPayload, TaskStatus } from './types';
 
 const TASKS_RESOURCE: OfflineResource = 'tasks';
@@ -217,7 +212,15 @@ export async function createTask(userId: string, payload: TaskPayload) {
     };
     const tasks = await loadOfflineTasks();
     tasks.push(task);
-    await persistOfflineTasks(tasks);
+    persistOfflineTasks(tasks);
+    await queueMutation({
+      table: 'tasks',
+      type: 'insert',
+      primaryKey: task.id,
+      payload: task,
+      updatedAt: task.updated_at,
+      timestamp: Date.now()
+    });
     return task;
   }
   const { data, error } = await supabase
@@ -255,6 +258,14 @@ export async function updateTask(taskId: string, payload: Partial<TaskPayload>, 
     if (!next) {
       throw new Error('Tarefa não encontrada no cache offline.');
     }
+    await queueMutation({
+      table: 'tasks',
+      type: 'update',
+      primaryKey: taskId,
+      payload: next,
+      updatedAt: next.updated_at,
+      timestamp: Date.now()
+    });
     return next;
   }
   const { data, error } = await supabase
@@ -276,8 +287,15 @@ export async function updateTaskStatus(taskId: string, status: TaskStatus, userI
 
 export async function deleteTask(taskId: string, userId?: string) {
   if (isOfflineMode(userId)) {
-    const tasks = (await loadOfflineTasks()).filter((task) => task.id !== taskId);
-    await persistOfflineTasks(tasks);
+    const tasks = loadOfflineTasks().filter((task) => task.id !== taskId);
+    persistOfflineTasks(tasks);
+    await queueMutation({
+      table: 'tasks',
+      type: 'delete',
+      primaryKey: taskId,
+      payload: { id: taskId, user_id: userId },
+      timestamp: Date.now()
+    });
     return;
   }
   const { error } = await supabase.from('tasks').delete().eq('id', taskId);
