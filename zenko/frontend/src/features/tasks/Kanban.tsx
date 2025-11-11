@@ -74,6 +74,7 @@ export default function Kanban() {
     taskId: string;
     pointerId: number | null;
     startX: number;
+    startY: number;
     hasMoved: boolean;
   } | null>(null);
   const suppressClickRef = useRef(false);
@@ -106,11 +107,12 @@ export default function Kanban() {
     [updateStatus]
   );
 
-  const startVirtualDrag = useCallback((taskId: string, pointerId: number | null, startX: number) => {
+  const startVirtualDrag = useCallback((taskId: string, pointerId: number | null, startX: number, startY: number) => {
     virtualDragRef.current = {
       taskId,
       pointerId,
       startX,
+      startY,
       hasMoved: false
     };
   }, []);
@@ -123,18 +125,21 @@ export default function Kanban() {
   }, []);
 
   const processVirtualDrag = useCallback(
-    (task: Task, clientX: number) => {
+    (task: Task, clientX: number, clientY: number) => {
       const drag = virtualDragRef.current;
       if (!drag || drag.taskId !== task.id || drag.hasMoved) {
         return;
       }
 
       const deltaX = clientX - drag.startX;
-      if (Math.abs(deltaX) < 48) {
+      const deltaY = clientY - drag.startY;
+      const primaryDelta = Math.abs(deltaX) > Math.abs(deltaY) ? deltaX : deltaY;
+
+      if (Math.abs(primaryDelta) < 48) {
         return;
       }
 
-      const direction: 'next' | 'previous' = deltaX > 0 ? 'next' : 'previous';
+      const direction: 'next' | 'previous' = primaryDelta > 0 ? 'next' : 'previous';
       const targetStatus = getAdjacentStatus(task.status, direction);
       if (!targetStatus) {
         finishVirtualDrag();
@@ -153,7 +158,7 @@ export default function Kanban() {
       if (event.pointerType !== 'mouse') {
         event.currentTarget.setPointerCapture(event.pointerId);
       }
-      startVirtualDrag(task.id, event.pointerId, event.clientX);
+      startVirtualDrag(task.id, event.pointerId, event.clientX, event.clientY);
     },
     [startVirtualDrag]
   );
@@ -165,7 +170,7 @@ export default function Kanban() {
         return;
       }
 
-      processVirtualDrag(task, event.clientX);
+      processVirtualDrag(task, event.clientX, event.clientY);
     },
     [processVirtualDrag]
   );
@@ -186,7 +191,7 @@ export default function Kanban() {
     (event: ReactTouchEvent<HTMLDivElement>, task: Task) => {
       const touch = event.touches[0];
       if (!touch) return;
-      startVirtualDrag(task.id, touch.identifier, touch.clientX);
+      startVirtualDrag(task.id, touch.identifier, touch.clientX, touch.clientY);
     },
     [startVirtualDrag]
   );
@@ -199,7 +204,7 @@ export default function Kanban() {
       if (!touch || drag.taskId !== task.id) {
         return;
       }
-      processVirtualDrag(task, touch.clientX);
+      processVirtualDrag(task, touch.clientX, touch.clientY);
     },
     [processVirtualDrag]
   );
@@ -302,10 +307,16 @@ export default function Kanban() {
                   ? `Pressione Enter ou Espaço para mover para ${nextStatusLabel}.`
                   : 'Esta tarefa está na última coluna.';
 
+                const checklistTotal = task.checklist.length;
+                const checklistDone = task.checklist.filter((item) => item.done).length;
+                const checklistPercentage = checklistTotal
+                  ? Math.round((checklistDone / checklistTotal) * 100)
+                  : 0;
+
                 return (
-                <Card
+                  <Card
                   key={task.id}
-                  className={`cursor-grab border-slate-200/80 bg-white/80 transition hover:-translate-y-0.5 hover:border-zenko-primary/40 dark:border-white/5 dark:bg-slate-900/70 ${
+                  className={`cursor-grab overflow-hidden border-slate-200/80 bg-white/80 transition hover:-translate-y-0.5 hover:border-zenko-primary/40 dark:border-white/5 dark:bg-slate-900/70 ${
                     draggingId === task.id ? 'border-zenko-primary/60 shadow-lg' : ''
                   }`}
                   data-task-id={task.id}
@@ -369,9 +380,13 @@ export default function Kanban() {
                       </span>
                     </label>
                     <div className="flex-1">
-                      <h4 className="text-base font-semibold text-slate-900 dark:text-white">{task.title}</h4>
+                      <h4 className="break-words text-base font-semibold leading-tight text-slate-900 dark:text-white">
+                        {task.title}
+                      </h4>
                       {task.description ? (
-                        <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">{task.description}</p>
+                        <p className="mt-1 break-words text-sm leading-snug text-slate-600 dark:text-slate-300">
+                          {task.description}
+                        </p>
                       ) : null}
                       {task.due_date && (
                         <p className="mt-2 inline-flex items-center gap-1 rounded-full bg-zenko-primary/10 px-3 py-1 text-[11px] font-medium text-zenko-primary">
@@ -404,6 +419,26 @@ export default function Kanban() {
                           ))}
                         </p>
                       )}
+                      {checklistTotal > 0 ? (
+                        <div className="mt-3 space-y-2">
+                          <div className="flex items-center justify-between text-[11px] font-medium text-slate-500 dark:text-slate-300">
+                            <span>Checklist</span>
+                            <span>
+                              {checklistDone}/{checklistTotal}
+                            </span>
+                          </div>
+                          <div className="h-1.5 rounded-full bg-slate-200 dark:bg-white/10">
+                            <div
+                              className={`h-1.5 rounded-full transition-all ${
+                                checklistDone === checklistTotal && checklistTotal > 0
+                                  ? 'bg-emerald-500'
+                                  : 'bg-zenko-primary'
+                              }`}
+                              style={{ width: `${checklistPercentage}%` }}
+                            />
+                          </div>
+                        </div>
+                      ) : null}
                       <div className="mt-3 flex flex-wrap gap-2 md:hidden motion-reduce:flex motion-reduce:md:flex">
                         <button
                           type="button"
