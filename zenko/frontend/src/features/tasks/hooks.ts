@@ -11,6 +11,7 @@ export function useTasks() {
   const userId = useSupabaseUserId();
   const setFilter = useTasksStore((state) => state.setFilter);
   const filters = useTasksStore((state) => state.filters);
+  const registerLabels = useTasksStore((state) => state.registerLabels);
   const toast = useToastStore((state) => state.show);
   const queryClient = useQueryClient();
 
@@ -40,8 +41,9 @@ export function useTasks() {
 
   const createMutation = useMutation({
     mutationFn: (payload: TaskPayload) => createTask(userId ?? OFFLINE_USER_ID, payload),
-    onSuccess: (task) => {
+    onSuccess: (task, variables) => {
       queryClient.setQueryData<Task[]>(['tasks', userId], (old) => (old ? [...old, task] : [task]));
+      registerLabels(variables.labels ?? task.labels ?? []);
       toast({ title: 'Tarefa criada', type: 'success' });
     },
     onError: (error: any) => toast({ title: 'Erro ao criar', description: error.message, type: 'error' })
@@ -50,7 +52,10 @@ export function useTasks() {
   const updateMutation = useMutation({
     mutationFn: ({ id, payload }: { id: string; payload: Partial<TaskPayload> }) =>
       updateTask(id, payload, userId ?? OFFLINE_USER_ID),
-    onSuccess: () => {
+    onSuccess: (_result, { payload }) => {
+      if (payload.labels) {
+        registerLabels(payload.labels);
+      }
       queryClient.invalidateQueries({ queryKey: ['tasks', userId] });
       toast({ title: 'Tarefa atualizada', type: 'success' });
     },
@@ -92,6 +97,11 @@ export function useTasks() {
 
     return query.data.filter((task) => {
       if (filters.status !== 'all' && task.status !== filters.status) return false;
+      if (filters.labels.length > 0) {
+        const normalized = new Set(filters.labels.map((label) => label.toLocaleLowerCase()));
+        const hasMatch = task.labels.some((label) => normalized.has(label.toLocaleLowerCase()));
+        if (!hasMatch) return false;
+      }
       if (filters.due === 'today') {
         const today = new Date().toISOString().slice(0, 10);
         return task.due_date?.slice(0, 10) === today;
@@ -107,6 +117,19 @@ export function useTasks() {
       return true;
     });
   }, [filters, query.data]);
+
+  useEffect(() => {
+    if (!query.data) return;
+    const collected = new Set<string>();
+    query.data.forEach((task) => {
+      task.labels.forEach((label) => {
+        if (label.trim()) {
+          collected.add(label);
+        }
+      });
+    });
+    registerLabels(Array.from(collected));
+  }, [query.data, registerLabels]);
 
   return {
     userId,

@@ -22,10 +22,16 @@ export function useProfile() {
   });
 
   useEffect(() => {
-    if (query.data?.theme_preference && query.data.theme_preference !== theme) {
-      setTheme(query.data.theme_preference);
+    const preference = query.data?.theme_preference;
+    if (!preference) {
+      return;
     }
-  }, [query.data?.theme_preference, setTheme, theme]);
+
+    const currentTheme = useThemeStore.getState().theme;
+    if (currentTheme !== preference) {
+      setTheme(preference);
+    }
+  }, [query.data?.theme_preference, setTheme]);
 
   const buildPayload = (payload: ProfilePayload): ProfilePayload => {
     const snapshot =
