@@ -1,6 +1,6 @@
 import { useEffect, useRef, useSyncExternalStore } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { OFFLINE_USER_ID, isOfflineMode, supabase } from '../../lib/supabase';
+import { isOfflineMode, supabase } from '../../lib/supabase';
 import { usePomodoroStore } from './store';
 import { scheduleNotification } from '../../lib/notifications';
 import { useToastStore } from '../../components/ui/ToastProvider';

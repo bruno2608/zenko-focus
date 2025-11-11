@@ -1,4 +1,4 @@
-import { OFFLINE_USER_ID, isOfflineMode, supabase } from '../../lib/supabase';
+import { isOfflineMode, supabase } from '../../lib/supabase';
 import { generateId } from '../../lib/id';
 import {
   OfflineStorageError,
