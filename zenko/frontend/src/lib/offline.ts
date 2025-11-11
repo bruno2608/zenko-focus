@@ -41,7 +41,6 @@ export class OfflineStorageError extends Error {
       });
     }
   }
-  return false;
 }
 
 function isQuotaExceededError(error: unknown) {
