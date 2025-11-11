@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type {
   KeyboardEvent as ReactKeyboardEvent,
   PointerEvent as ReactPointerEvent,
@@ -69,6 +69,12 @@ export default function Kanban() {
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [dropTarget, setDropTarget] = useState<{ column: TaskStatus; beforeId: string | null } | null>(null);
+  const [ordering, setOrdering] = useState<Record<TaskStatus, string[]>>({
+    todo: [],
+    doing: [],
+    done: []
+  });
   const connectivityStatus = useConnectivityStore((state) => state.status);
   const virtualDragRef = useRef<{
     taskId: string;
@@ -82,20 +88,77 @@ export default function Kanban() {
 
   const autoMoveToDone = profile?.auto_move_done ?? true;
 
-  const columnsData = useMemo(() => {
-    return columns.map((column) => ({
-      ...column,
-      tasks: tasks.filter((task) => task.status === column.key)
-    }));
+  useEffect(() => {
+    setOrdering((prev) => {
+      let changed = false;
+      const next: Record<TaskStatus, string[]> = { ...prev };
+
+      statusOrder.forEach((status) => {
+        const columnTasks = tasks.filter((task) => task.status === status);
+        const existing = prev[status] ?? [];
+        const known = existing.filter((id) => columnTasks.some((task) => task.id === id));
+        const missing = columnTasks
+          .map((task) => task.id)
+          .filter((id) => !known.includes(id));
+
+        const missingSorted = missing
+          .map((id) => columnTasks.find((task) => task.id === id)!)
+          .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+          .map((task) => task.id);
+
+        const merged = [...known, ...missingSorted];
+        const previous = prev[status] ?? [];
+        if (merged.length !== previous.length || merged.some((value, index) => value !== previous[index])) {
+          next[status] = merged;
+          changed = true;
+        }
+      });
+
+      return changed ? next : prev;
+    });
   }, [tasks]);
+
+  const columnsData = useMemo(() => {
+    return columns.map((column) => {
+      const columnTasks = tasks.filter((task) => task.status === column.key);
+      const order = ordering[column.key] ?? [];
+      const sorted = [...columnTasks].sort((a, b) => {
+        const indexA = order.indexOf(a.id);
+        const indexB = order.indexOf(b.id);
+        if (indexA === -1 && indexB === -1) {
+          return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+        }
+        if (indexA === -1) return 1;
+        if (indexB === -1) return -1;
+        return indexA - indexB;
+      });
+
+      return {
+        ...column,
+        tasks: sorted
+      };
+    });
+  }, [ordering, tasks]);
 
   const handleDrop = (taskId: string, status: TaskStatus) => {
     if (!taskId) return;
     const task = tasks.find((item) => item.id === taskId);
-    if (!task || task.status === status) {
+    if (!task) {
+      setDropTarget(null);
       return;
     }
+
+    const beforeId = dropTarget?.column === status ? dropTarget.beforeId : null;
+
+    if (task.status === status) {
+      reorderTask(taskId, status, beforeId);
+      setDropTarget(null);
+      return;
+    }
+
+    reorderTask(taskId, status, beforeId);
     updateStatus({ id: taskId, status });
+    setDropTarget(null);
   };
 
   const moveTask = useCallback(
@@ -106,6 +169,32 @@ export default function Kanban() {
     },
     [updateStatus]
   );
+
+  const reorderTask = useCallback((taskId: string, targetStatus: TaskStatus, beforeId: string | null) => {
+    setOrdering((prev) => {
+      const next: Record<TaskStatus, string[]> = {
+        todo: [...(prev.todo ?? [])],
+        doing: [...(prev.doing ?? [])],
+        done: [...(prev.done ?? [])]
+      };
+
+      statusOrder.forEach((status) => {
+        next[status] = next[status].filter((id) => id !== taskId);
+      });
+
+      const baseList = next[targetStatus] ?? [];
+      const sanitized = baseList.filter((id) => id !== taskId);
+      const insertIndex = beforeId ? sanitized.indexOf(beforeId) : sanitized.length;
+      if (insertIndex === -1) {
+        sanitized.push(taskId);
+      } else {
+        sanitized.splice(insertIndex, 0, taskId);
+      }
+      next[targetStatus] = sanitized;
+
+      return next;
+    });
+  }, []);
 
   const startVirtualDrag = useCallback((taskId: string, pointerId: number | null, startX: number, startY: number) => {
     virtualDragRef.current = {
@@ -122,6 +211,7 @@ export default function Kanban() {
     setTimeout(() => {
       suppressClickRef.current = false;
     }, 0);
+    setDropTarget(null);
   }, []);
 
   const processVirtualDrag = useCallback(
@@ -133,9 +223,8 @@ export default function Kanban() {
 
       const deltaX = clientX - drag.startX;
       const deltaY = clientY - drag.startY;
-      const primaryDelta = Math.abs(deltaX) > Math.abs(deltaY) ? deltaX : deltaY;
 
-      if (Math.abs(primaryDelta) < 48) {
+      if (Math.abs(deltaX) < 48 || Math.abs(deltaX) <= Math.abs(deltaY)) {
         return;
       }
 
@@ -155,9 +244,10 @@ export default function Kanban() {
 
   const handlePointerDown = useCallback(
     (event: ReactPointerEvent<HTMLDivElement>, task: Task) => {
-      if (event.pointerType !== 'mouse') {
-        event.currentTarget.setPointerCapture(event.pointerId);
+      if (event.pointerType === 'mouse') {
+        return;
       }
+      event.currentTarget.setPointerCapture(event.pointerId);
       startVirtualDrag(task.id, event.pointerId, event.clientX, event.clientY);
     },
     [startVirtualDrag]
@@ -184,6 +274,7 @@ export default function Kanban() {
         // ignore when pointer capture is not set
       }
       finishVirtualDrag();
+      setDropTarget(null);
     }
   }, [finishVirtualDrag]);
 
@@ -215,6 +306,7 @@ export default function Kanban() {
     const touch = Array.from(event.changedTouches).find((item) => item.identifier === drag.pointerId);
     if (touch || drag.pointerId === null) {
       finishVirtualDrag();
+      setDropTarget(null);
     }
   }, [finishVirtualDrag]);
 
@@ -283,7 +375,21 @@ export default function Kanban() {
         {columnsData.map((column) => (
           <section
             key={column.key}
-            onDragOver={(event) => event.preventDefault()}
+            onDragOver={(event) => {
+              event.preventDefault();
+              setDropTarget((current) =>
+                current?.column === column.key && current.beforeId === null
+                  ? current
+                  : { column: column.key, beforeId: null }
+              );
+              event.dataTransfer.dropEffect = 'move';
+            }}
+            onDragLeave={(event) => {
+              const related = event.relatedTarget as Node | null;
+              if (!related || !event.currentTarget.contains(related)) {
+                setDropTarget(null);
+              }
+            }}
             onDrop={(event) => {
               event.preventDefault();
               const taskId =
@@ -291,6 +397,7 @@ export default function Kanban() {
                 event.dataTransfer.getData('text/plain');
               handleDrop(taskId, column.key);
               setDraggingId(null);
+              setDropTarget(null);
             }}
             className={`space-y-3 rounded-3xl border border-slate-200 bg-gradient-to-br p-4 backdrop-blur dark:border-white/5 ${column.accent}`}
           >
@@ -299,7 +406,7 @@ export default function Kanban() {
               <span className="rounded-full bg-zenko-primary/10 px-2 py-1 text-xs text-zenko-primary dark:bg-white/10">{column.tasks.length}</span>
             </header>
             <div className="space-y-3">
-              {column.tasks.map((task) => {
+              {column.tasks.map((task, index) => {
                 const previousStatus = getAdjacentStatus(task.status, 'previous');
                 const nextStatus = getAdjacentStatus(task.status, 'next');
                 const nextStatusLabel = nextStatus ? columnTitles[nextStatus] : 'coluna final';
@@ -313,167 +420,204 @@ export default function Kanban() {
                   ? Math.round((checklistDone / checklistTotal) * 100)
                   : 0;
 
+                const isDropBefore = dropTarget?.column === column.key && dropTarget.beforeId === task.id;
+                const isLast = index === column.tasks.length - 1;
+
                 return (
-                  <Card
-                  key={task.id}
-                  className={`cursor-grab overflow-hidden border-slate-200/80 bg-white/80 transition hover:-translate-y-0.5 hover:border-zenko-primary/40 dark:border-white/5 dark:bg-slate-900/70 ${
-                    draggingId === task.id ? 'border-zenko-primary/60 shadow-lg' : ''
-                  }`}
-                  data-task-id={task.id}
-                  data-status={task.status}
-                  draggable
-                  tabIndex={0}
-                  aria-label={`Tarefa ${task.title}. Status atual: ${columnTitles[task.status]}. ${ariaInstruction}`}
-                  onPointerDown={(event) => handlePointerDown(event, task)}
-                  onPointerMove={(event) => handlePointerMove(event, task)}
-                  onPointerUp={handlePointerUp}
-                  onPointerCancel={handlePointerUp}
-                  onTouchStart={(event) => handleTouchStart(event, task)}
-                  onTouchMove={(event) => handleTouchMove(event, task)}
-                  onTouchEnd={handleTouchEnd}
-                  onTouchCancel={handleTouchEnd}
-                  onKeyDown={(event) => handleKeyDown(event, task)}
-                  onDragStart={(event) => {
-                    event.dataTransfer.effectAllowed = 'move';
-                    event.dataTransfer.setData('application/task-id', task.id);
-                    event.dataTransfer.setData('text/plain', task.id);
-                    setDraggingId(task.id);
-                  }}
-                  onDragEnd={() => setDraggingId(null)}
-                  onClick={() => {
-                    if (suppressClickRef.current) {
-                      suppressClickRef.current = false;
-                      return;
-                    }
-                    setSelectedTask(task);
-                    setModalOpen(true);
-                  }}
-                >
-                  <div className="flex items-start gap-3">
-                    <label
-                      className={`mt-1 flex h-6 w-6 items-center justify-center rounded-full border border-slate-300 bg-white/80 text-zenko-primary shadow-sm transition dark:border-white/20 dark:bg-white/10 ${
-                        autoMoveToDone ? 'cursor-pointer hover:scale-[1.02]' : 'cursor-not-allowed opacity-50'
+                  <div key={task.id} className="space-y-2">
+                    {isDropBefore ? <div className="h-0.5 rounded-full bg-zenko-primary/60" aria-hidden /> : null}
+                    <Card
+                      className={`cursor-grab overflow-hidden border-slate-200/80 bg-white/80 transition hover:-translate-y-0.5 hover:border-zenko-primary/40 dark:border-white/5 dark:bg-slate-900/70 ${
+                        draggingId === task.id ? 'border-zenko-primary/60 shadow-lg' : ''
                       }`}
-                      onClick={(event) => event.stopPropagation()}
+                      data-task-id={task.id}
+                      data-status={task.status}
+                      draggable
+                      tabIndex={0}
+                      aria-label={`Tarefa ${task.title}. Status atual: ${columnTitles[task.status]}. ${ariaInstruction}`}
+                      onPointerDown={(event) => handlePointerDown(event, task)}
+                      onPointerMove={(event) => handlePointerMove(event, task)}
+                      onPointerUp={handlePointerUp}
+                      onPointerCancel={handlePointerUp}
+                      onTouchStart={(event) => handleTouchStart(event, task)}
+                      onTouchMove={(event) => handleTouchMove(event, task)}
+                      onTouchEnd={handleTouchEnd}
+                      onTouchCancel={handleTouchEnd}
+                      onKeyDown={(event) => handleKeyDown(event, task)}
+                      onDragStart={(event) => {
+                        event.dataTransfer.effectAllowed = 'move';
+                        event.dataTransfer.setData('application/task-id', task.id);
+                        event.dataTransfer.setData('text/plain', task.id);
+                        setDraggingId(task.id);
+                        setDropTarget(null);
+                      }}
+                      onDragOver={(event) => {
+                        event.preventDefault();
+                        if (!draggingId || draggingId === task.id) {
+                          return;
+                        }
+                        const bounds = event.currentTarget.getBoundingClientRect();
+                        const offsetY = event.clientY - bounds.top;
+                        const shouldInsertBefore = offsetY < bounds.height / 2;
+                        if (shouldInsertBefore) {
+                          setDropTarget((current) =>
+                            current?.column === column.key && current.beforeId === task.id
+                              ? current
+                              : { column: column.key, beforeId: task.id }
+                          );
+                        } else {
+                          const nextTask = column.tasks[index + 1];
+                          setDropTarget({ column: column.key, beforeId: nextTask ? nextTask.id : null });
+                        }
+                        event.dataTransfer.dropEffect = 'move';
+                      }}
+                      onDragEnd={() => {
+                        setDraggingId(null);
+                        setDropTarget(null);
+                      }}
+                      onClick={() => {
+                        if (suppressClickRef.current) {
+                          suppressClickRef.current = false;
+                          return;
+                        }
+                        setSelectedTask(task);
+                        setModalOpen(true);
+                      }}
                     >
-                      <input
-                        type="checkbox"
-                        checked={task.status === 'done'}
-                        disabled={!autoMoveToDone}
-                        onChange={(event) => {
-                          event.stopPropagation();
-                          const checked = event.target.checked;
-                          if (checked) {
-                            updateStatus({ id: task.id, status: 'done' });
-                          } else {
-                            updateStatus({ id: task.id, status: 'todo' });
-                          }
-                        }}
-                        className="peer sr-only"
-                      />
-                      <span
-                        className={`pointer-events-none text-xs font-semibold transition-opacity ${
-                          task.status === 'done' ? 'opacity-100' : 'opacity-0'
-                        }`}
-                      >
-                        ✓
-                      </span>
-                    </label>
-                    <div className="flex-1">
-                      <h4 className="break-words text-base font-semibold leading-tight text-slate-900 dark:text-white">
-                        {task.title}
-                      </h4>
-                      {task.description ? (
-                        <p className="mt-1 break-words text-sm leading-snug text-slate-600 dark:text-slate-300">
-                          {task.description}
-                        </p>
-                      ) : null}
-                      {task.due_date && (
-                        <p className="mt-2 inline-flex items-center gap-1 rounded-full bg-zenko-primary/10 px-3 py-1 text-[11px] font-medium text-zenko-primary">
-                          <svg
-                            className="h-3.5 w-3.5"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="1.5"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            aria-hidden="true"
+                      <div className="flex items-start gap-3">
+                        <label
+                          className={`mt-1 flex h-6 w-6 items-center justify-center rounded-full border border-slate-300 bg-white/80 text-zenko-primary shadow-sm transition dark:border-white/20 dark:bg-white/10 ${
+                            autoMoveToDone ? 'cursor-pointer hover:scale-[1.02]' : 'cursor-not-allowed opacity-50'
+                          }`}
+                          onClick={(event) => event.stopPropagation()}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={task.status === 'done'}
+                            disabled={!autoMoveToDone}
+                            onChange={(event) => {
+                              event.stopPropagation();
+                              const checked = event.target.checked;
+                              if (checked) {
+                                updateStatus({ id: task.id, status: 'done' });
+                              } else {
+                                updateStatus({ id: task.id, status: 'todo' });
+                              }
+                            }}
+                            className="peer sr-only"
+                          />
+                          <span
+                            className={`pointer-events-none text-xs font-semibold transition-opacity ${
+                              task.status === 'done' ? 'opacity-100' : 'opacity-0'
+                            }`}
                           >
-                            <path d="M4 7h16" />
-                            <path d="M10 11h4" />
-                            <rect x="3" y="4" width="18" height="18" rx="2" />
-                          </svg>
-                          Prazo: {new Date(task.due_date).toLocaleDateString('pt-BR')}
-                        </p>
-                      )}
-                      {task.labels.length > 0 && (
-                        <p className="mt-3 flex flex-wrap gap-2">
-                          {task.labels.map((label) => (
-                            <span
-                              key={label}
-                              className="rounded-full bg-zenko-primary/10 px-3 py-1 text-[11px] font-medium text-zenko-primary"
+                            ✓
+                          </span>
+                        </label>
+                        <div className="flex-1">
+                          <h4 className="break-words text-base font-semibold leading-tight text-slate-900 dark:text-white">
+                            {task.title}
+                          </h4>
+                          {task.description ? (
+                            <p className="mt-1 break-words text-sm leading-snug text-slate-600 dark:text-slate-300">
+                              {task.description}
+                            </p>
+                          ) : null}
+                          {task.due_date && (
+                            <p className="mt-2 inline-flex items-center gap-1 rounded-full bg-zenko-primary/10 px-3 py-1 text-[11px] font-medium text-zenko-primary">
+                              <svg
+                                className="h-3.5 w-3.5"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="1.5"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                aria-hidden="true"
+                              >
+                                <path d="M4 7h16" />
+                                <path d="M10 11h4" />
+                                <rect x="3" y="4" width="18" height="18" rx="2" />
+                              </svg>
+                              Prazo: {new Date(task.due_date).toLocaleDateString('pt-BR')}
+                            </p>
+                          )}
+                          {task.labels.length > 0 && (
+                            <p className="mt-3 flex flex-wrap gap-2">
+                              {task.labels.map((label) => (
+                                <span
+                                  key={label}
+                                  className="rounded-full bg-zenko-primary/10 px-3 py-1 text-[11px] font-medium text-zenko-primary"
+                                >
+                                  {label}
+                                </span>
+                              ))}
+                            </p>
+                          )}
+                          {checklistTotal > 0 ? (
+                            <div className="mt-3 space-y-2">
+                              <div className="flex items-center justify-between text-[11px] font-medium text-slate-500 dark:text-slate-300">
+                                <span>Checklist</span>
+                                <span>
+                                  {checklistDone}/{checklistTotal}
+                                </span>
+                              </div>
+                              <div className="h-1.5 rounded-full bg-slate-200 dark:bg-white/10">
+                                <div
+                                  className={`h-1.5 rounded-full transition-all ${
+                                    checklistDone === checklistTotal && checklistTotal > 0
+                                      ? 'bg-emerald-500'
+                                      : 'bg-zenko-primary'
+                                  }`}
+                                  style={{ width: `${checklistPercentage}%` }}
+                                />
+                              </div>
+                            </div>
+                          ) : null}
+                          <div className="mt-3 flex flex-wrap gap-2 md:hidden motion-reduce:flex motion-reduce:md:flex">
+                            <button
+                              type="button"
+                              className="flex-1 rounded-full border border-zenko-primary/40 bg-white/90 px-3 py-2 text-xs font-semibold text-zenko-primary shadow-sm transition hover:border-zenko-primary/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/60 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50 dark:bg-slate-900/70"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                moveTask(task, 'previous');
+                              }}
+                              disabled={!previousStatus}
+                              aria-label={`Mover ${task.title} para ${previousStatus ? columnTitles[previousStatus] : 'coluna anterior'}`}
                             >
-                              {label}
-                            </span>
-                          ))}
-                        </p>
-                      )}
-                      {checklistTotal > 0 ? (
-                        <div className="mt-3 space-y-2">
-                          <div className="flex items-center justify-between text-[11px] font-medium text-slate-500 dark:text-slate-300">
-                            <span>Checklist</span>
-                            <span>
-                              {checklistDone}/{checklistTotal}
-                            </span>
-                          </div>
-                          <div className="h-1.5 rounded-full bg-slate-200 dark:bg-white/10">
-                            <div
-                              className={`h-1.5 rounded-full transition-all ${
-                                checklistDone === checklistTotal && checklistTotal > 0
-                                  ? 'bg-emerald-500'
-                                  : 'bg-zenko-primary'
-                              }`}
-                              style={{ width: `${checklistPercentage}%` }}
-                            />
+                              Mover para coluna anterior
+                            </button>
+                            <button
+                              type="button"
+                              className="flex-1 rounded-full border border-zenko-primary/40 bg-white/90 px-3 py-2 text-xs font-semibold text-zenko-primary shadow-sm transition hover:border-zenko-primary/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/60 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50 dark:bg-slate-900/70"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                moveTask(task, 'next');
+                              }}
+                              disabled={!nextStatus}
+                              aria-label={`Mover ${task.title} para ${nextStatus ? columnTitles[nextStatus] : 'coluna seguinte'}`}
+                            >
+                              Mover para próxima coluna
+                            </button>
                           </div>
                         </div>
-                      ) : null}
-                      <div className="mt-3 flex flex-wrap gap-2 md:hidden motion-reduce:flex motion-reduce:md:flex">
-                        <button
-                          type="button"
-                          className="flex-1 rounded-full border border-zenko-primary/40 bg-white/90 px-3 py-2 text-xs font-semibold text-zenko-primary shadow-sm transition hover:border-zenko-primary/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/60 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50 dark:bg-slate-900/70"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            moveTask(task, 'previous');
-                          }}
-                          disabled={!previousStatus}
-                          aria-label={`Mover ${task.title} para ${previousStatus ? columnTitles[previousStatus] : 'coluna anterior'}`}
-                        >
-                          Mover para coluna anterior
-                        </button>
-                        <button
-                          type="button"
-                          className="flex-1 rounded-full border border-zenko-primary/40 bg-white/90 px-3 py-2 text-xs font-semibold text-zenko-primary shadow-sm transition hover:border-zenko-primary/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/60 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50 dark:bg-slate-900/70"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            moveTask(task, 'next');
-                          }}
-                          disabled={!nextStatus}
-                          aria-label={`Mover ${task.title} para ${nextStatus ? columnTitles[nextStatus] : 'coluna seguinte'}`}
-                        >
-                          Mover para próxima coluna
-                        </button>
                       </div>
-                    </div>
+                    </Card>
+                    {dropTarget?.column === column.key && dropTarget.beforeId === null && isLast ? (
+                      <div className="h-0.5 rounded-full bg-zenko-primary/60" aria-hidden />
+                    ) : null}
                   </div>
-                  </Card>
                 );
               })}
               {column.tasks.length === 0 && (
-                <p className="rounded-2xl border border-dashed border-slate-200 bg-white/70 px-4 py-6 text-center text-xs text-slate-500 dark:border-white/10 dark:bg-white/5 dark:text-slate-400">
-                  Arraste tarefas para esta coluna
-                </p>
+                <div className="space-y-2">
+                  {dropTarget?.column === column.key ? (
+                    <div className="h-0.5 rounded-full bg-zenko-primary/60" aria-hidden />
+                  ) : null}
+                  <p className="rounded-2xl border border-dashed border-slate-200 bg-white/70 px-4 py-6 text-center text-xs text-slate-500 dark:border-white/10 dark:bg-white/5 dark:text-slate-400">
+                    Arraste tarefas para esta coluna
+                  </p>
+                </div>
               )}
             </div>
           </section>
