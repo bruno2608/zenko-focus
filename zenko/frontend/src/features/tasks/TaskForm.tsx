@@ -110,6 +110,12 @@ export default function TaskForm({
 
   const onSubmit = handleSubmit(async (data) => {
     setSubmitError(null);
+    const description = data.description?.trim() ? data.description : undefined;
+    const dueDateIso = data.due_date
+      ? new Date(data.due_date).toISOString()
+      : task
+        ? null
+        : undefined;
     const payload = {
       title: data.title,
       description,
