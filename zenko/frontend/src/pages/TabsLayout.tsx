@@ -284,8 +284,6 @@ export default function TabsLayout() {
         open={showOnboarding}
         loading={profileSaving}
         initialName={profile?.full_name}
-        initialFocus={profile?.focus_area}
-        initialObjectives={profile?.objectives}
         onSubmit={async (values) => {
           await updateProfile(values);
           setShowOnboarding(false);
