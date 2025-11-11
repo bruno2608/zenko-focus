@@ -59,7 +59,7 @@ describe('TaskForm', () => {
     expect(onClose).not.toHaveBeenCalled();
   });
 
-  it('submits with ISO due date when valid future date is provided', async () => {
+  it('submits with formatted due date when valid future date is provided', async () => {
     const onClose = vi.fn();
     render(<TaskForm onClose={onClose} />);
 
@@ -78,7 +78,7 @@ describe('TaskForm', () => {
     expect(createTaskMock).toHaveBeenCalledWith(
       expect.objectContaining({
         title: 'Planejar viagem',
-        due_date: new Date('2024-01-12').toISOString()
+        due_date: '2024-01-12'
       })
     );
     expect(onClose).toHaveBeenCalled();

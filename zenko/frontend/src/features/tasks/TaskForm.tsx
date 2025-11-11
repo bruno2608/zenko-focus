@@ -110,10 +110,16 @@ export default function TaskForm({
 
   const onSubmit = handleSubmit(async (data) => {
     setSubmitError(null);
+    const description = data.description?.trim() ? data.description : undefined;
+    const dueDateValue = data.due_date
+      ? data.due_date
+      : task
+        ? null
+        : undefined;
     const payload = {
       title: data.title,
       description,
-      due_date: dueDateIso,
+      due_date: dueDateValue,
       labels: data.labels?.split(',').map((label) => label.trim()).filter(Boolean) ?? [],
       status: data.status,
       checklist:
