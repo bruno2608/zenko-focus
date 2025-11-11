@@ -5,6 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import Input from '../../components/ui/Input';
 import Textarea from '../../components/ui/Textarea';
 import Button from '../../components/ui/Button';
+import Select from '../../components/ui/Select';
 import { useTasks } from './hooks';
 import { Task } from './types';
 import AttachmentUploader from './AttachmentUploader';
@@ -19,9 +20,6 @@ const schema = z.object({
 });
 
 type FormData = z.infer<typeof schema> & { attachments?: { name: string; url: string }[] };
-
-const selectClass =
-  'w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-sm text-white focus:border-transparent focus:outline-none focus:ring-2 focus:ring-zenko-primary/60 backdrop-blur';
 
 export default function TaskForm({ task, onClose }: { task?: Task; onClose: () => void }) {
   const { createTask, updateTask, deleteTask } = useTasks();
@@ -94,34 +92,34 @@ export default function TaskForm({ task, onClose }: { task?: Task; onClose: () =
   return (
     <form className="space-y-4" onSubmit={onSubmit}>
       <div>
-        <label className="mb-1 block text-xs uppercase tracking-wide text-slate-300">Título</label>
+        <label className="mb-1 block text-xs uppercase tracking-wide text-slate-500 dark:text-slate-300">Título</label>
         <Input {...register('title')} />
-        {errors.title && <p className="mt-1 text-xs text-rose-300">{errors.title.message}</p>}
+        {errors.title && <p className="mt-1 text-xs text-rose-600 dark:text-rose-300">{errors.title.message}</p>}
       </div>
       <div>
-        <label className="mb-1 block text-xs uppercase tracking-wide text-slate-300">Descrição</label>
+        <label className="mb-1 block text-xs uppercase tracking-wide text-slate-500 dark:text-slate-300">Descrição</label>
         <Textarea rows={3} {...register('description')} />
       </div>
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <div>
-          <label className="mb-1 block text-xs uppercase tracking-wide text-slate-300">Prazo</label>
+          <label className="mb-1 block text-xs uppercase tracking-wide text-slate-500 dark:text-slate-300">Prazo</label>
           <Input type="date" {...register('due_date')} />
         </div>
         <div>
-          <label className="mb-1 block text-xs uppercase tracking-wide text-slate-300">Status</label>
-          <select className={selectClass} {...register('status')}>
+          <label className="mb-1 block text-xs uppercase tracking-wide text-slate-500 dark:text-slate-300">Status</label>
+          <Select {...register('status')}>
             <option value="todo">A fazer</option>
             <option value="doing">Fazendo</option>
             <option value="done">Concluída</option>
-          </select>
+          </Select>
         </div>
       </div>
       <div>
-        <label className="mb-1 block text-xs uppercase tracking-wide text-slate-300">Etiquetas (separadas por vírgula)</label>
+        <label className="mb-1 block text-xs uppercase tracking-wide text-slate-500 dark:text-slate-300">Etiquetas (separadas por vírgula)</label>
         <Input {...register('labels')} />
       </div>
       <div>
-        <label className="mb-1 block text-xs uppercase tracking-wide text-slate-300">Checklist (uma linha por item)</label>
+        <label className="mb-1 block text-xs uppercase tracking-wide text-slate-500 dark:text-slate-300">Checklist (uma linha por item)</label>
         <Textarea rows={4} {...register('checklist')} />
       </div>
       <AttachmentUploader attachments={attachments} onChange={(next) => setValue('attachments', next)} />

@@ -1,7 +1,10 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import ThemeToggle from '../components/ui/ThemeToggle';
+import OnboardingDialog from '../features/profile/OnboardingDialog';
+import { useProfile } from '../features/profile/hooks';
 
 const tabs = [
   {
@@ -82,12 +85,33 @@ const tabs = [
         <path d="M22 19V11" />
       </svg>
     )
+  },
+  {
+    to: '/perfil',
+    label: 'Perfil',
+    icon: (
+      <svg
+        className="h-5 w-5"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden="true"
+      >
+        <path d="M12 12a5 5 0 1 0-5-5 5 5 0 0 0 5 5Z" />
+        <path d="M19 21a7 7 0 0 0-14 0" />
+      </svg>
+    )
   }
 ];
 
 export default function TabsLayout() {
   const location = useLocation();
   const navigate = useNavigate();
+  const { profile, isLoading: profileLoading, isSaving: profileSaving, updateProfile } = useProfile();
+  const [showOnboarding, setShowOnboarding] = useState(false);
 
   useEffect(() => {
     if (location.pathname === '') {
@@ -95,50 +119,108 @@ export default function TabsLayout() {
     }
   }, [location.pathname, navigate]);
 
+  useEffect(() => {
+    if (!profileLoading && profile && !profile.full_name) {
+      setShowOnboarding(true);
+    }
+  }, [profileLoading, profile]);
+
   const todayLabel = useMemo(() => {
     const formatted = format(new Date(), "EEEE, d 'de' MMMM", { locale: ptBR });
     return formatted.charAt(0).toUpperCase() + formatted.slice(1);
   }, []);
 
+  const greetingTitle = profile?.full_name
+    ? `Olá, ${profile.full_name.split(' ')[0]}!`
+    : 'Foco elegante para o seu dia';
+  const greetingSubtitle = profile?.focus_area
+    ? `Vamos conquistar resultados em ${profile.focus_area}.`
+    : 'Organize tarefas, ciclos Pomodoro e lembretes em uma experiência única.';
+
   return (
-    <div className="relative min-h-screen overflow-hidden bg-zenko-background text-slate-100">
+    <div className="relative min-h-screen overflow-hidden bg-slate-100 text-slate-900 transition-colors dark:bg-zenko-background dark:text-slate-100">
       <div className="pointer-events-none absolute inset-0">
-        <div className="absolute -top-20 left-1/2 h-72 w-72 -translate-x-1/2 rounded-full bg-zenko-secondary/25 blur-[140px]" />
-        <div className="absolute bottom-[-4rem] right-[-2rem] h-80 w-80 rounded-full bg-zenko-accent/20 blur-[160px]" />
+        <div className="absolute -top-32 left-1/2 hidden h-72 w-72 -translate-x-1/2 rounded-full bg-zenko-secondary/25 blur-[140px] dark:block" />
+        <div className="absolute bottom-[-4rem] right-[-2rem] hidden h-80 w-80 rounded-full bg-zenko-accent/20 blur-[160px] dark:block" />
+        <div className="absolute inset-x-0 top-0 h-56 bg-gradient-to-b from-white/60 via-white/40 to-transparent dark:hidden" />
       </div>
-      <div className="relative mx-auto flex min-h-screen w-full max-w-5xl flex-col px-4 pb-28 pt-8 sm:px-6">
-        <header className="mb-6 rounded-3xl border border-white/10 bg-white/5 p-5 backdrop-blur">
-          <p className="text-xs uppercase tracking-[0.35em] text-zenko-muted">Zenko · Produtividade</p>
-          <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h1 className="text-3xl font-semibold text-white">Foco elegante para o seu dia</h1>
-              <p className="text-sm text-slate-300">Organize tarefas, ciclos Pomodoro e lembretes em uma experiência única.</p>
+      <div className="relative mx-auto flex min-h-screen w-full max-w-6xl flex-col gap-6 px-4 pb-28 pt-8 sm:px-6 lg:flex-row lg:pb-12 lg:pl-6 lg:pr-8">
+        <aside className="hidden w-64 shrink-0 flex-col rounded-3xl border border-slate-200/80 bg-white/80 p-6 text-sm backdrop-blur dark:border-white/10 dark:bg-white/5 lg:flex">
+          <div className="mb-8 flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-zenko-primary to-zenko-secondary text-base font-semibold text-white">
+              Z
             </div>
-            <div className="rounded-2xl border border-white/10 bg-white/10 px-4 py-2 text-xs font-medium text-slate-200 backdrop-blur">
-              {todayLabel}
+            <div>
+              <p className="text-xs uppercase tracking-[0.35em] text-slate-500 dark:text-zenko-muted">Zenko Focus</p>
+              <p className="text-sm font-semibold text-slate-900 dark:text-white">
+                {profile?.full_name || 'Comece sua jornada'}
+              </p>
             </div>
           </div>
-        </header>
-        <main className="flex-1 space-y-6 overflow-y-auto pb-6">
-          <Outlet />
-        </main>
+          <nav className="space-y-2">
+            {tabs.map((tab) => (
+              <NavLink
+                key={`aside-${tab.to}`}
+                to={tab.to}
+                end={tab.to === '/'}
+                className={({ isActive }) =>
+                  `flex items-center gap-3 rounded-2xl px-3 py-2 transition-all ${
+                    isActive
+                      ? 'bg-gradient-to-r from-zenko-primary/15 via-zenko-secondary/15 to-zenko-primary/15 text-zenko-primary dark:text-white'
+                      : 'text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'
+                  }`
+                }
+              >
+                <span className="flex h-9 w-9 items-center justify-center rounded-2xl bg-zenko-primary/10 text-zenko-primary dark:bg-white/10">
+                  {tab.icon}
+                </span>
+                {tab.label}
+              </NavLink>
+            ))}
+          </nav>
+          <div className="mt-auto pt-6">
+            <ThemeToggle />
+          </div>
+        </aside>
+        <div className="relative flex-1">
+          <header className="mb-6 rounded-3xl border border-slate-200/70 bg-white/80 p-5 shadow-[0_20px_45px_-20px_rgba(15,23,42,0.15)] backdrop-blur dark:border-white/10 dark:bg-white/5">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <p className="text-xs uppercase tracking-[0.35em] text-slate-500 dark:text-zenko-muted">Zenko · Produtividade</p>
+                <h1 className="mt-2 text-3xl font-semibold text-slate-900 dark:text-white">{greetingTitle}</h1>
+                <p className="text-sm text-slate-600 dark:text-slate-300">{greetingSubtitle}</p>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="rounded-2xl border border-slate-200 bg-white/70 px-4 py-2 text-xs font-medium text-slate-600 shadow-sm backdrop-blur dark:border-white/10 dark:bg-white/10 dark:text-slate-200">
+                  {todayLabel}
+                </div>
+                <div className="lg:hidden">
+                  <ThemeToggle />
+                </div>
+              </div>
+            </div>
+          </header>
+          <main className="flex-1 space-y-6 overflow-y-auto pb-6">
+            <Outlet />
+          </main>
+        </div>
       </div>
-      <nav className="fixed bottom-4 left-1/2 z-40 w-[calc(100%-2rem)] max-w-2xl -translate-x-1/2 rounded-3xl border border-white/10 bg-slate-950/80 p-2 backdrop-blur">
-        <div className="grid grid-cols-4 gap-2">
+      <nav className="fixed bottom-4 left-1/2 z-40 w-[calc(100%-2rem)] max-w-2xl -translate-x-1/2 rounded-3xl border border-slate-200/80 bg-white/90 p-2 shadow-lg shadow-slate-900/10 backdrop-blur dark:border-white/10 dark:bg-slate-950/80 lg:hidden">
+        <div className="grid grid-cols-5 gap-2">
           {tabs.map((tab) => (
             <NavLink
               key={tab.to}
               to={tab.to}
               end={tab.to === '/'}
               className={({ isActive }) =>
-                `flex flex-col items-center gap-1 rounded-2xl px-3 py-2 text-xs font-medium transition-all ${
+                `flex flex-col items-center gap-1 rounded-2xl px-2 py-2 text-[11px] font-medium transition-all ${
                   isActive
-                    ? 'bg-gradient-to-r from-zenko-primary/30 via-zenko-secondary/30 to-zenko-primary/30 text-white shadow-lg shadow-zenko-secondary/20'
-                    : 'text-slate-400 hover:text-white'
+                    ? 'bg-gradient-to-r from-zenko-primary/20 via-zenko-secondary/20 to-zenko-primary/20 text-zenko-primary shadow-lg shadow-zenko-secondary/20 dark:text-white'
+                    : 'text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'
                 }`
               }
             >
-              <span className="flex h-8 w-8 items-center justify-center rounded-2xl bg-white/5 text-zenko-primary">
+              <span className="flex h-8 w-8 items-center justify-center rounded-2xl bg-zenko-primary/10 text-zenko-primary dark:bg-white/5">
                 {tab.icon}
               </span>
               {tab.label}
@@ -146,6 +228,17 @@ export default function TabsLayout() {
           ))}
         </div>
       </nav>
+      <OnboardingDialog
+        open={showOnboarding}
+        loading={profileSaving}
+        initialName={profile?.full_name}
+        initialFocus={profile?.focus_area}
+        initialObjectives={profile?.objectives}
+        onSubmit={async (values) => {
+          await updateProfile(values);
+          setShowOnboarding(false);
+        }}
+      />
     </div>
   );
 }

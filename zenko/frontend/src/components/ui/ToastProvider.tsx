@@ -25,9 +25,12 @@ export const useToastStore = create<ToastState>((set) => ({
 }));
 
 const typeStyles: Record<NonNullable<Toast['type']>, string> = {
-  error: 'border-red-500/40 bg-red-500/10 text-red-200',
-  success: 'border-emerald-500/40 bg-emerald-500/10 text-emerald-100',
-  info: 'border-zenko-primary/40 bg-zenko-primary/10 text-zenko-primary'
+  error:
+    'border-red-400/50 bg-red-50 text-red-700 dark:border-red-500/40 dark:bg-red-500/10 dark:text-red-200',
+  success:
+    'border-emerald-400/50 bg-emerald-50 text-emerald-700 dark:border-emerald-500/40 dark:bg-emerald-500/10 dark:text-emerald-100',
+  info:
+    'border-sky-400/50 bg-sky-50 text-sky-700 dark:border-zenko-primary/40 dark:bg-zenko-primary/10 dark:text-zenko-primary'
 };
 
 export function ToastProvider({ children }: { children: ReactNode }) {
@@ -48,12 +51,14 @@ export function ToastProvider({ children }: { children: ReactNode }) {
         {toasts.map((toast) => (
           <div
             key={toast.id}
-            className={`pointer-events-auto rounded-2xl border px-4 py-3 shadow-lg shadow-zenko-secondary/10 backdrop-blur ${
+            className={`pointer-events-auto rounded-2xl border px-4 py-3 shadow-lg shadow-slate-900/10 backdrop-blur dark:shadow-zenko-secondary/10 ${
               toast.type ? typeStyles[toast.type] : typeStyles.info
             }`}
           >
             <strong className="block text-sm font-semibold">{toast.title}</strong>
-            {toast.description && <span className="text-xs text-slate-200/80">{toast.description}</span>}
+            {toast.description && (
+              <span className="text-xs text-slate-600 dark:text-slate-200/80">{toast.description}</span>
+            )}
           </div>
         ))}
       </div>

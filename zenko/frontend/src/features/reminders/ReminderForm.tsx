@@ -72,18 +72,18 @@ export default function ReminderForm({ reminder, onClose, onCreate, onUpdate, on
   return (
     <form className="space-y-4" onSubmit={onSubmit}>
       <div>
-        <label className="mb-1 block text-xs uppercase tracking-wide text-slate-300">Título</label>
+        <label className="mb-1 block text-xs uppercase tracking-wide text-slate-500 dark:text-slate-300">Título</label>
         <Input {...register('title')} />
-        {errors.title && <p className="mt-1 text-xs text-rose-300">{errors.title.message}</p>}
+        {errors.title && <p className="mt-1 text-xs text-rose-600 dark:text-rose-300">{errors.title.message}</p>}
       </div>
       <div>
-        <label className="mb-1 block text-xs uppercase tracking-wide text-slate-300">Descrição</label>
+        <label className="mb-1 block text-xs uppercase tracking-wide text-slate-500 dark:text-slate-300">Descrição</label>
         <Textarea rows={3} {...register('description')} />
       </div>
       <div>
-        <label className="mb-1 block text-xs uppercase tracking-wide text-slate-300">Data e hora</label>
+        <label className="mb-1 block text-xs uppercase tracking-wide text-slate-500 dark:text-slate-300">Data e hora</label>
         <Input type="datetime-local" {...register('remind_at')} />
-        {errors.remind_at && <p className="mt-1 text-xs text-rose-300">{errors.remind_at.message}</p>}
+        {errors.remind_at && <p className="mt-1 text-xs text-rose-600 dark:text-rose-300">{errors.remind_at.message}</p>}
       </div>
       <div className="flex justify-end gap-2">
         {reminder && (

@@ -60,12 +60,15 @@ export default function PomodoroHistory() {
   }, [setHistory]);
 
   return (
-    <Card className="border-white/5 bg-slate-900/60">
-      <h2 className="mb-4 text-lg font-semibold text-white">Histórico recente</h2>
-      <ul className="space-y-2 text-sm text-slate-200">
-        {history.length === 0 && <li className="text-slate-400">Nenhum ciclo concluído hoje.</li>}
+    <Card className="border-slate-200/80 bg-white/90 dark:border-white/5 dark:bg-slate-900/60">
+      <h2 className="mb-4 text-lg font-semibold text-slate-900 dark:text-white">Histórico recente</h2>
+      <ul className="space-y-2 text-sm text-slate-600 dark:text-slate-200">
+        {history.length === 0 && <li className="text-slate-500 dark:text-slate-400">Nenhum ciclo concluído hoje.</li>}
         {history.map((session) => (
-          <li key={session.id} className="flex items-center justify-between rounded-2xl bg-white/5 px-3 py-2">
+          <li
+            key={session.id}
+            className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white/80 px-3 py-2 dark:border-white/10 dark:bg-white/5"
+          >
             <span>{new Date(session.started_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
             <span className="text-zenko-primary">{session.duration} min</span>
           </li>

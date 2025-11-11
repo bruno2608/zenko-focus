@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { RouterProvider } from 'react-router-dom';
 import Router from './routes/Router';
 import { ToastProvider, useToastStore } from './components/ui/ToastProvider';
+import { ThemeProvider } from './components/ui/ThemeProvider';
 import { isSupabaseConfigured } from './lib/supabase';
 
 function App() {
@@ -19,9 +20,11 @@ function App() {
   }, [showToast]);
 
   return (
-    <ToastProvider>
-      <RouterProvider router={Router} />
-    </ToastProvider>
+    <ThemeProvider>
+      <ToastProvider>
+        <RouterProvider router={Router} />
+      </ToastProvider>
+    </ThemeProvider>
   );
 }
 

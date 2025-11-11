@@ -1,13 +1,20 @@
 # Zenko by Zekai
 
-Zenko é um aplicativo mobile-first de produtividade com quatro módulos integrados: **Tarefas (Kanban)**, **Pomodoro**, **Lembretes** e **Dashboard**. Ele utiliza Supabase (Postgres, Auth anônima e Storage) para persistência, realtime e uploads. O frontend é construído em React + Vite + TypeScript e Tailwind, enquanto o backend (mínimo) usa Node + Express para health-check e futuras extensões.
+Zenko é um aplicativo mobile-first de produtividade com quatro módulos integrados — **Tarefas (Kanban)**, **Pomodoro**, **Lembretes** e **Dashboard** — e um hub de **Perfil** inspirado no layout premium de referência. Ele utiliza Supabase (Postgres, Auth anônima e Storage) para persistência, realtime e uploads. O frontend é construído em React + Vite + TypeScript e Tailwind, com tema híbrido (claro/escuro) e estética glassmorphism responsiva para desktop e mobile; o backend (mínimo) usa Node + Express para health-check e futuras extensões.
 
 ## Abas principais
 
-- **Tarefas** – Quadro Kanban com CRUD completo, drag-and-drop, filtros, checklist e anexos via Supabase Storage.
+- **Tarefas** – Quadro Kanban com CRUD completo, drag-and-drop, filtros, checklist, anexos via Supabase Storage e marcação rápida que conclui e move cards automaticamente para "Feitas".
 - **Pomodoro** – Timer com presets (25/10/5), opção customizada, histórico diário e registro automático no Supabase.
 - **Lembretes** – CRUD com agendamento de notificações locais e categorização entre próximos e passados.
 - **Dashboard** – KPIs em tempo real e gráficos Recharts consumindo views do banco e atualizações via Supabase Realtime.
+- **Perfil** – Onboarding estilizado para primeira visita, captura de perfil mínima (avatar, nome, foco), preferências (tema híbrido, notificações, auto-mover tarefas) e conquistas gamificadas.
+
+## Visão e roadmap
+
+- **Hub unificado de produtividade** – objetivo de reunir tarefas, tempo, lembretes e insights em um único aplicativo inspirado na experiência que você referenciou, mantendo fluidez tanto em telas pequenas quanto em desktop.
+- **Integrações futuras** – o roadmap prevê conectar com Google Tasks, Google Agenda e outros serviços para sincronizar atividades e calendários em tempo real, mantendo o Supabase como orquestrador central.
+- **Automação e dados inteligentes** – evolução planejada para automatizar checklists, sugerir blocos de foco e consolidar notificações entre módulos.
 
 ## Pré-requisitos
 
@@ -30,11 +37,9 @@ Copie `.env.example` para `.env` na raiz do projeto e preencha:
 ```bash
 VITE_SUPABASE_URL=SEU_SUPABASE_URL
 VITE_SUPABASE_ANON_KEY=SUA_CHAVE_ANON
-SUPABASE_URL=SEU_SUPABASE_URL
-SUPABASE_SERVICE_ROLE_KEY=SUA_SERVICE_ROLE
 ```
 
-As variáveis `SUPABASE_URL` e `SUPABASE_SERVICE_ROLE_KEY` são utilizadas apenas pelo backend (caso você venha a expandi-lo).
+Se decidir evoluir o backend, defina `SUPABASE_URL` e `SUPABASE_SERVICE_ROLE_KEY` diretamente no ambiente do servidor Express (não são necessários para executar o frontend).
 
 ## Instalação
 
@@ -117,9 +122,10 @@ Para evoluir do login anônimo, utilize o `supabase.auth.linkIdentity` para rela
 
 A entrega está preparada para:
 
-- Criar/editar/excluir tarefas com anexos e drag-and-drop persistente.
+- Criar/editar/excluir tarefas com anexos, drag-and-drop persistente e auto-mover ao concluir via checkbox.
 - Executar ciclos de Pomodoro com presets e histórico no Supabase, com notificações locais.
 - Gerenciar lembretes com notificações e segmentação entre próximos/passados.
 - Visualizar KPIs e gráficos atualizados em tempo real no Dashboard.
+- Realizar onboarding inicial, ajustar preferências (incluindo tema híbrido) e manter dados do perfil responsivo em desktop e mobile.
 - Executar testes unitários (Vitest) e end-to-end (Cypress).
 - Layout mobile-first para telas de 360-420px sem scroll horizontal.

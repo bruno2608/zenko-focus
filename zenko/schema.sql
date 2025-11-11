@@ -1,7 +1,16 @@
 -- USERS (auth.users é gerenciado pelo Supabase)
 create table if not exists profiles (
   id uuid primary key references auth.users(id) on delete cascade,
-  created_at timestamptz default now()
+  full_name text,
+  focus_area text,
+  objectives text,
+  avatar_url text,
+  notifications_enabled boolean default true,
+  auto_move_done boolean default true,
+  pomodoro_sound boolean default true,
+  theme_preference text check (theme_preference in ('light','dark')) default 'dark',
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
 );
 
 -- TASKS
