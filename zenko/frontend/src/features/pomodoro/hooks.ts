@@ -1,10 +1,9 @@
-import { useEffect, useRef } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useEffect, useRef, useSyncExternalStore } from 'react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { OFFLINE_USER_ID, isOfflineMode, supabase } from '../../lib/supabase';
 import { usePomodoroStore } from './store';
 import { scheduleNotification } from '../../lib/notifications';
 import { useToastStore } from '../../components/ui/ToastProvider';
-import { fetchTasks } from '../tasks/api';
 import { Task } from '../tasks/types';
 import { useSupabaseUserId } from '../../hooks/useSupabaseUser';
 import { readOffline, writeOffline } from '../../lib/offline';
@@ -38,6 +37,35 @@ async function createSession(userId: string, duration: number, taskId?: string) 
   return data;
 }
 
+function useCachedTasks(userId?: string | null) {
+  const queryClient = useQueryClient();
+  const subscribe = (onStoreChange: () => void) => {
+    if (!userId) {
+      return () => {};
+    }
+
+    return queryClient.getQueryCache().subscribe((event) => {
+      const queryKey = event?.query?.queryKey;
+      if (queryKey && queryKey[0] === 'tasks' && queryKey[1] === userId) {
+        onStoreChange();
+      }
+    });
+  };
+
+  const getSnapshot = () => {
+    if (!userId) {
+      return [] as Task[];
+    }
+    return queryClient.getQueryData<Task[]>(['tasks', userId]) ?? [];
+  };
+
+  const tasks = useSyncExternalStore(subscribe, getSnapshot, () => [] as Task[]);
+  const state = userId ? queryClient.getQueryState<Task[]>(['tasks', userId]) : undefined;
+  const isLoading = Boolean(userId) && state?.fetchStatus === 'fetching' && !state?.data;
+
+  return { tasks, isLoading };
+}
+
 export function usePomodoro() {
   const userId = useSupabaseUserId();
   const duration = usePomodoroStore((state) => state.duration);
@@ -56,12 +84,7 @@ export function usePomodoro() {
   const queryClient = useQueryClient();
   const toast = useToastStore((state) => state.show);
   const intervalRef = useRef<number | null>(null);
-
-  const tasksQuery = useQuery<Task[]>({
-    queryKey: ['tasks', userId],
-    queryFn: () => fetchTasks(userId ?? OFFLINE_USER_ID),
-    enabled: Boolean(userId)
-  });
+  const { tasks, isLoading: isLoadingTasks } = useCachedTasks(userId);
 
   const mutation = useMutation({
     mutationFn: (params: { duration: number; taskId?: string }) =>
@@ -120,8 +143,8 @@ export function usePomodoro() {
     setMode,
     setTask,
     addSession,
-    tasks: tasksQuery.data ?? [],
-    isLoadingTasks: tasksQuery.isLoading,
+    tasks,
+    isLoadingTasks,
     saveSession: mutation.mutate,
     isSaving: mutation.isLoading
   };
