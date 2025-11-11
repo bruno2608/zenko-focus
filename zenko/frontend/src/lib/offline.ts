@@ -25,6 +25,46 @@ function buildKey(resource: OfflineResource, key: string) {
   return `${resource}:${key}`;
 }
 
+function isQuotaExceededError(error: unknown) {
+  if (!error) return false;
+  if (error instanceof DOMException) {
+    return error.name === 'QuotaExceededError' || error.code === 22;
+  }
+  if (typeof error === 'object' && 'name' in (error as any)) {
+    return (error as any).name === 'QuotaExceededError';
+  }
+  return false;
+}
+
+function isMissingStoreError(error: unknown) {
+  return error instanceof DOMException && error.name === 'NotFoundError';
+}
+
+function deleteDatabase() {
+  if (!hasIndexedDb()) {
+    return Promise.resolve();
+  }
+  return new Promise<void>((resolve, reject) => {
+    const request = indexedDB.deleteDatabase(DB_NAME);
+    request.onsuccess = () => resolve();
+    request.onblocked = () => resolve();
+    request.onerror = () => {
+      const reason = request.error ?? new Error('Failed to delete offline database');
+      reject(reason);
+    };
+  });
+}
+
+async function recreateStore() {
+  try {
+    await deleteDatabase();
+  } catch (error) {
+    console.warn('Falha ao reinicializar armazenamento offline.', error);
+  }
+  store = null;
+  return getStore();
+}
+
 export class OfflineStorageError extends Error {
   constructor(
     message: string,
@@ -43,39 +83,53 @@ export class OfflineStorageError extends Error {
   }
 }
 
-function isQuotaExceededError(error: unknown) {
-  if (!error) return false;
-  if (error instanceof DOMException) {
-    return error.name === 'QuotaExceededError' || error.code === 22;
-  }
-  if (typeof error === 'object' && 'name' in (error as any)) {
-    return (error as any).name === 'QuotaExceededError';
-  }
-  return false;
-}
-
 export async function readOffline<T>(resource: OfflineResource, key: string, fallback: T): Promise<T> {
-  const store = getStore();
-  if (!store) {
+  let targetStore = getStore();
+  if (!targetStore) {
     return fallback;
   }
   try {
-    const value = await get(buildKey(resource, key), store);
+    const value = await get(buildKey(resource, key), targetStore);
     return (value as T | undefined) ?? fallback;
   } catch (error) {
+    if (isMissingStoreError(error)) {
+      const recreated = await recreateStore();
+      if (recreated) {
+        try {
+          const value = await get(buildKey(resource, key), recreated);
+          return (value as T | undefined) ?? fallback;
+        } catch (retryError) {
+          console.warn('Falha ao ler dados offline após recriação do store, usando padrão.', retryError);
+          return fallback;
+        }
+      }
+    }
     console.warn('Falha ao ler dados offline, usando padrão.', error);
     return fallback;
   }
 }
 
 export async function writeOffline<T>(resource: OfflineResource, key: string, value: T): Promise<void> {
-  const store = getStore();
-  if (!store) {
+  let targetStore = getStore();
+  if (!targetStore) {
     throw new OfflineStorageError('Armazenamento offline indisponível.', 'unavailable');
   }
   try {
-    await set(buildKey(resource, key), value, store);
+    await set(buildKey(resource, key), value, targetStore);
   } catch (error) {
+    if (isMissingStoreError(error)) {
+      const recreated = await recreateStore();
+      if (recreated) {
+        try {
+          await set(buildKey(resource, key), value, recreated);
+          return;
+        } catch (retryError) {
+          throw new OfflineStorageError('Não foi possível persistir dados offline.', 'unknown', {
+            cause: retryError
+          });
+        }
+      }
+    }
     if (isQuotaExceededError(error)) {
       throw new OfflineStorageError('Limite de armazenamento offline atingido.', 'quota_exceeded', { cause: error });
     }
