@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { OFFLINE_USER_ID, isOfflineMode, supabase } from '../../lib/supabase';
 import { useToastStore } from '../../components/ui/ToastProvider';
 import { useTasksStore } from './store';
@@ -9,7 +9,6 @@ import { useSupabaseUserId } from '../../hooks/useSupabaseUser';
 
 export function useTasks() {
   const userId = useSupabaseUserId();
-  const setTasks = useTasksStore((state) => state.setTasks);
   const setFilter = useTasksStore((state) => state.setFilter);
   const filters = useTasksStore((state) => state.filters);
   const toast = useToastStore((state) => state.show);
@@ -21,12 +20,6 @@ export function useTasks() {
     enabled: Boolean(userId),
     staleTime: 5_000
   });
-
-  useEffect(() => {
-    if (query.data) {
-      setTasks(query.data);
-    }
-  }, [query.data, setTasks]);
 
   useEffect(() => {
     if (!userId || isOfflineMode(userId)) return;
@@ -92,26 +85,32 @@ export function useTasks() {
     }
   });
 
-  const filteredTasks = query.data?.filter((task) => {
-    if (filters.status !== 'all' && task.status !== filters.status) return false;
-    if (filters.due === 'today') {
-      const today = new Date().toISOString().slice(0, 10);
-      return task.due_date?.slice(0, 10) === today;
+  const filteredTasks = useMemo(() => {
+    if (!query.data) {
+      return [] as Task[];
     }
-    if (filters.due === 'week') {
-      const now = new Date();
-      const endWeek = new Date(now);
-      endWeek.setDate(now.getDate() + 7);
-      const dueDate = task.due_date ? new Date(task.due_date) : null;
-      if (!dueDate) return false;
-      return dueDate >= now && dueDate <= endWeek;
-    }
-    return true;
-  });
+
+    return query.data.filter((task) => {
+      if (filters.status !== 'all' && task.status !== filters.status) return false;
+      if (filters.due === 'today') {
+        const today = new Date().toISOString().slice(0, 10);
+        return task.due_date?.slice(0, 10) === today;
+      }
+      if (filters.due === 'week') {
+        const now = new Date();
+        const endWeek = new Date(now);
+        endWeek.setDate(now.getDate() + 7);
+        const dueDate = task.due_date ? new Date(task.due_date) : null;
+        if (!dueDate) return false;
+        return dueDate >= now && dueDate <= endWeek;
+      }
+      return true;
+    });
+  }, [filters, query.data]);
 
   return {
     userId,
-    tasks: filteredTasks ?? [],
+    tasks: filteredTasks,
     isLoading: query.isLoading,
     createTask: createMutation.mutateAsync,
     updateTask: updateMutation.mutateAsync,
