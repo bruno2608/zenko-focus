@@ -1,17 +1,33 @@
-const palette = [
-  { background: '#0079bf', foreground: '#f8fafc' },
-  { background: '#d29034', foreground: '#fff7ed' },
-  { background: '#519839', foreground: '#ecfdf5' },
-  { background: '#b04632', foreground: '#fff1f2' },
-  { background: '#89609e', foreground: '#f5f3ff' },
-  { background: '#cd5a91', foreground: '#fdf2f8' },
-  { background: '#4bbf6b', foreground: '#ecfdf3' },
-  { background: '#00aecc', foreground: '#f0f9ff' }
-];
+export const trelloPalette = [
+  { id: 'green', background: '#61bd4f', foreground: '#0b2814' },
+  { id: 'yellow', background: '#f2d600', foreground: '#4d3b00' },
+  { id: 'orange', background: '#ff9f1a', foreground: '#482300' },
+  { id: 'red', background: '#eb5a46', foreground: '#2f0c07' },
+  { id: 'purple', background: '#c377e0', foreground: '#2e0436' },
+  { id: 'blue', background: '#0079bf', foreground: '#f1f5f9' },
+  { id: 'sky', background: '#00c2e0', foreground: '#013a46' },
+  { id: 'lime', background: '#51e898', foreground: '#0b3218' },
+  { id: 'pink', background: '#ff78cb', foreground: '#461032' },
+  { id: 'black', background: '#344563', foreground: '#f8fafc' }
+] as const;
 
-const fallback = palette[0];
+export type LabelColorId = (typeof trelloPalette)[number]['id'];
 
-export function getLabelColors(label: string, index = 0) {
+const paletteById = new Map(trelloPalette.map((entry) => [entry.id, entry]));
+
+const fallback = trelloPalette[0];
+
+export function getLabelColors(
+  label: string,
+  options: { colorId?: LabelColorId; fallbackIndex?: number } = {}
+) {
+  if (options.colorId) {
+    const resolved = paletteById.get(options.colorId);
+    if (resolved) {
+      return resolved;
+    }
+  }
+
   const normalized = label.trim().toLowerCase();
   if (!normalized) {
     return fallback;
@@ -23,8 +39,13 @@ export function getLabelColors(label: string, index = 0) {
     hash |= 0;
   }
 
-  const paletteIndex = Math.abs(hash + index) % palette.length;
-  return palette[paletteIndex] ?? fallback;
+  const indexOffset = options.fallbackIndex ?? 0;
+  const paletteIndex = Math.abs(hash + indexOffset) % trelloPalette.length;
+  return trelloPalette[paletteIndex] ?? fallback;
+}
+
+export function getColorFromId(colorId: LabelColorId) {
+  return paletteById.get(colorId) ?? fallback;
 }
 
 export function parseLabels(input: string | undefined | null): string[] {

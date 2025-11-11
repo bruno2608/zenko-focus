@@ -25,7 +25,8 @@ describe('TaskForm', () => {
     deleteTaskMock.mockResolvedValue(undefined);
     useTasksStore.setState((state) => ({
       filters: { ...state.filters, status: 'all', due: 'all', labels: [] },
-      labelsLibrary: []
+      labelsLibrary: [],
+      labelColorCursor: 0
     }));
   });
 

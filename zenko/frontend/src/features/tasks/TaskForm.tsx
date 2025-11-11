@@ -9,8 +9,8 @@ import Button from '../../components/ui/Button';
 import Select from '../../components/ui/Select';
 import { ChecklistItem, Task, TaskPayload } from './types';
 import AttachmentUploader from './AttachmentUploader';
-import { getLabelColors, parseLabels } from './labelColors';
-import { useTasksStore } from './store';
+import { getLabelColors, parseLabels, trelloPalette, type LabelColorId } from './labelColors';
+import { type LabelDefinition, useTasksStore } from './store';
 
 const futureDateMessage = 'Use uma data a partir de hoje';
 
@@ -81,6 +81,39 @@ interface Props {
   isUpdatePending: boolean;
 }
 
+function LabelColorOptions({
+  selectedColorId,
+  onSelect
+}: {
+  selectedColorId: LabelColorId;
+  onSelect: (colorId: LabelColorId) => void;
+}) {
+  return (
+    <div className="flex flex-wrap gap-2">
+      {trelloPalette.map((option) => {
+        const isSelected = selectedColorId === option.id;
+        return (
+          <button
+            key={`palette-${option.id}`}
+            type="button"
+            onClick={() => onSelect(option.id)}
+            className={`flex h-8 w-8 items-center justify-center rounded-full border-2 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/60 ${
+              isSelected
+                ? 'border-slate-900/70 dark:border-white'
+                : 'border-transparent hover:border-slate-900/40 dark:hover:border-white/40'
+            }`}
+            style={{ backgroundColor: option.background }}
+            aria-pressed={isSelected}
+            aria-label={`Selecionar cor ${option.id}`}
+          >
+            {isSelected ? <span className="block h-2 w-2 rounded-full bg-white/90" /> : null}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function TaskForm({
   task,
   onClose,
@@ -101,6 +134,15 @@ export default function TaskForm({
       }
     | null
   >(null);
+  const [isLabelManagerOpen, setLabelManagerOpen] = useState(false);
+  const [labelSearch, setLabelSearch] = useState('');
+  const [newLabelName, setNewLabelName] = useState('');
+  const [newLabelColor, setNewLabelColor] = useState<LabelColorId>(trelloPalette[0].id);
+  const [editingLabel, setEditingLabel] = useState<{
+    id: string;
+    value: string;
+    colorId: LabelColorId;
+  } | null>(null);
   const {
     register,
     handleSubmit,
@@ -133,6 +175,9 @@ export default function TaskForm({
 
   const savedLabels = useTasksStore((state) => state.labelsLibrary);
   const registerLabels = useTasksStore((state) => state.registerLabels);
+  const createLabelDefinition = useTasksStore((state) => state.createLabel);
+  const updateLabelDefinition = useTasksStore((state) => state.updateLabel);
+  const removeLabelDefinition = useTasksStore((state) => state.removeLabel);
 
   useEffect(() => {
     if (!task) {
@@ -183,13 +228,30 @@ export default function TaskForm({
   const attachments = watch('attachments') ?? [];
   const labelInput = watch('labels') ?? '';
   const labelPreview = useMemo(() => parseLabels(labelInput), [labelInput]);
+  const labelMap = useMemo(() => {
+    const map = new Map<string, LabelDefinition>();
+    savedLabels.forEach((definition) => {
+      map.set(definition.normalized, definition);
+    });
+    return map;
+  }, [savedLabels]);
+  const selectedLabelKeys = useMemo(
+    () => new Set(labelPreview.map((label) => label.toLocaleLowerCase())),
+    [labelPreview]
+  );
   const labelSuggestions = useMemo(() => {
     if (savedLabels.length === 0) {
-      return [] as string[];
+      return [] as LabelDefinition[];
     }
-    const used = new Set(labelPreview.map((label) => label.toLocaleLowerCase()));
-    return savedLabels.filter((label) => !used.has(label.toLocaleLowerCase()));
-  }, [labelPreview, savedLabels]);
+    return savedLabels.filter((label) => !selectedLabelKeys.has(label.normalized));
+  }, [savedLabels, selectedLabelKeys]);
+  const filteredLabels = useMemo(() => {
+    const query = labelSearch.trim().toLocaleLowerCase();
+    if (!query) {
+      return savedLabels;
+    }
+    return savedLabels.filter((label) => label.value.toLocaleLowerCase().includes(query));
+  }, [labelSearch, savedLabels]);
   const isSaving = task ? isUpdatePending : isCreatePending;
 
   const checklistCompleted = sanitizedChecklist.filter((item) => item.done).length;
@@ -312,15 +374,111 @@ export default function TaskForm({
     setChecklistDropTarget(null);
   };
 
-  const handleLabelSuggestionSelect = (label: string) => {
-    const current = parseLabels(labelInput);
-    const exists = current.some((item) => item.toLocaleLowerCase() === label.toLocaleLowerCase());
-    if (exists) {
+  const updateLabelsField = useCallback(
+    (labels: string[]) => {
+      setValue('labels', labels.join(', '), { shouldDirty: true, shouldValidate: true });
+    },
+    [setValue]
+  );
+
+  const handleLabelSuggestionSelect = useCallback(
+    (label: string) => {
+      const normalized = label.toLocaleLowerCase();
+      const current = parseLabels(labelInput);
+      if (current.some((item) => item.toLocaleLowerCase() === normalized)) {
+        return;
+      }
+      updateLabelsField([...current, label]);
+    },
+    [labelInput, updateLabelsField]
+  );
+
+  const handleLabelToggle = useCallback(
+    (label: string) => {
+      const normalized = label.toLocaleLowerCase();
+      const current = parseLabels(labelInput);
+      const exists = current.some((item) => item.toLocaleLowerCase() === normalized);
+      const next = exists
+        ? current.filter((item) => item.toLocaleLowerCase() !== normalized)
+        : [...current, label];
+      updateLabelsField(next);
+    },
+    [labelInput, updateLabelsField]
+  );
+
+  const handleCreateLabel = useCallback(
+    (applyToTask: boolean) => {
+      const trimmed = newLabelName.trim();
+      if (!trimmed) {
+        return;
+      }
+      createLabelDefinition(trimmed, newLabelColor);
+      setNewLabelName('');
+      setLabelSearch('');
+      if (applyToTask) {
+        handleLabelSuggestionSelect(trimmed);
+      }
+    },
+    [createLabelDefinition, handleLabelSuggestionSelect, newLabelColor, newLabelName]
+  );
+
+  const handleStartEditingLabel = useCallback((definition: LabelDefinition) => {
+    setEditingLabel({ id: definition.id, value: definition.value, colorId: definition.colorId });
+  }, []);
+
+  const handleLabelEditChange = useCallback((value: string) => {
+    setEditingLabel((prev) => (prev ? { ...prev, value } : prev));
+  }, []);
+
+  const handleLabelEditColorChange = useCallback((colorId: LabelColorId) => {
+    setEditingLabel((prev) => (prev ? { ...prev, colorId } : prev));
+  }, []);
+
+  const handleCancelLabelEdit = useCallback(() => {
+    setEditingLabel(null);
+  }, []);
+
+  const handleSaveLabelEdit = useCallback(() => {
+    if (!editingLabel) {
       return;
     }
-    const next = [...current, label];
-    setValue('labels', next.join(', '), { shouldDirty: true, shouldValidate: true });
-  };
+    const trimmed = editingLabel.value.trim();
+    if (!trimmed) {
+      return;
+    }
+    const normalized = trimmed.toLocaleLowerCase();
+    const duplicate = savedLabels.some(
+      (item) => item.id !== editingLabel.id && item.normalized === normalized
+    );
+    if (duplicate) {
+      return;
+    }
+    const currentDefinition = savedLabels.find((item) => item.id === editingLabel.id);
+    updateLabelDefinition(editingLabel.id, { value: trimmed, colorId: editingLabel.colorId });
+    setEditingLabel(null);
+    if (currentDefinition && currentDefinition.value !== trimmed) {
+      const current = parseLabels(labelInput);
+      const next = current.map((label) =>
+        label.toLocaleLowerCase() === currentDefinition.normalized ? trimmed : label
+      );
+      updateLabelsField(next);
+    }
+  }, [editingLabel, labelInput, savedLabels, updateLabelDefinition, updateLabelsField]);
+
+  const handleDeleteLabel = useCallback(
+    (definition: LabelDefinition) => {
+      setEditingLabel((currentEditing) =>
+        currentEditing?.id === definition.id ? null : currentEditing
+      );
+      removeLabelDefinition(definition.id);
+      const current = parseLabels(labelInput);
+      const next = current.filter((label) => label.toLocaleLowerCase() !== definition.normalized);
+      if (next.length !== current.length) {
+        updateLabelsField(next);
+      }
+    },
+    [labelInput, removeLabelDefinition, updateLabelsField]
+  );
 
   const onSubmit = handleSubmit(async (data) => {
     setSubmitError(null);
@@ -425,13 +583,15 @@ export default function TaskForm({
               Etiquetas salvas
             </p>
             <div className="flex flex-wrap gap-2">
-              {labelSuggestions.map((label) => {
-                const colors = getLabelColors(label);
+              {labelSuggestions.map((suggestion) => {
+                const colors = getLabelColors(suggestion.value, {
+                  colorId: suggestion.colorId
+                });
                 return (
                   <button
-                    key={`suggestion-${label}`}
+                    key={`suggestion-${suggestion.id}`}
                     type="button"
-                    onClick={() => handleLabelSuggestionSelect(label)}
+                    onClick={() => handleLabelSuggestionSelect(suggestion.value)}
                     className="inline-flex items-center gap-2 rounded-md px-2 py-1 text-[11px] font-semibold uppercase tracking-wide shadow-sm transition hover:scale-[1.01] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/60"
                     style={{
                       backgroundColor: colors.background,
@@ -442,7 +602,7 @@ export default function TaskForm({
                       className="inline-block h-2 w-2 rounded-full"
                       style={{ backgroundColor: colors.foreground, opacity: 0.5 }}
                     />
-                    {label}
+                    {suggestion.value}
                   </button>
                 );
               })}
@@ -452,10 +612,15 @@ export default function TaskForm({
         {labelPreview.length > 0 ? (
           <div className="mt-2 flex flex-wrap gap-2">
             {labelPreview.map((label, index) => {
-              const colors = getLabelColors(label, index);
+              const normalized = label.toLocaleLowerCase();
+              const definition = labelMap.get(normalized);
+              const colors = getLabelColors(label, {
+                colorId: definition?.colorId,
+                fallbackIndex: index
+              });
               return (
                 <span
-                  key={`${label}-${index}`}
+                  key={`${definition?.id ?? label}-${index}`}
                   className="inline-flex items-center gap-2 rounded-md px-2 py-1 text-[11px] font-semibold uppercase tracking-wide shadow-sm"
                   style={{
                     backgroundColor: colors.background,
@@ -466,10 +631,182 @@ export default function TaskForm({
                     className="inline-block h-2 w-2 rounded-full"
                     style={{ backgroundColor: colors.foreground, opacity: 0.5 }}
                   />
-                  {label}
+                  {definition?.value ?? label}
                 </span>
               );
             })}
+          </div>
+        ) : null}
+        <button
+          type="button"
+          className="mt-3 inline-flex items-center rounded-md border border-slate-200 bg-white px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-slate-600 transition hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/50 dark:border-white/10 dark:bg-white/10 dark:text-slate-200 dark:hover:bg-white/20"
+          onClick={() => setLabelManagerOpen((open) => !open)}
+        >
+          {isLabelManagerOpen ? 'Fechar gerenciador de etiquetas' : 'Gerenciar etiquetas'}
+        </button>
+        {isLabelManagerOpen ? (
+          <div className="mt-3 space-y-4 rounded-2xl border border-slate-200 bg-white/60 p-4 shadow-inner dark:border-white/10 dark:bg-white/5">
+            <div>
+              <label className="mb-1 block text-[11px] uppercase tracking-wide text-slate-400 dark:text-slate-500" htmlFor="task-label-search">
+                Buscar etiquetas
+              </label>
+              <Input
+                id="task-label-search"
+                value={labelSearch}
+                onChange={(event) => setLabelSearch(event.target.value)}
+                placeholder="Digite para filtrar..."
+              />
+            </div>
+            <div>
+              <p className="text-[11px] uppercase tracking-wide text-slate-400 dark:text-slate-500">
+                Nova etiqueta
+              </p>
+              <div className="mt-2 space-y-3">
+                <Input
+                  value={newLabelName}
+                  onChange={(event) => setNewLabelName(event.target.value)}
+                  placeholder="Nome da etiqueta"
+                />
+                <div className="space-y-2">
+                  <p className="text-[11px] uppercase tracking-wide text-slate-400 dark:text-slate-500">
+                    Cor
+                  </p>
+                  <LabelColorOptions
+                    selectedColorId={newLabelColor}
+                    onSelect={(colorId) => setNewLabelColor(colorId)}
+                  />
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    disabled={!newLabelName.trim()}
+                    onClick={() => handleCreateLabel(false)}
+                  >
+                    Criar
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    disabled={!newLabelName.trim()}
+                    onClick={() => handleCreateLabel(true)}
+                  >
+                    Criar e aplicar
+                  </Button>
+                </div>
+              </div>
+            </div>
+            <div>
+              <p className="text-[11px] uppercase tracking-wide text-slate-400 dark:text-slate-500">
+                Etiquetas disponíveis
+              </p>
+              <ul className="mt-3 space-y-3">
+                {filteredLabels.length === 0 ? (
+                  <li className="text-xs text-slate-500 dark:text-slate-400">
+                    Nenhuma etiqueta encontrada.
+                  </li>
+                ) : (
+                  filteredLabels.map((label) => {
+                    const colors = getLabelColors(label.value, { colorId: label.colorId });
+                    const isApplied = selectedLabelKeys.has(label.normalized);
+                    const isEditing = editingLabel?.id === label.id;
+                    return (
+                      <li
+                        key={label.id}
+                        className="rounded-2xl border border-slate-200 bg-white/60 p-3 shadow-sm dark:border-white/10 dark:bg-white/10"
+                      >
+                        {isEditing && editingLabel ? (
+                          (() => {
+                            const trimmedValue = editingLabel.value.trim();
+                            const normalizedValue = trimmedValue.toLocaleLowerCase();
+                            const hasDuplicate =
+                              trimmedValue.length > 0 &&
+                              savedLabels.some(
+                                (item) => item.id !== editingLabel.id && item.normalized === normalizedValue
+                              );
+                            return (
+                              <div className="space-y-3">
+                                <Input
+                                  value={editingLabel.value}
+                                  onChange={(event) => handleLabelEditChange(event.target.value)}
+                                />
+                                <div className="space-y-2">
+                                  <p className="text-[11px] uppercase tracking-wide text-slate-400 dark:text-slate-500">
+                                    Cor
+                                  </p>
+                                  <LabelColorOptions
+                                    selectedColorId={editingLabel.colorId}
+                                    onSelect={handleLabelEditColorChange}
+                                  />
+                                </div>
+                                {trimmedValue.length === 0 ? (
+                                  <p className="text-xs text-rose-500 dark:text-rose-300">
+                                    Informe um nome para salvar a etiqueta.
+                                  </p>
+                                ) : null}
+                                {hasDuplicate ? (
+                                  <p className="text-xs text-rose-500 dark:text-rose-300">
+                                    Já existe uma etiqueta com este nome.
+                                  </p>
+                                ) : null}
+                                <div className="flex flex-wrap gap-2">
+                                  <Button type="button" variant="secondary" onClick={handleCancelLabelEdit}>
+                                    Cancelar
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    onClick={handleSaveLabelEdit}
+                                    disabled={trimmedValue.length === 0 || hasDuplicate}
+                                  >
+                                    Salvar
+                                  </Button>
+                                </div>
+                              </div>
+                            );
+                          })()
+                        ) : (
+                          <div className="flex flex-wrap items-center gap-3">
+                            <button
+                              type="button"
+                              onClick={() => handleLabelToggle(label.value)}
+                              className={`inline-flex items-center gap-2 rounded-md px-3 py-1 text-[11px] font-semibold uppercase tracking-wide transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/60 ${
+                                isApplied ? 'ring-2 ring-zenko-primary/70' : ''
+                              }`}
+                              style={{
+                                backgroundColor: colors.background,
+                                color: colors.foreground
+                              }}
+                            >
+                              <span
+                                className="inline-block h-2 w-2 rounded-full"
+                                style={{ backgroundColor: colors.foreground, opacity: 0.5 }}
+                              />
+                              {label.value}
+                            </button>
+                            <div className="ml-auto flex gap-2">
+                              <button
+                                type="button"
+                                onClick={() => handleStartEditingLabel(label)}
+                                className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-500 transition hover:bg-slate-100 hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/50 dark:border-white/10 dark:bg-white/10 dark:text-slate-300 dark:hover:bg-white/20 dark:hover:text-slate-100"
+                              >
+                                Editar
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteLabel(label)}
+                                className="rounded-full border border-transparent bg-rose-100 px-3 py-1 text-xs font-medium text-rose-600 transition hover:bg-rose-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-400 dark:bg-rose-500/10 dark:text-rose-200 dark:hover:bg-rose-500/20"
+                              >
+                                Remover
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </li>
+                    );
+                  })
+                )}
+              </ul>
+            </div>
           </div>
         ) : null}
       </div>

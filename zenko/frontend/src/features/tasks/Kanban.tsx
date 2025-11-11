@@ -16,6 +16,7 @@ import { isOfflineMode } from '../../lib/supabase';
 import { useProfile } from '../profile/hooks';
 import { useConnectivityStore } from '../../store/connectivity';
 import { getLabelColors } from './labelColors';
+import { useTasksStore, type LabelDefinition } from './store';
 
 const columns: { key: TaskStatus; title: string; accent: string }[] = [
   {
@@ -88,6 +89,14 @@ export default function Kanban() {
   const showOffline = connectivityStatus === 'limited' || isOfflineMode(userId);
 
   const autoMoveToDone = profile?.auto_move_done ?? true;
+  const labelDefinitions = useTasksStore((state) => state.labelsLibrary);
+  const labelDefinitionMap = useMemo(() => {
+    const map = new Map<string, LabelDefinition>();
+    labelDefinitions.forEach((definition) => {
+      map.set(definition.normalized, definition);
+    });
+    return map;
+  }, [labelDefinitions]);
 
   useEffect(() => {
     setOrdering((prev) => {
@@ -519,17 +528,22 @@ export default function Kanban() {
                           {task.labels.length > 0 ? (
                             <div className="mb-3 flex flex-wrap gap-1" aria-label="Etiquetas da tarefa">
                               {task.labels.map((label, index) => {
-                                const colors = getLabelColors(label, index);
+                                const normalized = label.toLocaleLowerCase();
+                                const definition = labelDefinitionMap.get(normalized);
+                                const colors = getLabelColors(label, {
+                                  colorId: definition?.colorId,
+                                  fallbackIndex: index
+                                });
                                 return (
                                   <span
-                                    key={`${task.id}-label-${index}`}
+                                    key={`${task.id}-label-${definition?.id ?? index}`}
                                     className="inline-flex items-center rounded-md px-2 py-1 text-[10px] font-semibold uppercase tracking-wide shadow-sm"
                                     style={{
                                       backgroundColor: colors.background,
                                       color: colors.foreground
                                     }}
                                   >
-                                    {label}
+                                    {definition?.value ?? label}
                                   </span>
                                 );
                               })}
