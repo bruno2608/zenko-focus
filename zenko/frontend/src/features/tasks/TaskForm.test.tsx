@@ -43,6 +43,14 @@ describe('TaskForm', () => {
     isUpdatePending: false
   } as const;
 
+  const baseProps = {
+    createTask: createTaskMock,
+    updateTask: updateTaskMock,
+    deleteTask: deleteTaskMock,
+    isCreatePending: false,
+    isUpdatePending: false
+  } as const;
+
   it('blocks submission when due date is in the past', async () => {
     const onClose = vi.fn();
     render(<TaskForm {...baseProps} onClose={onClose} />);

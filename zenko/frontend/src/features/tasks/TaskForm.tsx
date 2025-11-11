@@ -1183,6 +1183,232 @@ export default function TaskForm({
     [labelInput, removeLabelDefinition, updateLabelsField]
   );
 
+  const checklistCompleted = sanitizedChecklist.filter((item) => item.done).length;
+  const checklistTotal = sanitizedChecklist.length;
+  const checklistProgress = checklistTotal === 0 ? 0 : Math.round((checklistCompleted / checklistTotal) * 100);
+
+  const handleAddChecklistItem = () => {
+    const trimmed = newChecklistText.trim();
+    if (!trimmed) {
+      return;
+    }
+    setChecklistItems((items) => [
+      ...items,
+      {
+        clientId: generateChecklistId(),
+        text: trimmed,
+        done: false
+      }
+    ]);
+    setNewChecklistText('');
+  };
+
+  const handleChecklistToggle = (id: string, done: boolean) => {
+    setChecklistItems((items) =>
+      items.map((item) => (item.clientId === id ? { ...item, done } : item))
+    );
+  };
+
+  const handleChecklistTextChange = (id: string, text: string) => {
+    setChecklistItems((items) =>
+      items.map((item) => (item.clientId === id ? { ...item, text } : item))
+    );
+  };
+
+  const handleChecklistRemove = (id: string) => {
+    setChecklistItems((items) => items.filter((item) => item.clientId !== id));
+    setChecklistDropTarget((current) => {
+      if (current?.id === id) {
+        return null;
+      }
+      return current;
+    });
+  };
+
+  const reorderChecklistItems = useCallback(
+    (itemId: string, targetId: string | null, position: 'before' | 'after') => {
+      if (!itemId) return;
+      setChecklistItems((items) => {
+        const currentIndex = items.findIndex((item) => item.clientId === itemId);
+        if (currentIndex === -1) return items;
+
+        const updated = [...items];
+        const [moved] = updated.splice(currentIndex, 1);
+
+        if (!targetId) {
+          updated.push(moved);
+          return updated;
+        }
+
+        if (targetId === itemId) {
+          updated.splice(currentIndex, 0, moved);
+          return updated;
+        }
+
+        const targetIndex = updated.findIndex((item) => item.clientId === targetId);
+        if (targetIndex === -1) {
+          updated.splice(currentIndex, 0, moved);
+          return items;
+        }
+
+        const insertIndex = position === 'before' ? targetIndex : targetIndex + 1;
+        updated.splice(insertIndex, 0, moved);
+        return updated;
+      });
+    },
+    []
+  );
+
+  const handleChecklistDragStart = (
+    event: ReactDragEvent<HTMLButtonElement>,
+    itemId: string
+  ) => {
+    event.stopPropagation();
+    event.dataTransfer.effectAllowed = 'move';
+    event.dataTransfer.setData('text/plain', itemId);
+    setDraggingChecklistId(itemId);
+    setChecklistDropTarget(null);
+  };
+
+  const handleChecklistDragOver = (
+    event: ReactDragEvent<HTMLLIElement>,
+    itemId: string
+  ) => {
+    if (!draggingChecklistId || draggingChecklistId === itemId) {
+      return;
+    }
+    event.preventDefault();
+    const rect = event.currentTarget.getBoundingClientRect();
+    const isBefore = event.clientY < rect.top + rect.height / 2;
+    setChecklistDropTarget({ id: itemId, position: isBefore ? 'before' : 'after' });
+    event.dataTransfer.dropEffect = 'move';
+  };
+
+  const handleChecklistDrop = (event: ReactDragEvent, itemId: string | null) => {
+    if (!draggingChecklistId) return;
+    event.preventDefault();
+    const resolvedTarget =
+      checklistDropTarget && (itemId === null || checklistDropTarget.id === itemId)
+        ? checklistDropTarget
+        : itemId
+        ? { id: itemId, position: 'after' as const }
+        : { id: null, position: 'after' as const };
+    reorderChecklistItems(draggingChecklistId, resolvedTarget.id, resolvedTarget.position);
+    setDraggingChecklistId(null);
+    setChecklistDropTarget(null);
+  };
+
+  const handleChecklistDragEnd = () => {
+    setDraggingChecklistId(null);
+    setChecklistDropTarget(null);
+  };
+
+  const updateLabelsField = useCallback(
+    (labels: string[]) => {
+      setValue('labels', labels.join(', '), { shouldDirty: true, shouldValidate: true });
+    },
+    [setValue]
+  );
+
+  const applyLabel = useCallback(
+    (label: string) => {
+      const normalized = label.toLocaleLowerCase();
+      const current = parseLabels(labelInput);
+      if (current.some((item) => item.toLocaleLowerCase() === normalized)) {
+        return;
+      }
+      updateLabelsField([...current, label]);
+    },
+    [labelInput, updateLabelsField]
+  );
+
+  const handleLabelToggle = useCallback(
+    (label: string) => {
+      const normalized = label.toLocaleLowerCase();
+      const current = parseLabels(labelInput);
+      const exists = current.some((item) => item.toLocaleLowerCase() === normalized);
+      const next = exists
+        ? current.filter((item) => item.toLocaleLowerCase() !== normalized)
+        : [...current, label];
+      updateLabelsField(next);
+    },
+    [labelInput, updateLabelsField]
+  );
+
+  const handleCreateLabel = useCallback(
+    (applyToTask: boolean) => {
+      const trimmed = newLabelName.trim();
+      if (!trimmed) {
+        return;
+      }
+      createLabelDefinition(trimmed, newLabelColor);
+      setNewLabelName('');
+      setLabelSearch('');
+      if (applyToTask) {
+        applyLabel(trimmed);
+      }
+    },
+    [applyLabel, createLabelDefinition, newLabelColor, newLabelName]
+  );
+
+  const handleStartEditingLabel = useCallback((definition: LabelDefinition) => {
+    setEditingLabel({ id: definition.id, value: definition.value, colorId: definition.colorId });
+  }, []);
+
+  const handleLabelEditChange = useCallback((value: string) => {
+    setEditingLabel((prev) => (prev ? { ...prev, value } : prev));
+  }, []);
+
+  const handleLabelEditColorChange = useCallback((colorId: LabelColorId) => {
+    setEditingLabel((prev) => (prev ? { ...prev, colorId } : prev));
+  }, []);
+
+  const handleCancelLabelEdit = useCallback(() => {
+    setEditingLabel(null);
+  }, []);
+
+  const handleSaveLabelEdit = useCallback(() => {
+    if (!editingLabel) {
+      return;
+    }
+    const trimmed = editingLabel.value.trim();
+    if (!trimmed) {
+      return;
+    }
+    const normalized = trimmed.toLocaleLowerCase();
+    const duplicate = savedLabels.some(
+      (item) => item.id !== editingLabel.id && item.normalized === normalized
+    );
+    if (duplicate) {
+      return;
+    }
+    const currentDefinition = savedLabels.find((item) => item.id === editingLabel.id);
+    updateLabelDefinition(editingLabel.id, { value: trimmed, colorId: editingLabel.colorId });
+    setEditingLabel(null);
+    if (currentDefinition && currentDefinition.value !== trimmed) {
+      const current = parseLabels(labelInput);
+      const next = current.map((label) =>
+        label.toLocaleLowerCase() === currentDefinition.normalized ? trimmed : label
+      );
+      updateLabelsField(next);
+    }
+  }, [editingLabel, labelInput, savedLabels, updateLabelDefinition, updateLabelsField]);
+
+  const handleDeleteLabel = useCallback(
+    (definition: LabelDefinition) => {
+      setEditingLabel((currentEditing) =>
+        currentEditing?.id === definition.id ? null : currentEditing
+      );
+      removeLabelDefinition(definition.id);
+      const current = parseLabels(labelInput);
+      const next = current.filter((label) => label.toLocaleLowerCase() !== definition.normalized);
+      if (next.length !== current.length) {
+        updateLabelsField(next);
+      }
+    },
+    [labelInput, removeLabelDefinition, updateLabelsField]
+  );
+
   const onSubmit = handleSubmit(async (data) => {
     setSubmitError(null);
     const labels = parseLabels(data.labels);
