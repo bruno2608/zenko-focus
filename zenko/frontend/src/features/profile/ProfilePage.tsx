@@ -8,9 +8,11 @@ import OfflineNotice from '../../components/OfflineNotice';
 import { isOfflineMode } from '../../lib/supabase';
 import { useProfile } from './hooks';
 import { useConnectivityStore } from '../../store/connectivity';
+import { useNotificationsStore } from '../../lib/notifications';
 
 export default function ProfilePage() {
   const { profile, isLoading, isSaving, updateProfile, userId } = useProfile();
+  const notificationPermission = useNotificationsStore((state) => state.permission);
   const [fullName, setFullName] = useState('');
   const [focusArea, setFocusArea] = useState('');
   const [objectives, setObjectives] = useState('');
@@ -53,6 +55,10 @@ export default function ProfilePage() {
 
   const connectivityStatus = useConnectivityStore((state) => state.status);
   const showOffline = connectivityStatus === 'limited' || isOfflineMode(userId);
+  const notificationsBlocked = notificationPermission === 'denied';
+  const notificationsTooltip = notificationsBlocked
+    ? 'As notificações foram bloqueadas no navegador. Permita novamente nas configurações do site.'
+    : undefined;
 
   return (
     <div className="space-y-6">
@@ -138,6 +144,8 @@ export default function ProfilePage() {
                   setNotificationsEnabled(checked);
                   await updateProfile({ notifications_enabled: checked });
                 }}
+                disabled={notificationsBlocked}
+                disabledReason={notificationsTooltip}
               />
               <PreferenceToggle
                 label="Mover automaticamente ao concluir"
@@ -197,18 +205,48 @@ interface PreferenceToggleProps {
   onCheckedChange: (checked: boolean) => Promise<void>;
   trueLabel?: string;
   falseLabel?: string;
+  disabled?: boolean;
+  disabledReason?: string;
 }
 
-function PreferenceToggle({ label, description, checked, onCheckedChange, trueLabel, falseLabel }: PreferenceToggleProps) {
+function PreferenceToggle({
+  label,
+  description,
+  checked,
+  onCheckedChange,
+  trueLabel,
+  falseLabel,
+  disabled = false,
+  disabledReason
+}: PreferenceToggleProps) {
+  const handleChange = async (next: boolean) => {
+    if (disabled) return;
+    await onCheckedChange(next);
+  };
+
   return (
-    <div className="flex items-center justify-between gap-4 rounded-2xl border border-slate-200/80 bg-white/70 p-4 backdrop-blur dark:border-white/10 dark:bg-white/5">
-      <div>
+    <div
+      data-preference-toggle={label}
+      className={`flex items-center justify-between gap-4 rounded-2xl border border-slate-200/80 bg-white/70 p-4 backdrop-blur transition-opacity dark:border-white/10 dark:bg-white/5 ${
+        disabled ? 'opacity-70' : ''
+      }`}
+      aria-disabled={disabled}
+    >
+      <div className="space-y-1">
         <p className="text-sm font-medium text-slate-800 dark:text-slate-100">{label}</p>
         <p className="text-xs text-slate-500 dark:text-slate-400">{description}</p>
+        {disabled && disabledReason ? (
+          <p className="text-xs font-medium text-amber-700 dark:text-amber-300">{disabledReason}</p>
+        ) : null}
       </div>
       <div className="flex items-center gap-3">
         {falseLabel ? <span className="text-xs text-slate-500 dark:text-slate-400">{falseLabel}</span> : null}
-        <Switch checked={checked} onCheckedChange={onCheckedChange} />
+        <Switch
+          checked={checked}
+          onCheckedChange={handleChange}
+          disabled={disabled}
+          title={disabled ? disabledReason : undefined}
+        />
         {trueLabel ? <span className="text-xs text-slate-500 dark:text-slate-400">{trueLabel}</span> : null}
       </div>
     </div>
