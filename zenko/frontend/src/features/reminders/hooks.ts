@@ -96,7 +96,9 @@ export function useReminders() {
     view,
     setView,
     createReminder: createMutation.mutateAsync,
+    createReminderIsPending: createMutation.isPending,
     updateReminder: updateMutation.mutateAsync,
+    updateReminderIsPending: updateMutation.isPending,
     deleteReminder: deleteMutation.mutateAsync,
     isLoading: query.isLoading
   };

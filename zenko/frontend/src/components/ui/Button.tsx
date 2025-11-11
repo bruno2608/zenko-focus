@@ -4,6 +4,7 @@ type Variant = 'primary' | 'ghost' | 'secondary';
 
 interface Props extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: Variant;
+  isLoading?: boolean;
 }
 
 const baseClass =
@@ -17,6 +18,39 @@ const variantClasses: Record<Variant, string> = {
   ghost: 'text-zenko-primary hover:text-zenko-secondary'
 };
 
-export default function Button({ className = '', variant = 'primary', ...props }: Props) {
-  return <button className={`${baseClass} ${variantClasses[variant]} ${className}`} {...props} />;
+export default function Button({ className = '', variant = 'primary', isLoading = false, disabled, children, ...props }: Props) {
+  const isDisabled = disabled || isLoading;
+
+  return (
+    <button
+      className={`${baseClass} ${variantClasses[variant]} ${className}`}
+      disabled={isDisabled}
+      aria-busy={isLoading || undefined}
+      {...props}
+    >
+      {isLoading && (
+        <>
+          <svg
+            className="mr-2 h-4 w-4 animate-spin text-current"
+            viewBox="0 0 24 24"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+            role="status"
+            aria-hidden="true"
+          >
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+            <path
+              className="opacity-75"
+              d="M4 12a8 8 0 018-8"
+              stroke="currentColor"
+              strokeWidth="4"
+              strokeLinecap="round"
+            />
+          </svg>
+          <span className="sr-only">Carregando...</span>
+        </>
+      )}
+      <span className="inline-flex items-center gap-1">{children}</span>
+    </button>
+  );
 }

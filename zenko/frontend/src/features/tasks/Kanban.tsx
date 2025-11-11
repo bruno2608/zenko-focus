@@ -30,7 +30,19 @@ const columns: { key: TaskStatus; title: string; accent: string }[] = [
 ];
 
 export default function Kanban() {
-  const { tasks, isLoading, updateStatus, filters, setFilter, userId } = useTasks();
+  const {
+    tasks,
+    isLoading,
+    updateStatus,
+    filters,
+    setFilter,
+    userId,
+    createTask,
+    updateTask,
+    deleteTask,
+    createTaskIsPending,
+    updateTaskIsPending
+  } = useTasks();
   const { profile } = useProfile();
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
@@ -221,7 +233,15 @@ export default function Kanban() {
         ))}
       </div>
       <Modal title={selectedTask ? 'Editar tarefa' : 'Nova tarefa'} open={modalOpen} onClose={() => setModalOpen(false)}>
-        <TaskForm task={selectedTask ?? undefined} onClose={() => setModalOpen(false)} />
+        <TaskForm
+          task={selectedTask ?? undefined}
+          onClose={() => setModalOpen(false)}
+          createTask={createTask}
+          updateTask={updateTask}
+          deleteTask={deleteTask}
+          isCreatePending={createTaskIsPending}
+          isUpdatePending={updateTaskIsPending}
+        />
       </Modal>
     </div>
   );
