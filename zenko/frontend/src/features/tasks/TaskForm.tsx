@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -6,8 +6,7 @@ import Input from '../../components/ui/Input';
 import Textarea from '../../components/ui/Textarea';
 import Button from '../../components/ui/Button';
 import Select from '../../components/ui/Select';
-import { useTasks } from './hooks';
-import { Task } from './types';
+import { Task, TaskPayload } from './types';
 import AttachmentUploader from './AttachmentUploader';
 
 const futureDateMessage = 'Use uma data a partir de hoje';
@@ -40,8 +39,26 @@ const schema = z.object({
 
 type FormData = z.infer<typeof schema> & { attachments?: { name: string; url: string }[] };
 
-export default function TaskForm({ task, onClose }: { task?: Task; onClose: () => void }) {
-  const { createTask, updateTask, deleteTask } = useTasks();
+interface Props {
+  task?: Task;
+  onClose: () => void;
+  createTask: (payload: TaskPayload) => Promise<unknown>;
+  updateTask: (input: { id: string; payload: Partial<TaskPayload> }) => Promise<unknown>;
+  deleteTask: (id: string) => Promise<unknown>;
+  isCreatePending: boolean;
+  isUpdatePending: boolean;
+}
+
+export default function TaskForm({
+  task,
+  onClose,
+  createTask,
+  updateTask,
+  deleteTask,
+  isCreatePending,
+  isUpdatePending
+}: Props) {
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const {
     register,
     handleSubmit,
@@ -61,6 +78,18 @@ export default function TaskForm({ task, onClose }: { task?: Task; onClose: () =
     }
   });
 
+  const fieldIds = useMemo(
+    () => ({
+      title: task ? 'task-title-edit' : 'task-title-new',
+      description: task ? 'task-description-edit' : 'task-description-new',
+      dueDate: task ? 'task-due-date-edit' : 'task-due-date-new',
+      status: task ? 'task-status-edit' : 'task-status-new',
+      labels: task ? 'task-labels-edit' : 'task-labels-new',
+      checklist: task ? 'task-checklist-edit' : 'task-checklist-new'
+    }),
+    [task]
+  );
+
   useEffect(() => {
     if (!task) return;
     setValue('title', task.title);
@@ -72,12 +101,15 @@ export default function TaskForm({ task, onClose }: { task?: Task; onClose: () =
     setValue('attachments', task.attachments);
   }, [task, setValue]);
 
+  useEffect(() => {
+    setSubmitError(null);
+  }, [task]);
+
   const attachments = watch('attachments') ?? [];
+  const isSaving = task ? isUpdatePending : isCreatePending;
 
   const onSubmit = handleSubmit(async (data) => {
-    const description = data.description ? data.description : undefined;
-    const dueDateResult = data.due_date ? z.coerce.date().safeParse(data.due_date) : null;
-    const dueDateIso = dueDateResult?.success ? dueDateResult.data.toISOString() : null;
+    setSubmitError(null);
     const payload = {
       title: data.title,
       description,
@@ -95,44 +127,69 @@ export default function TaskForm({ task, onClose }: { task?: Task; onClose: () =
       attachments
     };
 
-    if (task) {
-      await updateTask({ id: task.id, payload });
-    } else {
-      await createTask(payload);
+    try {
+      if (task) {
+        await updateTask({ id: task.id, payload });
+      } else {
+        await createTask(payload);
+      }
+      onClose();
+    } catch (error) {
+      setSubmitError(error instanceof Error ? error.message : 'Não foi possível salvar a tarefa.');
     }
-    onClose();
   });
 
   const handleDelete = async () => {
     if (!task) return;
     if (confirm('Deseja excluir esta tarefa?')) {
-      await deleteTask(task.id);
-      onClose();
+      try {
+        await deleteTask(task.id);
+        onClose();
+      } catch (error) {
+        setSubmitError(error instanceof Error ? error.message : 'Não foi possível remover a tarefa.');
+      }
     }
   };
 
   return (
     <form className="space-y-4" onSubmit={onSubmit}>
       <div>
-        <label className="mb-1 block text-xs uppercase tracking-wide text-slate-500 dark:text-slate-300">Título</label>
-        <Input {...register('title')} />
+        <label
+          htmlFor={fieldIds.title}
+          className="mb-1 block text-xs uppercase tracking-wide text-slate-500 dark:text-slate-300"
+        >
+          Título
+        </label>
+        <Input id={fieldIds.title} {...register('title')} />
         {errors.title && <p className="mt-1 text-xs text-rose-600 dark:text-rose-300">{errors.title.message}</p>}
       </div>
       <div>
-        <label className="mb-1 block text-xs uppercase tracking-wide text-slate-500 dark:text-slate-300">Descrição</label>
-        <Textarea rows={3} {...register('description', { setValueAs: (value) => (value === '' ? undefined : value) })} />
+        <label
+          htmlFor={fieldIds.description}
+          className="mb-1 block text-xs uppercase tracking-wide text-slate-500 dark:text-slate-300"
+        >
+          Descrição
+        </label>
+        <Textarea id={fieldIds.description} rows={3} {...register('description')} />
       </div>
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <div>
-          <label className="mb-1 block text-xs uppercase tracking-wide text-slate-500 dark:text-slate-300">Prazo</label>
-          <Input type="date" {...register('due_date', { setValueAs: (value) => (value === '' ? undefined : value) })} />
-          {errors.due_date && (
-            <p className="mt-1 text-xs text-rose-600 dark:text-rose-300">{errors.due_date.message}</p>
-          )}
+          <label
+            htmlFor={fieldIds.dueDate}
+            className="mb-1 block text-xs uppercase tracking-wide text-slate-500 dark:text-slate-300"
+          >
+            Prazo
+          </label>
+          <Input id={fieldIds.dueDate} type="date" {...register('due_date')} />
         </div>
         <div>
-          <label className="mb-1 block text-xs uppercase tracking-wide text-slate-500 dark:text-slate-300">Status</label>
-          <Select {...register('status')}>
+          <label
+            htmlFor={fieldIds.status}
+            className="mb-1 block text-xs uppercase tracking-wide text-slate-500 dark:text-slate-300"
+          >
+            Status
+          </label>
+          <Select id={fieldIds.status} {...register('status')}>
             <option value="todo">A fazer</option>
             <option value="doing">Fazendo</option>
             <option value="done">Concluída</option>
@@ -140,14 +197,29 @@ export default function TaskForm({ task, onClose }: { task?: Task; onClose: () =
         </div>
       </div>
       <div>
-        <label className="mb-1 block text-xs uppercase tracking-wide text-slate-500 dark:text-slate-300">Etiquetas (separadas por vírgula)</label>
-        <Input {...register('labels', { setValueAs: (value) => (value === '' ? undefined : value) })} />
+        <label
+          htmlFor={fieldIds.labels}
+          className="mb-1 block text-xs uppercase tracking-wide text-slate-500 dark:text-slate-300"
+        >
+          Etiquetas (separadas por vírgula)
+        </label>
+        <Input id={fieldIds.labels} {...register('labels')} />
       </div>
       <div>
-        <label className="mb-1 block text-xs uppercase tracking-wide text-slate-500 dark:text-slate-300">Checklist (uma linha por item)</label>
-        <Textarea rows={4} {...register('checklist', { setValueAs: (value) => (value === '' ? undefined : value) })} />
+        <label
+          htmlFor={fieldIds.checklist}
+          className="mb-1 block text-xs uppercase tracking-wide text-slate-500 dark:text-slate-300"
+        >
+          Checklist (uma linha por item)
+        </label>
+        <Textarea id={fieldIds.checklist} rows={4} {...register('checklist')} />
       </div>
       <AttachmentUploader attachments={attachments} onChange={(next) => setValue('attachments', next)} />
+      {submitError && (
+        <p className="text-sm text-rose-600 dark:text-rose-300" role="alert">
+          {submitError}
+        </p>
+      )}
       <div className="flex justify-end gap-2">
         {task && (
           <Button
@@ -155,11 +227,14 @@ export default function TaskForm({ task, onClose }: { task?: Task; onClose: () =
             variant="secondary"
             className="border-none bg-gradient-to-r from-rose-500 to-red-500 text-white hover:from-rose-400 hover:to-red-400"
             onClick={handleDelete}
+            disabled={isSaving}
           >
             Excluir
           </Button>
         )}
-        <Button type="submit">Salvar</Button>
+        <Button type="submit" isLoading={isSaving} disabled={isSaving}>
+          {isSaving ? 'Salvando...' : 'Salvar'}
+        </Button>
       </div>
     </form>
   );

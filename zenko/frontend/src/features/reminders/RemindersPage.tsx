@@ -25,7 +25,9 @@ export default function RemindersPage() {
     setView,
     isLoading,
     createReminder,
+    createReminderIsPending,
     updateReminder,
+    updateReminderIsPending,
     deleteReminder
   } = useReminders();
   const [selected, setSelected] = useState<Reminder | undefined>();
@@ -104,6 +106,8 @@ export default function RemindersPage() {
           onCreate={createReminder}
           onUpdate={updateReminder}
           onDelete={deleteReminder}
+          isCreatePending={createReminderIsPending}
+          isUpdatePending={updateReminderIsPending}
         />
       </Modal>
     </div>
