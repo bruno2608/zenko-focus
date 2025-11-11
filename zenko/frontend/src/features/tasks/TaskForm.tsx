@@ -9,6 +9,7 @@ import Button from '../../components/ui/Button';
 import Select from '../../components/ui/Select';
 import { ChecklistItem, Task, TaskPayload } from './types';
 import AttachmentUploader from './AttachmentUploader';
+import { getLabelColors, parseLabels } from './labelColors';
 
 const futureDateMessage = 'Use uma data a partir de hoje';
 
@@ -173,6 +174,8 @@ export default function TaskForm({
   }, [checklistItems]);
 
   const attachments = watch('attachments') ?? [];
+  const labelInput = watch('labels') ?? '';
+  const labelPreview = useMemo(() => parseLabels(labelInput), [labelInput]);
   const isSaving = task ? isUpdatePending : isCreatePending;
 
   const checklistCompleted = sanitizedChecklist.filter((item) => item.done).length;
@@ -307,7 +310,7 @@ export default function TaskForm({
       title: data.title,
       description,
       due_date: dueDateValue,
-      labels: data.labels?.split(',').map((label) => label.trim()).filter(Boolean) ?? [],
+      labels: parseLabels(data.labels),
       status: data.status,
       checklist: sanitizedChecklist,
       attachments
@@ -390,6 +393,29 @@ export default function TaskForm({
           Etiquetas (separadas por vírgula)
         </label>
         <Input id={fieldIds.labels} {...register('labels')} />
+        {labelPreview.length > 0 ? (
+          <div className="mt-2 flex flex-wrap gap-2">
+            {labelPreview.map((label, index) => {
+              const colors = getLabelColors(label, index);
+              return (
+                <span
+                  key={`${label}-${index}`}
+                  className="inline-flex items-center gap-2 rounded-md px-2 py-1 text-[11px] font-semibold uppercase tracking-wide shadow-sm"
+                  style={{
+                    backgroundColor: colors.background,
+                    color: colors.foreground
+                  }}
+                >
+                  <span
+                    className="inline-block h-2 w-2 rounded-full"
+                    style={{ backgroundColor: colors.foreground, opacity: 0.5 }}
+                  />
+                  {label}
+                </span>
+              );
+            })}
+          </div>
+        ) : null}
       </div>
       <section className="rounded-3xl border border-slate-200 bg-white/60 p-4 shadow-inner dark:border-white/10 dark:bg-white/5">
         <header className="flex items-center justify-between gap-4">

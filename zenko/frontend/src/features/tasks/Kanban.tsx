@@ -15,6 +15,7 @@ import OfflineNotice from '../../components/OfflineNotice';
 import { isOfflineMode } from '../../lib/supabase';
 import { useProfile } from '../profile/hooks';
 import { useConnectivityStore } from '../../store/connectivity';
+import { getLabelColors } from './labelColors';
 
 const columns: { key: TaskStatus; title: string; accent: string }[] = [
   {
@@ -514,7 +515,26 @@ export default function Kanban() {
                             ✓
                           </span>
                         </label>
-                        <div className="flex-1">
+                        <div className="flex-1 min-w-0">
+                          {task.labels.length > 0 ? (
+                            <div className="mb-3 flex flex-wrap gap-1" aria-label="Etiquetas da tarefa">
+                              {task.labels.map((label, index) => {
+                                const colors = getLabelColors(label, index);
+                                return (
+                                  <span
+                                    key={`${task.id}-label-${index}`}
+                                    className="inline-flex items-center rounded-md px-2 py-1 text-[10px] font-semibold uppercase tracking-wide shadow-sm"
+                                    style={{
+                                      backgroundColor: colors.background,
+                                      color: colors.foreground
+                                    }}
+                                  >
+                                    {label}
+                                  </span>
+                                );
+                              })}
+                            </div>
+                          ) : null}
                           <h4 className="break-words text-base font-semibold leading-tight text-slate-900 dark:text-white">
                             {task.title}
                           </h4>
@@ -542,27 +562,15 @@ export default function Kanban() {
                               Prazo: {new Date(task.due_date).toLocaleDateString('pt-BR')}
                             </p>
                           )}
-                          {task.labels.length > 0 && (
-                            <p className="mt-3 flex flex-wrap gap-2">
-                              {task.labels.map((label) => (
-                                <span
-                                  key={label}
-                                  className="rounded-full bg-zenko-primary/10 px-3 py-1 text-[11px] font-medium text-zenko-primary"
-                                >
-                                  {label}
-                                </span>
-                              ))}
-                            </p>
-                          )}
                           {checklistTotal > 0 ? (
                             <div className="mt-3 space-y-2">
-                              <div className="flex items-center justify-between text-[11px] font-medium text-slate-500 dark:text-slate-300">
+                              <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 text-[11px] font-medium text-slate-500 dark:text-slate-300">
                                 <span>Checklist</span>
                                 <span>
                                   {checklistDone}/{checklistTotal}
                                 </span>
                               </div>
-                              <div className="h-1.5 rounded-full bg-slate-200 dark:bg-white/10">
+                              <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-white/10">
                                 <div
                                   className={`h-1.5 rounded-full transition-all ${
                                     checklistDone === checklistTotal && checklistTotal > 0
