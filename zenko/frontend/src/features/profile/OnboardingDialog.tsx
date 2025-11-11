@@ -1,46 +1,31 @@
 import { FormEvent, useEffect, useState } from 'react';
 import Button from '../../components/ui/Button';
 import Input from '../../components/ui/Input';
-import Textarea from '../../components/ui/Textarea';
 
 interface OnboardingDialogProps {
   open: boolean;
   initialName?: string;
-  initialFocus?: string;
-  initialObjectives?: string;
   loading?: boolean;
-  onSubmit: (payload: { full_name: string; focus_area: string; objectives: string }) => Promise<void>;
+  onSubmit: (payload: { full_name: string }) => Promise<void>;
 }
 
 export default function OnboardingDialog({
   open,
   initialName = '',
-  initialFocus = '',
-  initialObjectives = '',
   loading = false,
   onSubmit
 }: OnboardingDialogProps) {
   const [name, setName] = useState(initialName);
-  const [focusArea, setFocusArea] = useState(initialFocus);
-  const [objectives, setObjectives] = useState(initialObjectives);
 
   useEffect(() => {
     setName(initialName);
   }, [initialName]);
 
-  useEffect(() => {
-    setFocusArea(initialFocus);
-  }, [initialFocus]);
-
-  useEffect(() => {
-    setObjectives(initialObjectives);
-  }, [initialObjectives]);
-
   if (!open) return null;
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    await onSubmit({ full_name: name.trim(), focus_area: focusArea.trim(), objectives: objectives.trim() });
+    await onSubmit({ full_name: name.trim() });
   };
 
   return (
@@ -63,23 +48,6 @@ export default function OnboardingDialog({
               onChange={(event) => setName(event.target.value)}
               placeholder="Digite seu nome"
               required
-            />
-          </label>
-          <label className="block text-left text-sm">
-            <span className="mb-1 block text-xs uppercase tracking-wide text-slate-400">Área principal de foco</span>
-            <Input
-              value={focusArea}
-              onChange={(event) => setFocusArea(event.target.value)}
-              placeholder="Ex.: Engenharia de Software, Vestibular, Negócios"
-            />
-          </label>
-          <label className="block text-left text-sm">
-            <span className="mb-1 block text-xs uppercase tracking-wide text-slate-400">Objetivos</span>
-            <Textarea
-              rows={3}
-              value={objectives}
-              onChange={(event) => setObjectives(event.target.value)}
-              placeholder="Descreva suas metas para os próximos meses"
             />
           </label>
           <Button type="submit" className="w-full" disabled={loading}>

@@ -1,15 +1,18 @@
 import { isOfflineMode, OFFLINE_USER_ID, supabase } from '../../lib/supabase';
-import { readOffline } from '../../lib/offline';
+import { readOffline, type OfflineResource } from '../../lib/offline';
 
-const OFFLINE_TASKS_KEY = 'tasks';
-const OFFLINE_SESSIONS_KEY = 'pomodoro-sessions';
-const OFFLINE_REMINDERS_KEY = 'reminders';
+const TASKS_RESOURCE: OfflineResource = 'tasks';
+const SESSIONS_RESOURCE: OfflineResource = 'pomodoro_sessions';
+const REMINDERS_RESOURCE: OfflineResource = 'reminders';
+const OFFLINE_COLLECTION_KEY = 'all';
 
 export async function fetchKpis(userId: string) {
   if (isOfflineMode(userId)) {
-    const tasks = readOffline<any[]>(OFFLINE_TASKS_KEY, []);
-    const sessions = readOffline<any[]>(OFFLINE_SESSIONS_KEY, []);
-    const reminders = readOffline<any[]>(OFFLINE_REMINDERS_KEY, []);
+    const [tasks, sessions, reminders] = await Promise.all([
+      readOffline<any[]>(TASKS_RESOURCE, OFFLINE_COLLECTION_KEY, []),
+      readOffline<any[]>(SESSIONS_RESOURCE, OFFLINE_COLLECTION_KEY, []),
+      readOffline<any[]>(REMINDERS_RESOURCE, OFFLINE_COLLECTION_KEY, [])
+    ]);
 
     const counts = tasks.reduce(
       (acc, task) => {
@@ -50,7 +53,7 @@ export async function fetchKpis(userId: string) {
 
 export async function fetchTaskStatusDistribution(userId: string) {
   if (isOfflineMode(userId)) {
-    const tasks = readOffline<any[]>(OFFLINE_TASKS_KEY, []);
+    const tasks = await readOffline<any[]>(TASKS_RESOURCE, OFFLINE_COLLECTION_KEY, []);
     const counts: Record<string, number> = { todo: 0, doing: 0, done: 0 };
     tasks.forEach((task) => {
       counts[task.status] = (counts[task.status] ?? 0) + 1;
@@ -71,7 +74,7 @@ export async function fetchTaskStatusDistribution(userId: string) {
 
 export async function fetchTasksCompletedByDay(userId: string) {
   if (isOfflineMode(userId)) {
-    const tasks = readOffline<any[]>(OFFLINE_TASKS_KEY, []);
+    const tasks = await readOffline<any[]>(TASKS_RESOURCE, OFFLINE_COLLECTION_KEY, []);
     const cutoff = new Date();
     cutoff.setDate(cutoff.getDate() - 6);
     const counts: Record<string, number> = {};

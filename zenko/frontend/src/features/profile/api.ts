@@ -1,8 +1,9 @@
 import { OFFLINE_USER_ID, isOfflineMode, supabase } from '../../lib/supabase';
-import { readOffline, writeOffline } from '../../lib/offline';
+import { readOffline, writeOffline, type OfflineResource } from '../../lib/offline';
 import { Profile, ProfilePayload } from './types';
 
 const OFFLINE_PROFILE_KEY = 'profile';
+const PROFILES_RESOURCE: OfflineResource = 'profiles';
 
 function fallbackProfile(userId: string): Profile {
   const now = new Date().toISOString();
@@ -21,12 +22,12 @@ function fallbackProfile(userId: string): Profile {
   };
 }
 
-function persistOffline(profile: Profile) {
-  writeOffline(`${OFFLINE_PROFILE_KEY}-${profile.id}`, profile);
+async function persistOffline(profile: Profile) {
+  await writeOffline(PROFILES_RESOURCE, `${OFFLINE_PROFILE_KEY}-${profile.id}`, profile);
 }
 
 function readOfflineProfile(userId: string) {
-  return readOffline<Profile>(`${OFFLINE_PROFILE_KEY}-${userId}`, fallbackProfile(userId));
+  return readOffline<Profile>(PROFILES_RESOURCE, `${OFFLINE_PROFILE_KEY}-${userId}`, fallbackProfile(userId));
 }
 
 function mapProfile(data: any, userId: string): Profile {
@@ -69,12 +70,12 @@ export async function fetchProfile(userId: string): Promise<Profile> {
 
   if (!data) {
     const profile = fallbackProfile(userId);
-    persistOffline(profile);
+    await persistOffline(profile);
     return profile;
   }
 
   const profile = mapProfile(data, userId);
-  persistOffline(profile);
+  await persistOffline(profile);
   return profile;
 }
 
@@ -84,14 +85,14 @@ export async function saveProfile(userId: string, payload: ProfilePayload): Prom
   }
 
   if (isOfflineMode(userId)) {
-    const base = readOfflineProfile(userId);
+    const base = await readOfflineProfile(userId);
     const merged: Profile = {
       ...base,
       ...payload,
       id: userId,
       updated_at: new Date().toISOString()
     };
-    persistOffline(merged);
+    await persistOffline(merged);
     return merged;
   }
 
@@ -106,6 +107,6 @@ export async function saveProfile(userId: string, payload: ProfilePayload): Prom
   }
 
   const profile = mapProfile(data, userId);
-  persistOffline(profile);
+  await persistOffline(profile);
   return profile;
 }
