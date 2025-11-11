@@ -8,14 +8,15 @@ import { Task } from '../tasks/types';
 import { useSupabaseUserId } from '../../hooks/useSupabaseUser';
 import { readOffline, writeOffline } from '../../lib/offline';
 import { generateId } from '../../lib/id';
+import { queueMutation } from '../../lib/offlineSync';
 
 const OFFLINE_SESSIONS_KEY = 'pomodoro-sessions';
 
-function saveOfflineSession(duration: number, taskId?: string) {
+function saveOfflineSession(userId: string, duration: number, taskId?: string) {
   const sessions = readOffline<any[]>(OFFLINE_SESSIONS_KEY, []);
   const session = {
     id: generateId(),
-    user_id: OFFLINE_USER_ID,
+    user_id: userId,
     duration_minutes: Math.round(duration / 60),
     task_id: taskId ?? null,
     started_at: new Date().toISOString()
@@ -26,7 +27,15 @@ function saveOfflineSession(duration: number, taskId?: string) {
 
 async function createSession(userId: string, duration: number, taskId?: string) {
   if (isOfflineMode(userId)) {
-    return saveOfflineSession(duration, taskId);
+    const session = saveOfflineSession(userId, duration, taskId);
+    await queueMutation({
+      table: 'pomodoro_sessions',
+      type: 'insert',
+      primaryKey: session.id,
+      payload: session,
+      timestamp: Date.now()
+    });
+    return session;
   }
   const { data, error } = await supabase
     .from('pomodoro_sessions')
