@@ -9,7 +9,7 @@ import OfflineNotice from '../../components/OfflineNotice';
 import { useThemeStore } from '../../store/theme';
 import { useConnectivityStore } from '../../store/connectivity';
 
-const COLORS = ['#38bdf8', '#6366f1', '#22d3ee'];
+const COLORS = ['#c084fc', '#a855f7', '#f472b6'];
 
 export default function DashboardPage() {
   const userId = useSupabaseUserId();
@@ -95,12 +95,12 @@ export default function DashboardPage() {
           <p className="mt-3 text-3xl font-semibold text-slate-900 dark:text-white">{kpis.tasks.total}</p>
           <p className="text-xs text-slate-600 dark:text-slate-300">{kpis.tasks.done} concluídas • {kpis.tasks.todo} pendentes</p>
         </Card>
-        <Card className="border-slate-200/80 bg-gradient-to-br from-emerald-300/20 via-transparent to-zenko-primary/10 dark:border-white/5 dark:from-emerald-400/15 dark:to-zenko-primary/10">
+        <Card className="border-slate-200/80 bg-gradient-to-br from-zenko-secondary/15 via-transparent to-zenko-accent/10 dark:border-white/5 dark:from-zenko-secondary/25 dark:to-zenko-accent/15">
           <h3 className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-300">Pomodoro hoje</h3>
           <p className="mt-3 text-3xl font-semibold text-slate-900 dark:text-white">{kpis.pomodoro.minutes_today} min</p>
           <p className="text-xs text-slate-600 dark:text-slate-300">{kpis.pomodoro.sessions_today} sessões completadas</p>
         </Card>
-        <Card className="border-slate-200/80 bg-gradient-to-br from-zenko-secondary/10 via-transparent to-zenko-primary/10 dark:border-white/5 dark:from-zenko-secondary/20 dark:to-zenko-primary/15">
+        <Card className="border-slate-200/80 bg-gradient-to-br from-zenko-accent/15 via-transparent to-zenko-secondary/10 dark:border-white/5 dark:from-zenko-accent/20 dark:to-zenko-secondary/15">
           <h3 className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-300">Lembretes ativos</h3>
           <p className="mt-3 text-3xl font-semibold text-slate-900 dark:text-white">{kpis.reminders.active_today}</p>
           <p className="text-xs text-slate-600 dark:text-slate-300">Pendentes para hoje</p>
@@ -154,8 +154,8 @@ export default function DashboardPage() {
                 <Bar dataKey="count" radius={8} fill="url(#barGradient)" />
                 <defs>
                   <linearGradient id="barGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#38bdf8" />
-                    <stop offset="100%" stopColor="#6366f1" />
+                    <stop offset="0%" stopColor="#c084fc" />
+                    <stop offset="100%" stopColor="#a855f7" />
                   </linearGradient>
                 </defs>
               </BarChart>

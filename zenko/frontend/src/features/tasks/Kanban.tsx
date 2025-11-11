@@ -25,7 +25,7 @@ const columns: { key: TaskStatus; title: string; accent: string }[] = [
   {
     key: 'done',
     title: 'Concluídas',
-    accent: 'from-emerald-300/10 to-zenko-primary/5 dark:from-emerald-400/10 dark:to-zenko-primary/10'
+    accent: 'from-zenko-accent/20 to-zenko-secondary/10 dark:from-zenko-accent/25 dark:to-zenko-secondary/15'
   }
 ];
 

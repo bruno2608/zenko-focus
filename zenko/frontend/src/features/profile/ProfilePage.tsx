@@ -217,13 +217,13 @@ function PreferenceToggle({ label, description, checked, onCheckedChange, trueLa
 
 function Achievement({ label, description }: { label: string; description: string }) {
   return (
-    <li className="flex items-start gap-3 rounded-2xl border border-emerald-400/20 bg-emerald-400/10 p-3 text-emerald-900 dark:border-emerald-400/20 dark:bg-emerald-400/10 dark:text-emerald-100">
-      <div className="mt-1 flex h-8 w-8 items-center justify-center rounded-full bg-emerald-500 text-sm font-semibold text-white">
+    <li className="flex items-start gap-3 rounded-2xl border border-zenko-secondary/30 bg-zenko-secondary/10 p-3 text-zenko-secondary dark:border-zenko-secondary/30 dark:bg-zenko-secondary/15 dark:text-white">
+      <div className="mt-1 flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-zenko-primary to-zenko-secondary text-sm font-semibold text-white">
         ✓
       </div>
       <div>
         <p className="text-sm font-semibold">{label}</p>
-        <p className="text-xs text-emerald-800/80 dark:text-emerald-100/80">{description}</p>
+        <p className="text-xs text-zenko-secondary/80 dark:text-zenko-primary/70">{description}</p>
       </div>
     </li>
   );

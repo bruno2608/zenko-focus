@@ -5,14 +5,14 @@ module.exports = {
     extend: {
       colors: {
         zenko: {
-          background: '#020617',
-          backgroundSoft: '#0b1220',
-          surface: '#0f172a',
-          surfaceElevated: '#15223a',
-          primary: '#38bdf8',
-          secondary: '#6366f1',
-          accent: '#22d3ee',
-          muted: '#94a3b8'
+          background: '#120322',
+          backgroundSoft: '#1a0a33',
+          surface: '#1f1236',
+          surfaceElevated: '#2b194d',
+          primary: '#c084fc',
+          secondary: '#a855f7',
+          accent: '#f472b6',
+          muted: '#a78bfa'
         }
       },
       fontFamily: {
