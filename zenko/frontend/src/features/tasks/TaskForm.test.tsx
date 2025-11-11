@@ -35,18 +35,13 @@ describe('TaskForm', () => {
     vi.clearAllMocks();
   });
 
-  function getInputByLabelText(label: string) {
-    const labelElement = screen.getByText(label);
-    const container = labelElement.parentElement;
-    if (!container) {
-      throw new Error(`Label container not found for ${label}`);
-    }
-    const input = container.querySelector('input');
-    if (!input) {
-      throw new Error(`Input not found for label ${label}`);
-    }
-    return input as HTMLInputElement;
-  }
+  const baseProps = {
+    createTask: createTaskMock,
+    updateTask: updateTaskMock,
+    deleteTask: deleteTaskMock,
+    isCreatePending: false,
+    isUpdatePending: false
+  } as const;
 
   const baseProps = {
     createTask: createTaskMock,
@@ -60,13 +55,15 @@ describe('TaskForm', () => {
     const onClose = vi.fn();
     render(<TaskForm {...baseProps} onClose={onClose} />);
 
-    const titleInput = getInputByLabelText('Título');
+    const titleInput = screen.getByLabelText('Título');
     fireEvent.change(titleInput, { target: { value: 'Nova tarefa' } });
 
-    const dueDateInput = getInputByLabelText('Prazo');
+    const dueToggle = screen.getByRole('checkbox', { name: 'Data de entrega' });
+    fireEvent.click(dueToggle);
+    const dueDateInput = screen.getByLabelText('Data de entrega');
     fireEvent.change(dueDateInput, { target: { value: '2024-01-09' } });
 
-    fireEvent.click(screen.getByRole('button', { name: 'Salvar' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Criar tarefa' }));
 
     expect(await screen.findByText('Use uma data a partir de hoje')).toBeInTheDocument();
     expect(createTaskMock).not.toHaveBeenCalled();
@@ -77,13 +74,15 @@ describe('TaskForm', () => {
     const onClose = vi.fn();
     render(<TaskForm {...baseProps} onClose={onClose} />);
 
-    const titleInput = getInputByLabelText('Título');
+    const titleInput = screen.getByLabelText('Título');
     fireEvent.change(titleInput, { target: { value: 'Planejar viagem' } });
 
-    const dueDateInput = getInputByLabelText('Prazo');
+    const dueToggle = screen.getByRole('checkbox', { name: 'Data de entrega' });
+    fireEvent.click(dueToggle);
+    const dueDateInput = screen.getByLabelText('Data de entrega');
     fireEvent.change(dueDateInput, { target: { value: '2024-01-12' } });
 
-    fireEvent.click(screen.getByRole('button', { name: 'Salvar' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Criar tarefa' }));
 
     await waitFor(() => {
       expect(createTaskMock).toHaveBeenCalledTimes(1);
@@ -102,13 +101,15 @@ describe('TaskForm', () => {
     const onClose = vi.fn();
     render(<TaskForm {...baseProps} onClose={onClose} />);
 
-    const titleInput = getInputByLabelText('Título');
+    const titleInput = screen.getByLabelText('Título');
     fireEvent.change(titleInput, { target: { value: 'Enviar relatório' } });
 
-    const dueDateInput = getInputByLabelText('Prazo');
+    const dueToggle = screen.getByRole('checkbox', { name: 'Data de entrega' });
+    fireEvent.click(dueToggle);
+    const dueDateInput = screen.getByLabelText('Data de entrega');
     fireEvent.change(dueDateInput, { target: { value: '2024-01-10' } });
 
-    fireEvent.click(screen.getByRole('button', { name: 'Salvar' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Criar tarefa' }));
 
     await waitFor(() => {
       expect(createTaskMock).toHaveBeenCalledTimes(1);
@@ -138,10 +139,7 @@ describe('TaskForm', () => {
 
     render(<TaskForm {...baseProps} task={task} onClose={onClose} />);
 
-    const dueDateInput = getInputByLabelText('Prazo');
-    fireEvent.change(dueDateInput, { target: { value: '' } });
-
-    fireEvent.click(screen.getByRole('button', { name: 'Salvar' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Remover' }));
 
     await waitFor(() => {
       expect(updateTaskMock).toHaveBeenCalledTimes(1);
@@ -153,6 +151,6 @@ describe('TaskForm', () => {
         payload: expect.objectContaining({ due_date: null })
       })
     );
-    expect(onClose).toHaveBeenCalled();
+    expect(onClose).not.toHaveBeenCalled();
   });
 });

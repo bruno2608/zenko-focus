@@ -552,11 +552,6 @@ export default function Kanban() {
                           <h4 className="break-words text-base font-semibold leading-tight text-slate-900 dark:text-white">
                             {task.title}
                           </h4>
-                          {task.description ? (
-                            <p className="mt-1 break-words text-sm leading-snug text-slate-600 dark:text-slate-300">
-                              {task.description}
-                            </p>
-                          ) : null}
                           {task.due_date && (
                             <p className="mt-2 inline-flex items-center gap-1 rounded-full bg-zenko-primary/10 px-3 py-1 text-[11px] font-medium text-zenko-primary">
                               <svg
