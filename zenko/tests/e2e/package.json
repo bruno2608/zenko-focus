@@ -1,0 +1,12 @@
+{
+  "name": "zenko-e2e",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "cypress": "^13.7.1"
+  },
+  "scripts": {
+    "cy:open": "cypress open",
+    "cy:run": "cypress run"
+  }
+}

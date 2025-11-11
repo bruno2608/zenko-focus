@@ -1,0 +1,44 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html, body, #root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: 'Inter', 'Poppins', sans-serif;
+  background: linear-gradient(180deg, rgba(248, 250, 252, 0.94) 0%, rgba(241, 245, 249, 0.98) 60%, rgba(226, 232, 240, 1) 100%);
+  color: #0f172a;
+  transition: background 0.4s ease, color 0.4s ease;
+}
+
+.dark body {
+  background: radial-gradient(circle at top, rgba(56, 189, 248, 0.16), transparent 55%),
+    radial-gradient(circle at bottom right, rgba(52, 211, 153, 0.12), transparent 45%),
+    #070b14;
+  color: #e2e8f0;
+}
+
+.zenko-select {
+  background-color: rgba(255, 255, 255, 0.9);
+  color: inherit;
+}
+
+.zenko-select option,
+.zenko-select optgroup {
+  background-color: #ffffff;
+  color: #0f172a;
+}
+
+.dark .zenko-select {
+  background-image: linear-gradient(135deg, rgba(34, 211, 238, 0.32), rgba(56, 189, 248, 0.2));
+  color: #e2e8f0;
+}
+
+.dark .zenko-select option,
+.dark .zenko-select optgroup {
+  background-color: rgba(7, 11, 20, 0.94);
+  color: #e2e8f0;
+}
