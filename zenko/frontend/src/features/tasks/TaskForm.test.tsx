@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { vi } from 'vitest';
 import TaskForm from './TaskForm';
 import type { Task } from './types';
+import { useTasksStore } from './store';
 
 const createTaskMock = vi.fn();
 const updateTaskMock = vi.fn();
@@ -22,6 +23,11 @@ describe('TaskForm', () => {
     createTaskMock.mockResolvedValue(undefined);
     updateTaskMock.mockResolvedValue(undefined);
     deleteTaskMock.mockResolvedValue(undefined);
+    useTasksStore.setState((state) => ({
+      filters: { ...state.filters, status: 'all', due: 'all', labels: [] },
+      labelsLibrary: [],
+      labelColorCursor: 0
+    }));
   });
 
   afterEach(() => {
@@ -42,9 +48,17 @@ describe('TaskForm', () => {
     return input as HTMLInputElement;
   }
 
+  const baseProps = {
+    createTask: createTaskMock,
+    updateTask: updateTaskMock,
+    deleteTask: deleteTaskMock,
+    isCreatePending: false,
+    isUpdatePending: false
+  } as const;
+
   it('blocks submission when due date is in the past', async () => {
     const onClose = vi.fn();
-    render(<TaskForm onClose={onClose} />);
+    render(<TaskForm {...baseProps} onClose={onClose} />);
 
     const titleInput = getInputByLabelText('Título');
     fireEvent.change(titleInput, { target: { value: 'Nova tarefa' } });
@@ -61,7 +75,7 @@ describe('TaskForm', () => {
 
   it('submits with formatted due date when valid future date is provided', async () => {
     const onClose = vi.fn();
-    render(<TaskForm onClose={onClose} />);
+    render(<TaskForm {...baseProps} onClose={onClose} />);
 
     const titleInput = getInputByLabelText('Título');
     fireEvent.change(titleInput, { target: { value: 'Planejar viagem' } });
@@ -84,6 +98,28 @@ describe('TaskForm', () => {
     expect(onClose).toHaveBeenCalled();
   });
 
+  it('permite salvar uma tarefa com prazo para o dia atual', async () => {
+    const onClose = vi.fn();
+    render(<TaskForm {...baseProps} onClose={onClose} />);
+
+    const titleInput = getInputByLabelText('Título');
+    fireEvent.change(titleInput, { target: { value: 'Enviar relatório' } });
+
+    const dueDateInput = getInputByLabelText('Prazo');
+    fireEvent.change(dueDateInput, { target: { value: '2024-01-10' } });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Salvar' }));
+
+    await waitFor(() => {
+      expect(createTaskMock).toHaveBeenCalledTimes(1);
+    });
+
+    expect(createTaskMock).toHaveBeenCalledWith(
+      expect.objectContaining({ due_date: '2024-01-10' })
+    );
+    expect(onClose).toHaveBeenCalled();
+  });
+
   it('sends null due date when the field is cleared for an existing task', async () => {
     const onClose = vi.fn();
     const task: Task = {
@@ -100,7 +136,7 @@ describe('TaskForm', () => {
       updated_at: '2024-01-01T10:00:00.000Z'
     };
 
-    render(<TaskForm task={task} onClose={onClose} />);
+    render(<TaskForm {...baseProps} task={task} onClose={onClose} />);
 
     const dueDateInput = getInputByLabelText('Prazo');
     fireEvent.change(dueDateInput, { target: { value: '' } });
