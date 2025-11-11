@@ -2,15 +2,15 @@ import { useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, YAxis } from 'recharts';
 import Card from '../../components/ui/Card';
-import { OFFLINE_USER_ID, isSupabaseConfigured, supabase } from '../../lib/supabase';
+import { supabase } from '../../lib/supabase';
 import { fetchKpis, fetchTaskStatusDistribution, fetchTasksCompletedByDay } from './api';
 import { useSupabaseUserId } from '../../hooks/useSupabaseUser';
-import OfflineNotice from '../../components/OfflineNotice';
 
 const COLORS = ['#38bdf8', '#94a3b8', '#22d3ee'];
 
 export default function DashboardPage() {
   const userId = useSupabaseUserId();
+
   const queryClient = useQueryClient();
 
   const kpiQuery = useQuery({
@@ -32,7 +32,7 @@ export default function DashboardPage() {
   });
 
   useEffect(() => {
-    if (!userId || !isSupabaseConfigured || userId === OFFLINE_USER_ID) return;
+    if (!userId) return;
     const channel = supabase
       .channel('dashboard-live')
       .on(
