@@ -1,17 +1,7 @@
-import { isOfflineMode, OFFLINE_USER_ID, supabase } from '../../lib/supabase';
+import { isOfflineMode, supabase } from '../../lib/supabase';
 import { Reminder, ReminderPayload } from './types';
-import { readOffline, writeOffline } from '../../lib/offline';
 import { generateId } from '../../lib/id';
-
-const OFFLINE_REMINDERS_KEY = 'reminders';
-
-function loadOfflineReminders() {
-  return readOffline<Reminder[]>(OFFLINE_REMINDERS_KEY, []);
-}
-
-function persistOfflineReminders(reminders: Reminder[]) {
-  writeOffline(OFFLINE_REMINDERS_KEY, reminders);
-}
+import { loadOfflineReminders, persistOfflineReminders } from './offlineRepository';
 
 export async function fetchReminders(userId: string) {
   if (isOfflineMode(userId)) {
