@@ -1,17 +1,18 @@
-import { isOfflineMode, OFFLINE_USER_ID, supabase } from '../../lib/supabase';
+import { isOfflineMode, supabase } from '../../lib/supabase';
 import { Reminder, ReminderPayload } from './types';
-import { readOffline, writeOffline } from '../../lib/offline';
+import { readOffline, writeOffline, type OfflineResource } from '../../lib/offline';
 import { generateId } from '../../lib/id';
 import { queueMutation } from '../../lib/offlineSync';
 
-const OFFLINE_REMINDERS_KEY = 'reminders';
+const REMINDERS_RESOURCE: OfflineResource = 'reminders';
+const OFFLINE_REMINDERS_KEY = 'all';
 
 function loadOfflineReminders() {
-  return readOffline<Reminder[]>(OFFLINE_REMINDERS_KEY, []);
+  return readOffline<Reminder[]>(REMINDERS_RESOURCE, OFFLINE_REMINDERS_KEY, []);
 }
 
 function persistOfflineReminders(reminders: Reminder[]) {
-  writeOffline(OFFLINE_REMINDERS_KEY, reminders);
+  return writeOffline(REMINDERS_RESOURCE, OFFLINE_REMINDERS_KEY, reminders);
 }
 
 export async function fetchReminders(userId: string) {
@@ -60,7 +61,7 @@ export async function createReminder(userId: string, payload: ReminderPayload) {
 
 export async function updateReminder(id: string, payload: Partial<ReminderPayload>, userId?: string) {
   if (isOfflineMode(userId)) {
-    const reminders = loadOfflineReminders();
+    const reminders = await loadOfflineReminders();
     const updated = reminders.map((reminder) =>
       reminder.id === id
         ? {
@@ -73,7 +74,7 @@ export async function updateReminder(id: string, payload: Partial<ReminderPayloa
           }
         : reminder
     );
-    persistOfflineReminders(updated);
+    await persistOfflineReminders(updated);
     const next = updated.find((reminder) => reminder.id === id);
     if (!next) throw new Error('Lembrete não encontrado offline.');
     await queueMutation({
