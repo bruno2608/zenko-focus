@@ -1,28 +1,12 @@
 import { useEffect, useRef, useSyncExternalStore } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { OFFLINE_USER_ID, isOfflineMode, supabase } from '../../lib/supabase';
+import { isOfflineMode, supabase } from '../../lib/supabase';
 import { usePomodoroStore } from './store';
 import { scheduleNotification } from '../../lib/notifications';
 import { useToastStore } from '../../components/ui/ToastProvider';
 import { Task } from '../tasks/types';
 import { useSupabaseUserId } from '../../hooks/useSupabaseUser';
-import { readOffline, writeOffline } from '../../lib/offline';
-import { generateId } from '../../lib/id';
-
-const OFFLINE_SESSIONS_KEY = 'pomodoro-sessions';
-
-function saveOfflineSession(duration: number, taskId?: string) {
-  const sessions = readOffline<any[]>(OFFLINE_SESSIONS_KEY, []);
-  const session = {
-    id: generateId(),
-    user_id: OFFLINE_USER_ID,
-    duration_minutes: Math.round(duration / 60),
-    task_id: taskId ?? null,
-    started_at: new Date().toISOString()
-  };
-  writeOffline(OFFLINE_SESSIONS_KEY, [session, ...sessions].slice(0, 50));
-  return session;
-}
+import { saveOfflineSession } from './offlineRepository';
 
 async function createSession(userId: string, duration: number, taskId?: string) {
   if (isOfflineMode(userId)) {

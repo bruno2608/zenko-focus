@@ -1,17 +1,7 @@
-import { OFFLINE_USER_ID, isOfflineMode, supabase } from '../../lib/supabase';
+import { isOfflineMode, supabase } from '../../lib/supabase';
 import { generateId } from '../../lib/id';
-import { readOffline, writeOffline } from '../../lib/offline';
 import { Task, TaskPayload, TaskStatus } from './types';
-
-const OFFLINE_TASKS_KEY = 'tasks';
-
-function loadOfflineTasks() {
-  return readOffline<Task[]>(OFFLINE_TASKS_KEY, []);
-}
-
-function persistOfflineTasks(tasks: Task[]) {
-  writeOffline(OFFLINE_TASKS_KEY, tasks);
-}
+import { loadOfflineTasks, persistOfflineTasks } from './offlineRepository';
 
 async function toDataUrl(file: File) {
   return new Promise<string>((resolve, reject) => {

@@ -1,9 +1,8 @@
-import { isOfflineMode, OFFLINE_USER_ID, supabase } from '../../lib/supabase';
+import { isOfflineMode, supabase } from '../../lib/supabase';
 import { readOffline } from '../../lib/offline';
-
-const OFFLINE_TASKS_KEY = 'tasks';
-const OFFLINE_SESSIONS_KEY = 'pomodoro-sessions';
-const OFFLINE_REMINDERS_KEY = 'reminders';
+import { OFFLINE_TASKS_KEY } from '../tasks/offlineRepository';
+import { OFFLINE_SESSIONS_KEY } from '../pomodoro/offlineRepository';
+import { OFFLINE_REMINDERS_KEY } from '../reminders/offlineRepository';
 
 export async function fetchKpis(userId: string) {
   if (isOfflineMode(userId)) {
