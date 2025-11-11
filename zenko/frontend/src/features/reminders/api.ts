@@ -2,6 +2,7 @@ import { isOfflineMode, supabase } from '../../lib/supabase';
 import { Reminder, ReminderPayload } from './types';
 import { readOffline, writeOffline, type OfflineResource } from '../../lib/offline';
 import { generateId } from '../../lib/id';
+import { queueMutation } from '../../lib/offlineSync';
 
 const REMINDERS_RESOURCE: OfflineResource = 'reminders';
 const OFFLINE_REMINDERS_KEY = 'all';
@@ -38,8 +39,15 @@ export async function createReminder(userId: string, payload: ReminderPayload) {
       sent: payload.sent ?? false,
       created_at: new Date().toISOString()
     };
-    const reminders = await loadOfflineReminders();
-    await persistOfflineReminders([...reminders, reminder]);
+    const reminders = loadOfflineReminders();
+    persistOfflineReminders([...reminders, reminder]);
+    await queueMutation({
+      table: 'reminders',
+      type: 'insert',
+      primaryKey: reminder.id,
+      payload: reminder,
+      timestamp: Date.now()
+    });
     return reminder;
   }
   const { data, error } = await supabase
@@ -69,6 +77,13 @@ export async function updateReminder(id: string, payload: Partial<ReminderPayloa
     await persistOfflineReminders(updated);
     const next = updated.find((reminder) => reminder.id === id);
     if (!next) throw new Error('Lembrete não encontrado offline.');
+    await queueMutation({
+      table: 'reminders',
+      type: 'update',
+      primaryKey: id,
+      payload: next,
+      timestamp: Date.now()
+    });
     return next;
   }
   const { data, error } = await supabase
@@ -83,8 +98,15 @@ export async function updateReminder(id: string, payload: Partial<ReminderPayloa
 
 export async function deleteReminder(id: string, userId?: string) {
   if (isOfflineMode(userId)) {
-    const reminders = (await loadOfflineReminders()).filter((reminder) => reminder.id !== id);
-    await persistOfflineReminders(reminders);
+    const reminders = loadOfflineReminders().filter((reminder) => reminder.id !== id);
+    persistOfflineReminders(reminders);
+    await queueMutation({
+      table: 'reminders',
+      type: 'delete',
+      primaryKey: id,
+      payload: { id, user_id: userId },
+      timestamp: Date.now()
+    });
     return;
   }
   const { error } = await supabase.from('reminders').delete().eq('id', id);
