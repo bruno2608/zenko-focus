@@ -1460,7 +1460,7 @@ export default function TaskForm({
           </div>
         )}
       </section>
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <section className="rounded-3xl border border-slate-200 bg-white/60 p-4 shadow-inner dark:border-white/10 dark:bg-white/5">
           <header className="flex items-start justify-between gap-4">
             <div>

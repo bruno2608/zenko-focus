@@ -131,7 +131,7 @@ export default function Modal({
         aria-labelledby={titleId}
         aria-describedby={describedBy}
         tabIndex={-1}
-        className="w-full max-w-xl overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_25px_60px_-15px_rgba(15,23,42,0.18)] backdrop-blur dark:border-white/10 dark:bg-slate-900/80 dark:shadow-[0_25px_60px_-15px_rgba(15,23,42,0.8)]"
+        className="w-full max-w-2xl overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_25px_60px_-15px_rgba(15,23,42,0.18)] backdrop-blur dark:border-white/10 dark:bg-slate-900/80 dark:shadow-[0_25px_60px_-15px_rgba(15,23,42,0.8)] sm:max-w-3xl lg:max-w-4xl"
       >
         <div className="flex max-h-[calc(100vh-4rem)] flex-col">
           <div className="flex items-start justify-between gap-3 px-6 pb-4 pt-6">
