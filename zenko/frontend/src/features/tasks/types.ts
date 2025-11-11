@@ -8,6 +8,10 @@ export interface ChecklistItem {
 export interface Attachment {
   name: string;
   url: string;
+  offlineId?: string;
+  size?: number;
+  type?: string;
+  created_at?: string;
 }
 
 export interface Task {

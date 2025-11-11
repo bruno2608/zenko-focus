@@ -1,16 +1,17 @@
 import { isOfflineMode, OFFLINE_USER_ID, supabase } from '../../lib/supabase';
 import { Reminder, ReminderPayload } from './types';
-import { readOffline, writeOffline } from '../../lib/offline';
+import { readOffline, writeOffline, type OfflineResource } from '../../lib/offline';
 import { generateId } from '../../lib/id';
 
-const OFFLINE_REMINDERS_KEY = 'reminders';
+const REMINDERS_RESOURCE: OfflineResource = 'reminders';
+const OFFLINE_REMINDERS_KEY = 'all';
 
 function loadOfflineReminders() {
-  return readOffline<Reminder[]>(OFFLINE_REMINDERS_KEY, []);
+  return readOffline<Reminder[]>(REMINDERS_RESOURCE, OFFLINE_REMINDERS_KEY, []);
 }
 
 function persistOfflineReminders(reminders: Reminder[]) {
-  writeOffline(OFFLINE_REMINDERS_KEY, reminders);
+  return writeOffline(REMINDERS_RESOURCE, OFFLINE_REMINDERS_KEY, reminders);
 }
 
 export async function fetchReminders(userId: string) {
@@ -37,8 +38,8 @@ export async function createReminder(userId: string, payload: ReminderPayload) {
       sent: payload.sent ?? false,
       created_at: new Date().toISOString()
     };
-    const reminders = loadOfflineReminders();
-    persistOfflineReminders([...reminders, reminder]);
+    const reminders = await loadOfflineReminders();
+    await persistOfflineReminders([...reminders, reminder]);
     return reminder;
   }
   const { data, error } = await supabase
@@ -52,7 +53,7 @@ export async function createReminder(userId: string, payload: ReminderPayload) {
 
 export async function updateReminder(id: string, payload: Partial<ReminderPayload>, userId?: string) {
   if (isOfflineMode(userId)) {
-    const reminders = loadOfflineReminders();
+    const reminders = await loadOfflineReminders();
     const updated = reminders.map((reminder) =>
       reminder.id === id
         ? {
@@ -65,7 +66,7 @@ export async function updateReminder(id: string, payload: Partial<ReminderPayloa
           }
         : reminder
     );
-    persistOfflineReminders(updated);
+    await persistOfflineReminders(updated);
     const next = updated.find((reminder) => reminder.id === id);
     if (!next) throw new Error('Lembrete não encontrado offline.');
     return next;
@@ -82,8 +83,8 @@ export async function updateReminder(id: string, payload: Partial<ReminderPayloa
 
 export async function deleteReminder(id: string, userId?: string) {
   if (isOfflineMode(userId)) {
-    const reminders = loadOfflineReminders().filter((reminder) => reminder.id !== id);
-    persistOfflineReminders(reminders);
+    const reminders = (await loadOfflineReminders()).filter((reminder) => reminder.id !== id);
+    await persistOfflineReminders(reminders);
     return;
   }
   const { error } = await supabase.from('reminders').delete().eq('id', id);
