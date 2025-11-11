@@ -2,15 +2,15 @@ import { useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, YAxis } from 'recharts';
 import Card from '../../components/ui/Card';
-import { supabase } from '../../lib/supabase';
+import { OFFLINE_USER_ID, isSupabaseConfigured, supabase } from '../../lib/supabase';
 import { fetchKpis, fetchTaskStatusDistribution, fetchTasksCompletedByDay } from './api';
 import { useSupabaseUserId } from '../../hooks/useSupabaseUser';
+import OfflineNotice from '../../components/OfflineNotice';
 
-const COLORS = ['#38bdf8', '#94a3b8', '#22d3ee'];
+const COLORS = ['#38bdf8', '#6366f1', '#22d3ee'];
 
 export default function DashboardPage() {
   const userId = useSupabaseUserId();
-
   const queryClient = useQueryClient();
 
   const kpiQuery = useQuery({
@@ -32,7 +32,7 @@ export default function DashboardPage() {
   });
 
   useEffect(() => {
-    if (!userId) return;
+    if (!userId || !isSupabaseConfigured || userId === OFFLINE_USER_ID) return;
     const channel = supabase
       .channel('dashboard-live')
       .on(
@@ -65,36 +65,45 @@ export default function DashboardPage() {
   }, [queryClient, userId]);
 
   if (kpiQuery.isLoading) {
-    return <p>Carregando dashboard...</p>;
+    return <p className="text-sm text-slate-300">Carregando dashboard...</p>;
   }
 
-  const kpis = kpiQuery.data ?? { tasks: { total: 0, done: 0, todo: 0, doing: 0 }, pomodoro: { minutes_today: 0, sessions_today: 0 }, reminders: { active_today: 0 } };
+  const kpis =
+    kpiQuery.data ?? {
+      tasks: { total: 0, done: 0, todo: 0, doing: 0 },
+      pomodoro: { minutes_today: 0, sessions_today: 0 },
+      reminders: { active_today: 0 }
+    };
 
   return (
-    <div className="space-y-4">
-      <h1 className="text-xl font-semibold">Dashboard</h1>
-      {!isSupabaseConfigured || userId === OFFLINE_USER_ID ? (
-        <OfflineNotice feature="Dashboard" />
-      ) : null}
+    <div className="space-y-6">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h2 className="text-2xl font-semibold text-white">Painel em tempo real</h2>
+          <p className="text-sm text-slate-300">Acompanhe resultados das suas ações sem precisar atualizar a página.</p>
+        </div>
+      </div>
+      {!isSupabaseConfigured || userId === OFFLINE_USER_ID ? <OfflineNotice feature="Dashboard" /> : null}
       <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-        <Card>
-          <h2 className="text-sm text-slate-400">Tarefas</h2>
-          <p className="text-2xl font-bold">{kpis.tasks.total}</p>
-          <p className="text-xs text-slate-300">{kpis.tasks.done} concluídas</p>
+        <Card className="border-white/5 bg-gradient-to-br from-zenko-primary/20 via-transparent to-zenko-secondary/20">
+          <h3 className="text-xs uppercase tracking-wide text-slate-300">Tarefas totais</h3>
+          <p className="mt-3 text-3xl font-semibold text-white">{kpis.tasks.total}</p>
+          <p className="text-xs text-slate-300">{kpis.tasks.done} concluídas • {kpis.tasks.todo} pendentes</p>
         </Card>
-        <Card>
-          <h2 className="text-sm text-slate-400">Pomodoros (hoje)</h2>
-          <p className="text-2xl font-bold">{kpis.pomodoro.minutes_today} min</p>
-          <p className="text-xs text-slate-300">{kpis.pomodoro.sessions_today} sessões</p>
+        <Card className="border-white/5 bg-gradient-to-br from-emerald-400/15 via-transparent to-zenko-primary/10">
+          <h3 className="text-xs uppercase tracking-wide text-slate-300">Pomodoro hoje</h3>
+          <p className="mt-3 text-3xl font-semibold text-white">{kpis.pomodoro.minutes_today} min</p>
+          <p className="text-xs text-slate-300">{kpis.pomodoro.sessions_today} sessões completadas</p>
         </Card>
-        <Card>
-          <h2 className="text-sm text-slate-400">Lembretes ativos hoje</h2>
-          <p className="text-2xl font-bold">{kpis.reminders.active_today}</p>
+        <Card className="border-white/5 bg-gradient-to-br from-zenko-secondary/20 via-transparent to-zenko-primary/15">
+          <h3 className="text-xs uppercase tracking-wide text-slate-300">Lembretes ativos</h3>
+          <p className="mt-3 text-3xl font-semibold text-white">{kpis.reminders.active_today}</p>
+          <p className="text-xs text-slate-300">Pendentes para hoje</p>
         </Card>
       </div>
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        <Card>
-          <h2 className="mb-2 text-sm font-semibold">Distribuição de status</h2>
+        <Card className="border-white/5 bg-slate-900/60">
+          <h3 className="mb-3 text-sm font-semibold text-white">Distribuição de status</h3>
           <div className="h-64">
             <ResponsiveContainer>
               <PieChart>
@@ -103,20 +112,47 @@ export default function DashboardPage() {
                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                   ))}
                 </Pie>
-                <Tooltip />
+                <Tooltip
+                  contentStyle={{
+                    background: '#0f172a',
+                    borderRadius: 16,
+                    border: '1px solid rgba(148, 163, 184, 0.2)',
+                    color: '#e2e8f0'
+                  }}
+                />
               </PieChart>
             </ResponsiveContainer>
           </div>
         </Card>
-        <Card>
-          <h2 className="mb-2 text-sm font-semibold">Conclusões por dia</h2>
+        <Card className="border-white/5 bg-slate-900/60">
+          <h3 className="mb-3 text-sm font-semibold text-white">Conclusões por dia</h3>
           <div className="h-64">
             <ResponsiveContainer>
               <BarChart data={doneQuery.data ?? []}>
-                <XAxis dataKey="day" tickFormatter={(value) => new Date(value).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })} />
-                <YAxis allowDecimals={false} />
-                <Tooltip labelFormatter={(value) => new Date(value as string).toLocaleDateString('pt-BR')} />
-                <Bar dataKey="count" fill="#38bdf8" radius={6} />
+                <XAxis
+                  dataKey="day"
+                  tickFormatter={(value) =>
+                    new Date(value).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
+                  }
+                  stroke="#94a3b8"
+                />
+                <YAxis allowDecimals={false} stroke="#94a3b8" />
+                <Tooltip
+                  labelFormatter={(value) => new Date(value as string).toLocaleDateString('pt-BR')}
+                  contentStyle={{
+                    background: '#0f172a',
+                    borderRadius: 16,
+                    border: '1px solid rgba(148, 163, 184, 0.2)',
+                    color: '#e2e8f0'
+                  }}
+                />
+                <Bar dataKey="count" radius={8} fill="url(#barGradient)" />
+                <defs>
+                  <linearGradient id="barGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#38bdf8" />
+                    <stop offset="100%" stopColor="#6366f1" />
+                  </linearGradient>
+                </defs>
               </BarChart>
             </ResponsiveContainer>
           </div>

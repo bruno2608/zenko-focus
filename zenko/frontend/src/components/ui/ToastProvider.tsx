@@ -24,14 +24,18 @@ export const useToastStore = create<ToastState>((set) => ({
   dismiss: (id) => set((state) => ({ toasts: state.toasts.filter((t) => t.id !== id) }))
 }));
 
+const typeStyles: Record<NonNullable<Toast['type']>, string> = {
+  error: 'border-red-500/40 bg-red-500/10 text-red-200',
+  success: 'border-emerald-500/40 bg-emerald-500/10 text-emerald-100',
+  info: 'border-zenko-primary/40 bg-zenko-primary/10 text-zenko-primary'
+};
+
 export function ToastProvider({ children }: { children: ReactNode }) {
   const toasts = useToastStore((state) => state.toasts);
   const dismiss = useToastStore((state) => state.dismiss);
 
   useEffect(() => {
-    const timers = toasts.map((toast) =>
-      setTimeout(() => dismiss(toast.id), 4000)
-    );
+    const timers = toasts.map((toast) => setTimeout(() => dismiss(toast.id), 4000));
     return () => {
       timers.forEach((timer) => clearTimeout(timer));
     };
@@ -40,20 +44,16 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   return (
     <>
       {children}
-      <div className="fixed bottom-24 right-4 z-50 space-y-2">
+      <div className="pointer-events-none fixed bottom-28 right-4 z-50 flex w-full max-w-xs flex-col gap-2">
         {toasts.map((toast) => (
           <div
             key={toast.id}
-            className={`min-w-[200px] rounded-lg border px-4 py-3 shadow-lg ${
-              toast.type === 'error'
-                ? 'border-red-500 bg-red-500/20'
-                : toast.type === 'success'
-                ? 'border-emerald-500 bg-emerald-500/20'
-                : 'border-zenko-primary bg-zenko-primary/20'
+            className={`pointer-events-auto rounded-2xl border px-4 py-3 shadow-lg shadow-zenko-secondary/10 backdrop-blur ${
+              toast.type ? typeStyles[toast.type] : typeStyles.info
             }`}
           >
             <strong className="block text-sm font-semibold">{toast.title}</strong>
-            {toast.description && <span className="text-xs text-slate-200">{toast.description}</span>}
+            {toast.description && <span className="text-xs text-slate-200/80">{toast.description}</span>}
           </div>
         ))}
       </div>

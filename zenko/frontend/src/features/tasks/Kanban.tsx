@@ -8,16 +8,20 @@ import TaskForm from './TaskForm';
 import OfflineNotice from '../../components/OfflineNotice';
 import { OFFLINE_USER_ID, isSupabaseConfigured } from '../../lib/supabase';
 
-const columns: { key: TaskStatus; title: string }[] = [
-  { key: 'todo', title: 'A Fazer' },
-  { key: 'doing', title: 'Fazendo' },
-  { key: 'done', title: 'Feito' }
+const columns: { key: TaskStatus; title: string; accent: string }[] = [
+  { key: 'todo', title: 'A Fazer', accent: 'from-zenko-primary/20 to-zenko-secondary/10' },
+  { key: 'doing', title: 'Fazendo', accent: 'from-zenko-secondary/20 to-zenko-primary/10' },
+  { key: 'done', title: 'Concluídas', accent: 'from-emerald-400/10 to-zenko-primary/10' }
 ];
+
+const selectClass =
+  'rounded-2xl border border-white/10 bg-white/5 px-3 py-2 text-xs text-white focus:border-transparent focus:outline-none focus:ring-2 focus:ring-zenko-primary/60 backdrop-blur';
 
 export default function Kanban() {
   const { tasks, isLoading, updateStatus, filters, setFilter, userId } = useTasks();
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
+  const [draggingId, setDraggingId] = useState<string | null>(null);
 
   const columnsData = useMemo(() => {
     return columns.map((column) => ({
@@ -27,27 +31,38 @@ export default function Kanban() {
   }, [tasks]);
 
   const handleDrop = (taskId: string, status: TaskStatus) => {
+    if (!taskId) return;
+    const task = tasks.find((item) => item.id === taskId);
+    if (!task || task.status === status) {
+      return;
+    }
     updateStatus({ id: taskId, status });
   };
 
   if (isLoading) {
-    return <p>Carregando...</p>;
+    return <p className="text-sm text-slate-300">Carregando...</p>;
   }
 
   return (
-    <div className="space-y-4">
-      {!isSupabaseConfigured || userId === OFFLINE_USER_ID ? (
-        <OfflineNotice feature="Tarefas" />
-      ) : null}
-      <div className="flex items-center justify-between gap-2">
-        <h1 className="text-xl font-semibold">Tarefas</h1>
-        <Button onClick={() => { setSelectedTask(null); setModalOpen(true); }}>Nova tarefa</Button>
+    <div className="space-y-6">
+      {!isSupabaseConfigured || userId === OFFLINE_USER_ID ? <OfflineNotice feature="Tarefas" /> : null}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h2 className="text-2xl font-semibold text-white">Quadro de tarefas</h2>
+          <p className="text-sm text-slate-300">Arraste e solte para mover prioridades rapidamente.</p>
+        </div>
+        <Button onClick={() => {
+          setSelectedTask(null);
+          setModalOpen(true);
+        }}>
+          Nova tarefa
+        </Button>
       </div>
-      <div className="flex gap-2 text-xs text-slate-200">
-        <label className="flex items-center gap-2">
-          Status
+      <div className="flex flex-wrap gap-3 text-xs text-slate-200">
+        <label className="flex items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-3 py-2 backdrop-blur">
+          <span className="text-xs uppercase tracking-wide text-slate-300">Status</span>
           <select
-            className="rounded-md bg-zenko-surface px-2 py-1"
+            className={selectClass}
             value={filters.status}
             onChange={(e) => setFilter({ status: e.target.value as any })}
           >
@@ -57,10 +72,10 @@ export default function Kanban() {
             <option value="done">Concluídos</option>
           </select>
         </label>
-        <label className="flex items-center gap-2">
-          Prazo
+        <label className="flex items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-3 py-2 backdrop-blur">
+          <span className="text-xs uppercase tracking-wide text-slate-300">Prazo</span>
           <select
-            className="rounded-md bg-zenko-surface px-2 py-1"
+            className={selectClass}
             value={filters.due}
             onChange={(e) => setFilter({ due: e.target.value as any })}
           >
@@ -77,31 +92,54 @@ export default function Kanban() {
             onDragOver={(event) => event.preventDefault()}
             onDrop={(event) => {
               event.preventDefault();
-              const taskId = event.dataTransfer.getData('task');
+              const taskId =
+                event.dataTransfer.getData('application/task-id') ||
+                event.dataTransfer.getData('text/plain');
               handleDrop(taskId, column.key);
+              setDraggingId(null);
             }}
-            className="space-y-3 rounded-xl border border-slate-700 bg-zenko-surface p-4"
+            className={`space-y-3 rounded-3xl border border-white/5 bg-gradient-to-br ${column.accent} p-4 backdrop-blur`}
           >
             <header className="flex items-center justify-between">
-              <h2 className="font-semibold">{column.title}</h2>
-              <span className="text-xs text-slate-400">{column.tasks.length}</span>
+              <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-200">{column.title}</h3>
+              <span className="rounded-full bg-white/10 px-2 py-1 text-xs text-zenko-primary">{column.tasks.length}</span>
             </header>
             <div className="space-y-3">
               {column.tasks.map((task) => (
                 <Card
                   key={task.id}
+                  className={`cursor-grab border-white/5 bg-slate-900/70 transition hover:-translate-y-0.5 hover:border-zenko-primary/40 ${
+                    draggingId === task.id ? 'border-zenko-primary/60 shadow-lg' : ''
+                  }`}
                   draggable
-                  onDragStart={(event) => event.dataTransfer.setData('task', task.id)}
+                  onDragStart={(event) => {
+                    event.dataTransfer.effectAllowed = 'move';
+                    event.dataTransfer.setData('application/task-id', task.id);
+                    event.dataTransfer.setData('text/plain', task.id);
+                    setDraggingId(task.id);
+                  }}
+                  onDragEnd={() => setDraggingId(null)}
                 >
-                  <button className="w-full text-left" onClick={() => { setSelectedTask(task); setModalOpen(true); }}>
-                    <h3 className="font-semibold">{task.title}</h3>
+                  <button
+                    className="w-full text-left"
+                    onClick={() => {
+                      setSelectedTask(task);
+                      setModalOpen(true);
+                    }}
+                  >
+                    <h4 className="text-base font-semibold text-white">{task.title}</h4>
                     {task.due_date && (
-                      <p className="text-xs text-zenko-primary">Prazo: {new Date(task.due_date).toLocaleDateString('pt-BR')}</p>
+                      <p className="mt-1 text-xs text-zenko-primary">
+                        Prazo: {new Date(task.due_date).toLocaleDateString('pt-BR')}
+                      </p>
                     )}
                     {task.labels.length > 0 && (
-                      <p className="mt-2 flex flex-wrap gap-1">
+                      <p className="mt-3 flex flex-wrap gap-2">
                         {task.labels.map((label) => (
-                          <span key={label} className="rounded-full bg-zenko-primary/10 px-2 py-1 text-[10px] text-zenko-primary">
+                          <span
+                            key={label}
+                            className="rounded-full bg-zenko-primary/10 px-3 py-1 text-[11px] font-medium text-zenko-primary"
+                          >
                             {label}
                           </span>
                         ))}
@@ -110,6 +148,11 @@ export default function Kanban() {
                   </button>
                 </Card>
               ))}
+              {column.tasks.length === 0 && (
+                <p className="rounded-2xl border border-dashed border-white/10 bg-white/5 px-4 py-6 text-center text-xs text-slate-400">
+                  Arraste tarefas para esta coluna
+                </p>
+              )}
             </div>
           </section>
         ))}

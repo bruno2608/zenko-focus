@@ -15,12 +15,13 @@ const schema = z.object({
   due_date: z.string().optional(),
   labels: z.string().optional(),
   status: z.enum(['todo', 'doing', 'done']),
-  checklist: z
-    .string()
-    .optional()
+  checklist: z.string().optional()
 });
 
 type FormData = z.infer<typeof schema> & { attachments?: { name: string; url: string }[] };
+
+const selectClass =
+  'w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-sm text-white focus:border-transparent focus:outline-none focus:ring-2 focus:ring-zenko-primary/60 backdrop-blur';
 
 export default function TaskForm({ task, onClose }: { task?: Task; onClose: () => void }) {
   const { createTask, updateTask, deleteTask } = useTasks();
@@ -93,22 +94,22 @@ export default function TaskForm({ task, onClose }: { task?: Task; onClose: () =
   return (
     <form className="space-y-4" onSubmit={onSubmit}>
       <div>
-        <label className="text-sm">Título</label>
+        <label className="mb-1 block text-xs uppercase tracking-wide text-slate-300">Título</label>
         <Input {...register('title')} />
-        {errors.title && <p className="text-xs text-red-400">{errors.title.message}</p>}
+        {errors.title && <p className="mt-1 text-xs text-rose-300">{errors.title.message}</p>}
       </div>
       <div>
-        <label className="text-sm">Descrição</label>
+        <label className="mb-1 block text-xs uppercase tracking-wide text-slate-300">Descrição</label>
         <Textarea rows={3} {...register('description')} />
       </div>
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <div>
-          <label className="text-sm">Prazo</label>
+          <label className="mb-1 block text-xs uppercase tracking-wide text-slate-300">Prazo</label>
           <Input type="date" {...register('due_date')} />
         </div>
         <div>
-          <label className="text-sm">Status</label>
-          <select className="w-full rounded-md bg-zenko-surface px-3 py-2" {...register('status')}>
+          <label className="mb-1 block text-xs uppercase tracking-wide text-slate-300">Status</label>
+          <select className={selectClass} {...register('status')}>
             <option value="todo">A fazer</option>
             <option value="doing">Fazendo</option>
             <option value="done">Concluída</option>
@@ -116,20 +117,22 @@ export default function TaskForm({ task, onClose }: { task?: Task; onClose: () =
         </div>
       </div>
       <div>
-        <label className="text-sm">Etiquetas (separadas por vírgula)</label>
+        <label className="mb-1 block text-xs uppercase tracking-wide text-slate-300">Etiquetas (separadas por vírgula)</label>
         <Input {...register('labels')} />
       </div>
       <div>
-        <label className="text-sm">Checklist (uma linha por item, use [x] para concluído)</label>
+        <label className="mb-1 block text-xs uppercase tracking-wide text-slate-300">Checklist (uma linha por item)</label>
         <Textarea rows={4} {...register('checklist')} />
       </div>
-      <AttachmentUploader
-        attachments={attachments}
-        onChange={(next) => setValue('attachments', next)}
-      />
+      <AttachmentUploader attachments={attachments} onChange={(next) => setValue('attachments', next)} />
       <div className="flex justify-end gap-2">
         {task && (
-          <Button type="button" variant="secondary" className="!bg-red-500" onClick={handleDelete}>
+          <Button
+            type="button"
+            variant="secondary"
+            className="border-none bg-gradient-to-r from-rose-500 to-red-500 text-white hover:from-rose-400 hover:to-red-400"
+            onClick={handleDelete}
+          >
             Excluir
           </Button>
         )}

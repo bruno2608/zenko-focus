@@ -27,31 +27,31 @@ export default function AttachmentUploader({ attachments, onChange }: Props) {
   };
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <p className="text-sm font-medium">Anexos</p>
-        <label className="cursor-pointer text-xs text-zenko-primary">
+        <p className="text-sm font-medium text-white">Anexos</p>
+        <label className="cursor-pointer rounded-2xl border border-dashed border-zenko-primary/40 px-3 py-1 text-xs font-medium text-zenko-primary hover:border-zenko-primary/60">
           <input type="file" multiple className="hidden" onChange={(e) => handleFiles(e.target.files)} />
           {isUploading ? 'Enviando...' : 'Adicionar'}
         </label>
       </div>
-      <ul className="space-y-1 text-xs text-slate-300">
+      <ul className="space-y-2 text-xs text-slate-200">
         {attachments.map((attachment) => (
-          <li key={attachment.url} className="flex items-center justify-between">
+          <li key={attachment.url} className="flex items-center justify-between rounded-2xl bg-white/5 px-3 py-2">
             <a href={attachment.url} target="_blank" rel="noreferrer" className="text-zenko-primary underline">
               {attachment.name}
             </a>
             <Button
               type="button"
               variant="ghost"
-              className="text-xs text-red-400"
+              className="text-xs text-red-300 hover:text-red-200"
               onClick={() => onChange(attachments.filter((item) => item.url !== attachment.url))}
             >
               remover
             </Button>
           </li>
         ))}
-        {attachments.length === 0 && <li>Nenhum anexo</li>}
+        {attachments.length === 0 && <li className="text-slate-400">Nenhum anexo</li>}
       </ul>
     </div>
   );
