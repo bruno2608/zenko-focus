@@ -5,6 +5,7 @@ import { ptBR } from 'date-fns/locale';
 import ThemeToggle from '../components/ui/ThemeToggle';
 import OnboardingDialog from '../features/profile/OnboardingDialog';
 import { useProfile } from '../features/profile/hooks';
+import NotificationBanner from '../components/NotificationBanner';
 
 const tabs = [
   {
@@ -228,6 +229,7 @@ export default function TabsLayout() {
                 </div>
               </div>
             </header>
+            <NotificationBanner />
             <main className="flex-1 space-y-6 overflow-visible pb-6 lg:pb-8">
               <Outlet />
             </main>

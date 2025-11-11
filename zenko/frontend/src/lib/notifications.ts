@@ -1,4 +1,27 @@
+import { create } from 'zustand';
 import { useToastStore } from '../components/ui/ToastProvider';
+
+type NotificationPermissionState = {
+  permission: NotificationPermission | 'unsupported';
+  setPermission: (permission: NotificationPermission | 'unsupported') => void;
+};
+
+function resolveInitialPermission(): NotificationPermission | 'unsupported' {
+  if (typeof window === 'undefined') {
+    return 'default';
+  }
+
+  if (!('Notification' in window)) {
+    return 'unsupported';
+  }
+
+  return window.Notification.permission;
+}
+
+export const useNotificationsStore = create<NotificationPermissionState>((set) => ({
+  permission: resolveInitialPermission(),
+  setPermission: (permission) => set({ permission })
+}));
 
 let audioContext: AudioContext | null = null;
 
@@ -21,10 +44,25 @@ function getAudioContext() {
 }
 
 export async function initNotifications() {
+  const setPermission = useNotificationsStore.getState().setPermission;
   getAudioContext();
-  if (!('Notification' in window)) return;
+  if (typeof window === 'undefined' || !('Notification' in window)) {
+    setPermission('unsupported');
+    return;
+  }
+
+  setPermission(Notification.permission);
+
+  if (Notification.permission === 'denied') {
+    return;
+  }
+
   if (Notification.permission === 'default') {
-    await Notification.requestPermission();
+    const result = await Notification.requestPermission();
+    setPermission(result);
+    if (result !== 'granted') {
+      return;
+    }
   }
   if ('serviceWorker' in navigator) {
     await navigator.serviceWorker.register('/sw.js').catch(() => undefined);
