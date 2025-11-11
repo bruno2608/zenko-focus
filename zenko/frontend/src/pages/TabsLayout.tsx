@@ -339,13 +339,6 @@ export default function TabsLayout() {
                 </NavLink>
               ))}
             </nav>
-            <div className="mt-8 rounded-3xl border border-white/10 bg-white/5 p-4 text-left">
-              <p className="text-sm font-medium text-white/90">Preferências rápidas</p>
-              <div className="mt-3 flex items-center justify-between gap-3">
-                <span className="text-sm text-white/70">Tema do aplicativo</span>
-                <ThemeToggle />
-              </div>
-            </div>
           </div>
         </div>
       )}
