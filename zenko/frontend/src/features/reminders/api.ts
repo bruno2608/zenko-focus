@@ -1,4 +1,4 @@
-import { isOfflineMode, OFFLINE_USER_ID, supabase } from '../../lib/supabase';
+import { isOfflineMode, supabase } from '../../lib/supabase';
 import { Reminder, ReminderPayload } from './types';
 import { readOffline, writeOffline, type OfflineResource } from '../../lib/offline';
 import { generateId } from '../../lib/id';
