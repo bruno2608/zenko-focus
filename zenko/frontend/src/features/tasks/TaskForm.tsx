@@ -131,6 +131,9 @@ export default function TaskForm({
     [task]
   );
 
+  const savedLabels = useTasksStore((state) => state.labelsLibrary);
+  const registerLabels = useTasksStore((state) => state.registerLabels);
+
   useEffect(() => {
     if (!task) {
       reset({
@@ -180,8 +183,6 @@ export default function TaskForm({
   const attachments = watch('attachments') ?? [];
   const labelInput = watch('labels') ?? '';
   const labelPreview = useMemo(() => parseLabels(labelInput), [labelInput]);
-  const savedLabels = useTasksStore((state) => state.labelsLibrary);
-  const registerLabels = useTasksStore((state) => state.registerLabels);
   const labelSuggestions = useMemo(() => {
     if (savedLabels.length === 0) {
       return [] as string[];
