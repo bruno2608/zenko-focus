@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import type { DragEvent as ReactDragEvent } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -10,6 +11,25 @@ import { ChecklistItem, Task, TaskPayload } from './types';
 import AttachmentUploader from './AttachmentUploader';
 
 const futureDateMessage = 'Use uma data a partir de hoje';
+
+type ChecklistEntry = ChecklistItem & { clientId: string };
+
+let checklistIdCounter = 0;
+
+const generateChecklistId = () => {
+  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
+    try {
+      return crypto.randomUUID();
+    } catch (error) {
+      // ignore and fallback to counter-based id
+    }
+  }
+  checklistIdCounter += 1;
+  return `checklist-${Date.now()}-${checklistIdCounter}`;
+};
+
+const toChecklistEntries = (items: ChecklistItem[] = []): ChecklistEntry[] =>
+  items.map((item) => ({ ...item, clientId: generateChecklistId() }));
 
 function parseDateInput(value: string) {
   const [year, month, day] = value.split('-').map(Number);
@@ -69,8 +89,16 @@ export default function TaskForm({
   isUpdatePending
 }: Props) {
   const [submitError, setSubmitError] = useState<string | null>(null);
-  const [checklistItems, setChecklistItems] = useState<ChecklistItem[]>(task?.checklist ?? []);
+  const [checklistItems, setChecklistItems] = useState<ChecklistEntry[]>(() => toChecklistEntries(task?.checklist));
   const [newChecklistText, setNewChecklistText] = useState('');
+  const [draggingChecklistId, setDraggingChecklistId] = useState<string | null>(null);
+  const [checklistDropTarget, setChecklistDropTarget] = useState<
+    | {
+        id: string | null;
+        position: 'before' | 'after';
+      }
+    | null
+  >(null);
   const {
     register,
     handleSubmit,
@@ -113,6 +141,8 @@ export default function TaskForm({
       });
       setChecklistItems([]);
       setNewChecklistText('');
+      setDraggingChecklistId(null);
+      setChecklistDropTarget(null);
       return;
     }
     reset({
@@ -123,8 +153,10 @@ export default function TaskForm({
       status: task.status,
       attachments: task.attachments
     });
-    setChecklistItems(task.checklist ?? []);
+    setChecklistItems(toChecklistEntries(task.checklist ?? []));
     setNewChecklistText('');
+    setDraggingChecklistId(null);
+    setChecklistDropTarget(null);
   }, [task, reset]);
 
   useEffect(() => {
@@ -152,24 +184,115 @@ export default function TaskForm({
     if (!trimmed) {
       return;
     }
-    setChecklistItems((items) => [...items, { text: trimmed, done: false }]);
+    setChecklistItems((items) => [
+      ...items,
+      {
+        clientId: generateChecklistId(),
+        text: trimmed,
+        done: false
+      }
+    ]);
     setNewChecklistText('');
   };
 
-  const handleChecklistToggle = (index: number, done: boolean) => {
+  const handleChecklistToggle = (id: string, done: boolean) => {
     setChecklistItems((items) =>
-      items.map((item, itemIndex) => (itemIndex === index ? { ...item, done } : item))
+      items.map((item) => (item.clientId === id ? { ...item, done } : item))
     );
   };
 
-  const handleChecklistTextChange = (index: number, text: string) => {
+  const handleChecklistTextChange = (id: string, text: string) => {
     setChecklistItems((items) =>
-      items.map((item, itemIndex) => (itemIndex === index ? { ...item, text } : item))
+      items.map((item) => (item.clientId === id ? { ...item, text } : item))
     );
   };
 
-  const handleChecklistRemove = (index: number) => {
-    setChecklistItems((items) => items.filter((_, itemIndex) => itemIndex !== index));
+  const handleChecklistRemove = (id: string) => {
+    setChecklistItems((items) => items.filter((item) => item.clientId !== id));
+    setChecklistDropTarget((current) => {
+      if (current?.id === id) {
+        return null;
+      }
+      return current;
+    });
+  };
+
+  const reorderChecklistItems = useCallback(
+    (itemId: string, targetId: string | null, position: 'before' | 'after') => {
+      if (!itemId) return;
+      setChecklistItems((items) => {
+        const currentIndex = items.findIndex((item) => item.clientId === itemId);
+        if (currentIndex === -1) return items;
+
+        const updated = [...items];
+        const [moved] = updated.splice(currentIndex, 1);
+
+        if (!targetId) {
+          updated.push(moved);
+          return updated;
+        }
+
+        if (targetId === itemId) {
+          updated.splice(currentIndex, 0, moved);
+          return updated;
+        }
+
+        const targetIndex = updated.findIndex((item) => item.clientId === targetId);
+        if (targetIndex === -1) {
+          updated.splice(currentIndex, 0, moved);
+          return items;
+        }
+
+        const insertIndex = position === 'before' ? targetIndex : targetIndex + 1;
+        updated.splice(insertIndex, 0, moved);
+        return updated;
+      });
+    },
+    []
+  );
+
+  const handleChecklistDragStart = (
+    event: ReactDragEvent<HTMLButtonElement>,
+    itemId: string
+  ) => {
+    event.stopPropagation();
+    event.dataTransfer.effectAllowed = 'move';
+    event.dataTransfer.setData('text/plain', itemId);
+    setDraggingChecklistId(itemId);
+    setChecklistDropTarget(null);
+  };
+
+  const handleChecklistDragOver = (
+    event: ReactDragEvent<HTMLLIElement>,
+    itemId: string
+  ) => {
+    if (!draggingChecklistId || draggingChecklistId === itemId) {
+      return;
+    }
+    event.preventDefault();
+    const rect = event.currentTarget.getBoundingClientRect();
+    const isBefore = event.clientY < rect.top + rect.height / 2;
+    setChecklistDropTarget({ id: itemId, position: isBefore ? 'before' : 'after' });
+    event.dataTransfer.dropEffect = 'move';
+  };
+
+  const handleChecklistDrop = (event: ReactDragEvent, itemId: string | null) => {
+    if (!draggingChecklistId) return;
+    event.preventDefault();
+    const resolvedTarget =
+      checklistDropTarget && (itemId === null || checklistDropTarget.id === itemId)
+        ? checklistDropTarget
+        : itemId
+        ? { id: itemId, position: 'after' as const }
+        : { id: null, position: 'after' as const };
+    reorderChecklistItems(draggingChecklistId, resolvedTarget.id, resolvedTarget.position);
+    setDraggingChecklistId(null);
+    setChecklistDropTarget(null);
+  };
+
+  const handleChecklistDragEnd = () => {
+    setDraggingChecklistId(null);
+    setChecklistDropTarget(null);
   };
 
   const onSubmit = handleSubmit(async (data) => {
@@ -294,18 +417,58 @@ export default function TaskForm({
             Organize suas etapas adicionando itens abaixo. Cada item pode ser marcado como concluído.
           </p>
         )}
-        <ul className="mt-4 space-y-2">
-          {checklistItems.map((item, index) => (
+        <ul
+          className="mt-4 space-y-2"
+          onDragOver={(event) => {
+            if (!draggingChecklistId) return;
+            event.preventDefault();
+            event.dataTransfer.dropEffect = 'move';
+            if (checklistItems.length === 0) {
+              setChecklistDropTarget({ id: null, position: 'after' });
+            }
+          }}
+          onDrop={(event) => handleChecklistDrop(event, null)}
+        >
+          {checklistItems.map((item) => {
+            const isDragging = draggingChecklistId === item.clientId;
+            const showBefore =
+              checklistDropTarget?.id === item.clientId &&
+              checklistDropTarget.position === 'before';
+            const showAfter =
+              checklistDropTarget?.id === item.clientId &&
+              checklistDropTarget.position === 'after';
+
+            return (
             <li
-              key={`checklist-item-${index}`}
-              className="group flex items-start gap-3 rounded-2xl bg-white/80 px-3 py-2 shadow-sm transition hover:bg-white dark:bg-white/5 dark:hover:bg-white/10"
+              key={item.clientId}
+              className={`group relative flex items-start gap-3 rounded-2xl bg-white/80 px-3 py-2 shadow-sm transition hover:bg-white dark:bg-white/5 dark:hover:bg-white/10 ${
+                isDragging ? 'opacity-60' : ''
+              }`}
+              onDragOver={(event) => handleChecklistDragOver(event, item.clientId)}
+              onDrop={(event) => handleChecklistDrop(event, item.clientId)}
             >
+              <span
+                aria-hidden="true"
+                className={`pointer-events-none absolute left-3 right-3 h-1 rounded-full bg-zenko-primary/60 transition-opacity ${
+                  showBefore ? 'top-0 -translate-y-1/2 opacity-100' : 'opacity-0'
+                }`}
+              />
+              <button
+                type="button"
+                draggable
+                onDragStart={(event) => handleChecklistDragStart(event, item.clientId)}
+                onDragEnd={handleChecklistDragEnd}
+                aria-label="Reordenar item do checklist"
+                className="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-transparent bg-slate-100 text-lg leading-none text-slate-400 transition hover:bg-slate-200 hover:text-slate-600 active:cursor-grabbing active:bg-slate-200 dark:bg-white/10 dark:text-slate-500 dark:hover:bg-white/20 dark:hover:text-slate-200"
+              >
+                <span aria-hidden="true">⋮⋮</span>
+              </button>
               <label className="relative mt-1 flex h-5 w-5 cursor-pointer items-center justify-center rounded border border-slate-300 bg-white text-zenko-primary shadow-sm transition dark:border-white/20 dark:bg-white/10">
                 <input
                   type="checkbox"
                   className="peer sr-only"
                   checked={item.done}
-                  onChange={(event) => handleChecklistToggle(index, event.target.checked)}
+                  onChange={(event) => handleChecklistToggle(item.clientId, event.target.checked)}
                 />
                 <span
                   className={`pointer-events-none text-xs font-semibold transition-opacity ${
@@ -318,7 +481,7 @@ export default function TaskForm({
               <div className="flex-1 space-y-1">
                 <Input
                   value={item.text}
-                  onChange={(event) => handleChecklistTextChange(index, event.target.value)}
+                  onChange={(event) => handleChecklistTextChange(item.clientId, event.target.value)}
                   className={`w-full border-transparent bg-transparent px-0 text-sm font-medium text-slate-700 shadow-none focus:border-zenko-primary/40 focus:ring-0 dark:text-slate-200 ${
                     item.done ? 'line-through opacity-75' : ''
                   }`}
@@ -326,14 +489,26 @@ export default function TaskForm({
               </div>
               <button
                 type="button"
-                onClick={() => handleChecklistRemove(index)}
+                onClick={() => handleChecklistRemove(item.clientId)}
                 className="mt-1 inline-flex rounded-full border border-transparent bg-slate-100 px-2 py-1 text-xs font-medium text-slate-500 transition hover:bg-rose-100 hover:text-rose-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/50 dark:bg-white/5 dark:hover:bg-rose-500/10 dark:hover:text-rose-200"
                 aria-label={`Remover item ${item.text}`}
               >
                 Remover
               </button>
+              <span
+                aria-hidden="true"
+                className={`pointer-events-none absolute left-3 right-3 h-1 rounded-full bg-zenko-primary/60 transition-opacity ${
+                  showAfter ? 'bottom-0 translate-y-1/2 opacity-100' : 'opacity-0'
+                }`}
+              />
             </li>
-          ))}
+          );
+          })}
+          {checklistDropTarget?.id === null && (
+            <li className="relative flex items-center justify-center rounded-2xl border border-dashed border-zenko-primary/40 bg-white/60 py-3 text-xs font-medium text-zenko-primary dark:border-white/10 dark:bg-white/10">
+              Solte aqui para posicionar ao final
+            </li>
+          )}
         </ul>
         <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center">
           <Input
