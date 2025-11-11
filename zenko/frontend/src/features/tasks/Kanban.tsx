@@ -229,7 +229,7 @@ export default function Kanban() {
         return;
       }
 
-      const direction: 'next' | 'previous' = deltaX > 0 ? 'next' : 'previous';
+      const direction: 'next' | 'previous' = primaryDelta > 0 ? 'next' : 'previous';
       const targetStatus = getAdjacentStatus(task.status, direction);
       if (!targetStatus) {
         finishVirtualDrag();
