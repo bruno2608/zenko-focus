@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { vi } from 'vitest';
 import TaskForm from './TaskForm';
 import type { Task } from './types';
+import { useTasksStore } from './store';
 
 const createTaskMock = vi.fn();
 const updateTaskMock = vi.fn();
@@ -22,6 +23,10 @@ describe('TaskForm', () => {
     createTaskMock.mockResolvedValue(undefined);
     updateTaskMock.mockResolvedValue(undefined);
     deleteTaskMock.mockResolvedValue(undefined);
+    useTasksStore.setState((state) => ({
+      filters: { ...state.filters, status: 'all', due: 'all', labels: [] },
+      labelsLibrary: []
+    }));
   });
 
   afterEach(() => {

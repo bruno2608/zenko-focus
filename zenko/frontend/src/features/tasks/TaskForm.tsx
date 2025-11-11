@@ -10,6 +10,7 @@ import Select from '../../components/ui/Select';
 import { ChecklistItem, Task, TaskPayload } from './types';
 import AttachmentUploader from './AttachmentUploader';
 import { getLabelColors, parseLabels } from './labelColors';
+import { useTasksStore } from './store';
 
 const futureDateMessage = 'Use uma data a partir de hoje';
 
@@ -158,7 +159,10 @@ export default function TaskForm({
     setNewChecklistText('');
     setDraggingChecklistId(null);
     setChecklistDropTarget(null);
-  }, [task, reset]);
+    if (task.labels.length > 0) {
+      registerLabels(task.labels);
+    }
+  }, [task, reset, registerLabels]);
 
   useEffect(() => {
     setSubmitError(null);
@@ -176,6 +180,15 @@ export default function TaskForm({
   const attachments = watch('attachments') ?? [];
   const labelInput = watch('labels') ?? '';
   const labelPreview = useMemo(() => parseLabels(labelInput), [labelInput]);
+  const savedLabels = useTasksStore((state) => state.labelsLibrary);
+  const registerLabels = useTasksStore((state) => state.registerLabels);
+  const labelSuggestions = useMemo(() => {
+    if (savedLabels.length === 0) {
+      return [] as string[];
+    }
+    const used = new Set(labelPreview.map((label) => label.toLocaleLowerCase()));
+    return savedLabels.filter((label) => !used.has(label.toLocaleLowerCase()));
+  }, [labelPreview, savedLabels]);
   const isSaving = task ? isUpdatePending : isCreatePending;
 
   const checklistCompleted = sanitizedChecklist.filter((item) => item.done).length;
@@ -298,6 +311,16 @@ export default function TaskForm({
     setChecklistDropTarget(null);
   };
 
+  const handleLabelSuggestionSelect = (label: string) => {
+    const current = parseLabels(labelInput);
+    const exists = current.some((item) => item.toLocaleLowerCase() === label.toLocaleLowerCase());
+    if (exists) {
+      return;
+    }
+    const next = [...current, label];
+    setValue('labels', next.join(', '), { shouldDirty: true, shouldValidate: true });
+  };
+
   const onSubmit = handleSubmit(async (data) => {
     setSubmitError(null);
     const description = data.description?.trim() ? data.description : undefined;
@@ -306,11 +329,12 @@ export default function TaskForm({
       : task
         ? null
         : undefined;
+    const labels = parseLabels(data.labels);
     const payload = {
       title: data.title,
       description,
       due_date: dueDateValue,
-      labels: parseLabels(data.labels),
+      labels,
       status: data.status,
       checklist: sanitizedChecklist,
       attachments
@@ -322,6 +346,7 @@ export default function TaskForm({
       } else {
         await createTask(payload);
       }
+      registerLabels(labels);
       onClose();
     } catch (error) {
       setSubmitError(error instanceof Error ? error.message : 'Não foi possível salvar a tarefa.');
@@ -393,6 +418,36 @@ export default function TaskForm({
           Etiquetas (separadas por vírgula)
         </label>
         <Input id={fieldIds.labels} {...register('labels')} />
+        {labelSuggestions.length > 0 ? (
+          <div className="mt-2 space-y-2">
+            <p className="text-[11px] uppercase tracking-wide text-slate-400 dark:text-slate-500">
+              Etiquetas salvas
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {labelSuggestions.map((label) => {
+                const colors = getLabelColors(label);
+                return (
+                  <button
+                    key={`suggestion-${label}`}
+                    type="button"
+                    onClick={() => handleLabelSuggestionSelect(label)}
+                    className="inline-flex items-center gap-2 rounded-md px-2 py-1 text-[11px] font-semibold uppercase tracking-wide shadow-sm transition hover:scale-[1.01] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/60"
+                    style={{
+                      backgroundColor: colors.background,
+                      color: colors.foreground
+                    }}
+                  >
+                    <span
+                      className="inline-block h-2 w-2 rounded-full"
+                      style={{ backgroundColor: colors.foreground, opacity: 0.5 }}
+                    />
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ) : null}
         {labelPreview.length > 0 ? (
           <div className="mt-2 flex flex-wrap gap-2">
             {labelPreview.map((label, index) => {
