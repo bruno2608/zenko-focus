@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { OFFLINE_USER_ID, isOfflineMode, supabase } from '../../lib/supabase';
 import { useReminderStore } from './store';
@@ -19,7 +19,6 @@ function scheduleReminderNotification(reminder: Reminder) {
 export function useReminders() {
   const userId = useSupabaseUserId();
   const queryClient = useQueryClient();
-  const setReminders = useReminderStore((state) => state.setReminders);
   const view = useReminderStore((state) => state.view);
   const setView = useReminderStore((state) => state.setView);
   const toast = useToastStore((state) => state.show);
@@ -29,12 +28,6 @@ export function useReminders() {
     queryFn: () => fetchReminders(userId ?? OFFLINE_USER_ID),
     enabled: Boolean(userId)
   });
-
-  useEffect(() => {
-    if (query.data) {
-      setReminders(query.data);
-    }
-  }, [query.data, setReminders]);
 
   useEffect(() => {
     if (!userId || isOfflineMode(userId)) return;
@@ -85,8 +78,23 @@ export function useReminders() {
   }, [query.data]);
 
   const reminders = query.data ?? [];
-  const upcoming = reminders.filter((reminder) => !reminder.sent && new Date(reminder.remind_at) >= new Date());
-  const past = reminders.filter((reminder) => reminder.sent || new Date(reminder.remind_at) < new Date());
+  const { upcoming, past } = useMemo(() => {
+    const now = new Date();
+    const buckets = reminders.reduce(
+      (acc, reminder) => {
+        const remindAt = new Date(reminder.remind_at);
+        if (!reminder.sent && remindAt >= now) {
+          acc.upcoming.push(reminder);
+        } else {
+          acc.past.push(reminder);
+        }
+        return acc;
+      },
+      { upcoming: [] as Reminder[], past: [] as Reminder[] }
+    );
+
+    return buckets;
+  }, [reminders]);
 
   return {
     userId,

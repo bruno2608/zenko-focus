@@ -1,4 +1,9 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
+import type {
+  KeyboardEvent as ReactKeyboardEvent,
+  PointerEvent as ReactPointerEvent,
+  TouchEvent as ReactTouchEvent
+} from 'react';
 import Button from '../../components/ui/Button';
 import Card from '../../components/ui/Card';
 import Modal from '../../components/ui/Modal';
@@ -29,6 +34,23 @@ const columns: { key: TaskStatus; title: string; accent: string }[] = [
   }
 ];
 
+const columnTitles: Record<TaskStatus, string> = {
+  todo: 'A Fazer',
+  doing: 'Fazendo',
+  done: 'Concluídas'
+};
+
+const statusOrder: TaskStatus[] = ['todo', 'doing', 'done'];
+
+const getAdjacentStatus = (current: TaskStatus, direction: 'next' | 'previous'): TaskStatus | null => {
+  const index = statusOrder.indexOf(current);
+  if (index === -1) return null;
+  if (direction === 'next') {
+    return statusOrder[index + 1] ?? null;
+  }
+  return statusOrder[index - 1] ?? null;
+};
+
 export default function Kanban() {
   const {
     tasks,
@@ -48,6 +70,13 @@ export default function Kanban() {
   const [modalOpen, setModalOpen] = useState(false);
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const connectivityStatus = useConnectivityStore((state) => state.status);
+  const virtualDragRef = useRef<{
+    taskId: string;
+    pointerId: number | null;
+    startX: number;
+    hasMoved: boolean;
+  } | null>(null);
+  const suppressClickRef = useRef(false);
   const showOffline = connectivityStatus === 'limited' || isOfflineMode(userId);
 
   const autoMoveToDone = profile?.auto_move_done ?? true;
@@ -67,6 +96,137 @@ export default function Kanban() {
     }
     updateStatus({ id: taskId, status });
   };
+
+  const moveTask = useCallback(
+    (task: Task, direction: 'next' | 'previous') => {
+      const nextStatus = getAdjacentStatus(task.status, direction);
+      if (!nextStatus) return;
+      updateStatus({ id: task.id, status: nextStatus });
+    },
+    [updateStatus]
+  );
+
+  const startVirtualDrag = useCallback((taskId: string, pointerId: number | null, startX: number) => {
+    virtualDragRef.current = {
+      taskId,
+      pointerId,
+      startX,
+      hasMoved: false
+    };
+  }, []);
+
+  const finishVirtualDrag = useCallback(() => {
+    virtualDragRef.current = null;
+    setTimeout(() => {
+      suppressClickRef.current = false;
+    }, 0);
+  }, []);
+
+  const processVirtualDrag = useCallback(
+    (task: Task, clientX: number) => {
+      const drag = virtualDragRef.current;
+      if (!drag || drag.taskId !== task.id || drag.hasMoved) {
+        return;
+      }
+
+      const deltaX = clientX - drag.startX;
+      if (Math.abs(deltaX) < 48) {
+        return;
+      }
+
+      const direction: 'next' | 'previous' = deltaX > 0 ? 'next' : 'previous';
+      const targetStatus = getAdjacentStatus(task.status, direction);
+      if (!targetStatus) {
+        finishVirtualDrag();
+        return;
+      }
+
+      drag.hasMoved = true;
+      suppressClickRef.current = true;
+      moveTask(task, direction);
+    },
+    [finishVirtualDrag, moveTask]
+  );
+
+  const handlePointerDown = useCallback(
+    (event: ReactPointerEvent<HTMLDivElement>, task: Task) => {
+      if (event.pointerType !== 'mouse') {
+        event.currentTarget.setPointerCapture(event.pointerId);
+      }
+      startVirtualDrag(task.id, event.pointerId, event.clientX);
+    },
+    [startVirtualDrag]
+  );
+
+  const handlePointerMove = useCallback(
+    (event: ReactPointerEvent<HTMLDivElement>, task: Task) => {
+      const drag = virtualDragRef.current;
+      if (!drag || drag.pointerId !== event.pointerId) {
+        return;
+      }
+
+      processVirtualDrag(task, event.clientX);
+    },
+    [processVirtualDrag]
+  );
+
+  const handlePointerUp = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
+    const drag = virtualDragRef.current;
+    if (drag && drag.pointerId === event.pointerId) {
+      try {
+        event.currentTarget.releasePointerCapture(event.pointerId);
+      } catch {
+        // ignore when pointer capture is not set
+      }
+      finishVirtualDrag();
+    }
+  }, [finishVirtualDrag]);
+
+  const handleTouchStart = useCallback(
+    (event: ReactTouchEvent<HTMLDivElement>, task: Task) => {
+      const touch = event.touches[0];
+      if (!touch) return;
+      startVirtualDrag(task.id, touch.identifier, touch.clientX);
+    },
+    [startVirtualDrag]
+  );
+
+  const handleTouchMove = useCallback(
+    (event: ReactTouchEvent<HTMLDivElement>, task: Task) => {
+      const drag = virtualDragRef.current;
+      if (!drag) return;
+      const touch = Array.from(event.touches).find((item) => item.identifier === drag.pointerId) ?? event.touches[0];
+      if (!touch || drag.taskId !== task.id) {
+        return;
+      }
+      processVirtualDrag(task, touch.clientX);
+    },
+    [processVirtualDrag]
+  );
+
+  const handleTouchEnd = useCallback((event: ReactTouchEvent<HTMLDivElement>) => {
+    const drag = virtualDragRef.current;
+    if (!drag) return;
+    const touch = Array.from(event.changedTouches).find((item) => item.identifier === drag.pointerId);
+    if (touch || drag.pointerId === null) {
+      finishVirtualDrag();
+    }
+  }, [finishVirtualDrag]);
+
+  const handleKeyDown = useCallback(
+    (event: ReactKeyboardEvent<HTMLDivElement>, task: Task) => {
+      if (event.key !== 'Enter' && event.key !== ' ') {
+        return;
+      }
+
+      event.preventDefault();
+      const nextStatus = getAdjacentStatus(task.status, 'next');
+      if (nextStatus) {
+        moveTask(task, 'next');
+      }
+    },
+    [moveTask]
+  );
 
   if (isLoading) {
     return <p className="text-sm text-slate-300">Carregando...</p>;
@@ -134,13 +294,34 @@ export default function Kanban() {
               <span className="rounded-full bg-zenko-primary/10 px-2 py-1 text-xs text-zenko-primary dark:bg-white/10">{column.tasks.length}</span>
             </header>
             <div className="space-y-3">
-              {column.tasks.map((task) => (
+              {column.tasks.map((task) => {
+                const previousStatus = getAdjacentStatus(task.status, 'previous');
+                const nextStatus = getAdjacentStatus(task.status, 'next');
+                const nextStatusLabel = nextStatus ? columnTitles[nextStatus] : 'coluna final';
+                const ariaInstruction = nextStatus
+                  ? `Pressione Enter ou Espaço para mover para ${nextStatusLabel}.`
+                  : 'Esta tarefa está na última coluna.';
+
+                return (
                 <Card
                   key={task.id}
                   className={`cursor-grab border-slate-200/80 bg-white/80 transition hover:-translate-y-0.5 hover:border-zenko-primary/40 dark:border-white/5 dark:bg-slate-900/70 ${
                     draggingId === task.id ? 'border-zenko-primary/60 shadow-lg' : ''
                   }`}
+                  data-task-id={task.id}
+                  data-status={task.status}
                   draggable
+                  tabIndex={0}
+                  aria-label={`Tarefa ${task.title}. Status atual: ${columnTitles[task.status]}. ${ariaInstruction}`}
+                  onPointerDown={(event) => handlePointerDown(event, task)}
+                  onPointerMove={(event) => handlePointerMove(event, task)}
+                  onPointerUp={handlePointerUp}
+                  onPointerCancel={handlePointerUp}
+                  onTouchStart={(event) => handleTouchStart(event, task)}
+                  onTouchMove={(event) => handleTouchMove(event, task)}
+                  onTouchEnd={handleTouchEnd}
+                  onTouchCancel={handleTouchEnd}
+                  onKeyDown={(event) => handleKeyDown(event, task)}
                   onDragStart={(event) => {
                     event.dataTransfer.effectAllowed = 'move';
                     event.dataTransfer.setData('application/task-id', task.id);
@@ -149,6 +330,10 @@ export default function Kanban() {
                   }}
                   onDragEnd={() => setDraggingId(null)}
                   onClick={() => {
+                    if (suppressClickRef.current) {
+                      suppressClickRef.current = false;
+                      return;
+                    }
                     setSelectedTask(task);
                     setModalOpen(true);
                   }}
@@ -219,10 +404,37 @@ export default function Kanban() {
                           ))}
                         </p>
                       )}
+                      <div className="mt-3 flex flex-wrap gap-2 md:hidden motion-reduce:flex motion-reduce:md:flex">
+                        <button
+                          type="button"
+                          className="flex-1 rounded-full border border-zenko-primary/40 bg-white/90 px-3 py-2 text-xs font-semibold text-zenko-primary shadow-sm transition hover:border-zenko-primary/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/60 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50 dark:bg-slate-900/70"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            moveTask(task, 'previous');
+                          }}
+                          disabled={!previousStatus}
+                          aria-label={`Mover ${task.title} para ${previousStatus ? columnTitles[previousStatus] : 'coluna anterior'}`}
+                        >
+                          Mover para coluna anterior
+                        </button>
+                        <button
+                          type="button"
+                          className="flex-1 rounded-full border border-zenko-primary/40 bg-white/90 px-3 py-2 text-xs font-semibold text-zenko-primary shadow-sm transition hover:border-zenko-primary/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/60 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50 dark:bg-slate-900/70"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            moveTask(task, 'next');
+                          }}
+                          disabled={!nextStatus}
+                          aria-label={`Mover ${task.title} para ${nextStatus ? columnTitles[nextStatus] : 'coluna seguinte'}`}
+                        >
+                          Mover para próxima coluna
+                        </button>
+                      </div>
                     </div>
                   </div>
-                </Card>
-              ))}
+                  </Card>
+                );
+              })}
               {column.tasks.length === 0 && (
                 <p className="rounded-2xl border border-dashed border-slate-200 bg-white/70 px-4 py-6 text-center text-xs text-slate-500 dark:border-white/10 dark:bg-white/5 dark:text-slate-400">
                   Arraste tarefas para esta coluna

@@ -8,10 +8,25 @@ import Button from '../../components/ui/Button';
 import { Reminder, ReminderPayload } from './types';
 import { toDatetimeLocal } from '../../lib/datetime';
 
+const futureDateMessage = 'Use uma data a partir de hoje';
+
 const schema = z.object({
   title: z.string().min(1, 'Informe um título'),
   description: z.string().optional(),
-  remind_at: z.string().min(1, 'Informe data e hora')
+  remind_at: z
+    .string()
+    .min(1, 'Informe data e hora')
+    .superRefine((value, ctx) => {
+      if (!value) return;
+      const result = z.coerce.date().safeParse(value);
+      if (!result.success) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: futureDateMessage });
+        return;
+      }
+      if (result.data < new Date()) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: futureDateMessage });
+      }
+    })
 });
 
 type FormValues = z.infer<typeof schema>;
@@ -78,8 +93,8 @@ export default function ReminderForm({
     setSubmitError(null);
     const payload = {
       title: data.title,
-      description: data.description,
-      remind_at: new Date(data.remind_at).toISOString()
+      description,
+      remind_at: remindAtResult.data.toISOString()
     };
     try {
       if (reminder) {

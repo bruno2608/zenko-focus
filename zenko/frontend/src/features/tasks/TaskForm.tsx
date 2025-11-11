@@ -9,10 +9,29 @@ import Select from '../../components/ui/Select';
 import { Task, TaskPayload } from './types';
 import AttachmentUploader from './AttachmentUploader';
 
+const futureDateMessage = 'Use uma data a partir de hoje';
+
 const schema = z.object({
   title: z.string().min(1, 'Título obrigatório'),
   description: z.string().optional(),
-  due_date: z.string().optional(),
+  due_date: z
+    .string()
+    .optional()
+    .superRefine((value, ctx) => {
+      if (!value) return;
+      const result = z.coerce.date().safeParse(value);
+      if (!result.success) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: futureDateMessage });
+        return;
+      }
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const dueDate = new Date(result.data);
+      dueDate.setHours(0, 0, 0, 0);
+      if (dueDate < today) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: futureDateMessage });
+      }
+    }),
   labels: z.string().optional(),
   status: z.enum(['todo', 'doing', 'done']),
   checklist: z.string().optional()
@@ -93,8 +112,8 @@ export default function TaskForm({
     setSubmitError(null);
     const payload = {
       title: data.title,
-      description: data.description,
-      due_date: data.due_date ? new Date(data.due_date).toISOString() : null,
+      description,
+      due_date: dueDateIso,
       labels: data.labels?.split(',').map((label) => label.trim()).filter(Boolean) ?? [],
       status: data.status,
       checklist:
