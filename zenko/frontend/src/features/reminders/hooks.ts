@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '../../lib/supabase';
+import { OFFLINE_USER_ID, isSupabaseConfigured, supabase } from '../../lib/supabase';
 import { useReminderStore } from './store';
 import { useToastStore } from '../../components/ui/ToastProvider';
 import { createReminder, deleteReminder, fetchReminders, updateReminder } from './api';
@@ -26,7 +26,7 @@ export function useReminders() {
 
   const query = useQuery<Reminder[]>({
     queryKey: ['reminders', userId],
-    queryFn: () => fetchReminders(userId!),
+    queryFn: () => fetchReminders(userId ?? OFFLINE_USER_ID),
     enabled: Boolean(userId)
   });
 
@@ -37,7 +37,7 @@ export function useReminders() {
   }, [query.data, setReminders]);
 
   useEffect(() => {
-    if (!userId) return;
+    if (!userId || !isSupabaseConfigured || userId === OFFLINE_USER_ID) return;
     const channel = supabase
       .channel('reminders-changes')
       .on(
@@ -52,7 +52,7 @@ export function useReminders() {
   }, [queryClient, userId]);
 
   const createMutation = useMutation({
-    mutationFn: (payload: ReminderPayload) => createReminder(userId!, payload),
+    mutationFn: (payload: ReminderPayload) => createReminder(userId ?? OFFLINE_USER_ID, payload),
     onSuccess: (reminder) => {
       queryClient.setQueryData<Reminder[]>(['reminders', userId], (old) => (old ? [...old, reminder] : [reminder]));
       toast({ title: 'Lembrete criado', type: 'success' });
@@ -62,7 +62,8 @@ export function useReminders() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, payload }: { id: string; payload: Partial<ReminderPayload> }) => updateReminder(id, payload),
+    mutationFn: ({ id, payload }: { id: string; payload: Partial<ReminderPayload> }) =>
+      updateReminder(id, payload, userId ?? OFFLINE_USER_ID),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['reminders', userId] });
       toast({ title: 'Lembrete atualizado', type: 'success' });
@@ -71,7 +72,7 @@ export function useReminders() {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id: string) => deleteReminder(id),
+    mutationFn: (id: string) => deleteReminder(id, userId ?? OFFLINE_USER_ID),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['reminders', userId] });
       toast({ title: 'Lembrete removido', type: 'success' });
@@ -88,6 +89,7 @@ export function useReminders() {
   const past = reminders.filter((reminder) => reminder.sent || new Date(reminder.remind_at) < new Date());
 
   return {
+    userId,
     reminders,
     upcoming,
     past,

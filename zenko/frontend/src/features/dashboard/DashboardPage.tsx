@@ -73,6 +73,9 @@ export default function DashboardPage() {
   return (
     <div className="space-y-4">
       <h1 className="text-xl font-semibold">Dashboard</h1>
+      {!isSupabaseConfigured || userId === OFFLINE_USER_ID ? (
+        <OfflineNotice feature="Dashboard" />
+      ) : null}
       <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
         <Card>
           <h2 className="text-sm text-slate-400">Tarefas</h2>

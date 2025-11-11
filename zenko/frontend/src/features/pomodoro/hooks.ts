@@ -1,14 +1,34 @@
 import { useEffect, useRef } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '../../lib/supabase';
+import { OFFLINE_USER_ID, isSupabaseConfigured, supabase } from '../../lib/supabase';
 import { usePomodoroStore } from './store';
 import { scheduleNotification } from '../../lib/notifications';
 import { useToastStore } from '../../components/ui/ToastProvider';
 import { fetchTasks } from '../tasks/api';
 import { Task } from '../tasks/types';
 import { useSupabaseUserId } from '../../hooks/useSupabaseUser';
+import { readOffline, writeOffline } from '../../lib/offline';
+import { generateId } from '../../lib/id';
+
+const OFFLINE_SESSIONS_KEY = 'pomodoro-sessions';
+
+function saveOfflineSession(duration: number, taskId?: string) {
+  const sessions = readOffline<any[]>(OFFLINE_SESSIONS_KEY, []);
+  const session = {
+    id: generateId(),
+    user_id: OFFLINE_USER_ID,
+    duration_minutes: Math.round(duration / 60),
+    task_id: taskId ?? null,
+    started_at: new Date().toISOString()
+  };
+  writeOffline(OFFLINE_SESSIONS_KEY, [session, ...sessions].slice(0, 50));
+  return session;
+}
 
 async function createSession(userId: string, duration: number, taskId?: string) {
+  if (!isSupabaseConfigured || userId === OFFLINE_USER_ID) {
+    return saveOfflineSession(duration, taskId);
+  }
   const { data, error } = await supabase
     .from('pomodoro_sessions')
     .insert({ user_id: userId, duration_minutes: Math.round(duration / 60), task_id: taskId })
@@ -39,7 +59,7 @@ export function usePomodoro() {
 
   const tasksQuery = useQuery<Task[]>({
     queryKey: ['tasks', userId],
-    queryFn: () => fetchTasks(userId!),
+    queryFn: () => fetchTasks(userId ?? OFFLINE_USER_ID),
     enabled: Boolean(userId)
   });
 
@@ -87,6 +107,7 @@ export function usePomodoro() {
   }, [remaining, status, duration, taskId, mutation, reset]);
 
   return {
+    userId,
     duration,
     remaining,
     status,

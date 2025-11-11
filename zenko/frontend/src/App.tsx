@@ -8,14 +8,7 @@ function App() {
   const showToast = useToastStore((state) => state.show);
 
   useEffect(() => {
-    if (typeof window !== 'undefined' && window.__ZENKO_BOOT_ERROR__) {
-      showToast({
-        title: 'Modo limitado',
-        description: window.__ZENKO_BOOT_ERROR__,
-        type: 'info'
-      });
-      delete window.__ZENKO_BOOT_ERROR__;
-    } else if (!isSupabaseConfigured) {
+    if (!isSupabaseConfigured) {
       showToast({
         title: 'Configure o Supabase',
         description:

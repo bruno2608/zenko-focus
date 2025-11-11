@@ -2,6 +2,8 @@ import Button from '../../components/ui/Button';
 import Card from '../../components/ui/Card';
 import { usePomodoro } from './hooks';
 import PomodoroHistory from './PomodoroHistory';
+import OfflineNotice from '../../components/OfflineNotice';
+import { OFFLINE_USER_ID, isSupabaseConfigured } from '../../lib/supabase';
 
 const presets = [
   { label: '25 min foco', mode: 'focus', duration: 25 * 60 },
@@ -17,6 +19,7 @@ function formatTime(seconds: number) {
 
 export default function PomodoroTimer() {
   const {
+    userId,
     duration,
     remaining,
     status,
@@ -38,6 +41,9 @@ export default function PomodoroTimer() {
 
   return (
     <div className="space-y-6">
+      {!isSupabaseConfigured || userId === OFFLINE_USER_ID ? (
+        <OfflineNotice feature="Pomodoro" />
+      ) : null}
       <section className="space-y-4">
         <h1 className="text-xl font-semibold">Pomodoro</h1>
         <Card>

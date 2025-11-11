@@ -5,6 +5,8 @@ import Modal from '../../components/ui/Modal';
 import { useTasks } from './hooks';
 import { Task, TaskStatus } from './types';
 import TaskForm from './TaskForm';
+import OfflineNotice from '../../components/OfflineNotice';
+import { OFFLINE_USER_ID, isSupabaseConfigured } from '../../lib/supabase';
 
 const columns: { key: TaskStatus; title: string }[] = [
   { key: 'todo', title: 'A Fazer' },
@@ -13,7 +15,7 @@ const columns: { key: TaskStatus; title: string }[] = [
 ];
 
 export default function Kanban() {
-  const { tasks, isLoading, updateStatus, filters, setFilter } = useTasks();
+  const { tasks, isLoading, updateStatus, filters, setFilter, userId } = useTasks();
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
 
@@ -34,6 +36,9 @@ export default function Kanban() {
 
   return (
     <div className="space-y-4">
+      {!isSupabaseConfigured || userId === OFFLINE_USER_ID ? (
+        <OfflineNotice feature="Tarefas" />
+      ) : null}
       <div className="flex items-center justify-between gap-2">
         <h1 className="text-xl font-semibold">Tarefas</h1>
         <Button onClick={() => { setSelectedTask(null); setModalOpen(true); }}>Nova tarefa</Button>

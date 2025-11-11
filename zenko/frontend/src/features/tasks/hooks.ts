@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
-import { supabase } from '../../lib/supabase';
+import { OFFLINE_USER_ID, isSupabaseConfigured, supabase } from '../../lib/supabase';
 import { useToastStore } from '../../components/ui/ToastProvider';
 import { useTasksStore } from './store';
 import { Task, TaskPayload, TaskStatus } from './types';
@@ -17,7 +17,7 @@ export function useTasks() {
 
   const query = useQuery<Task[]>({
     queryKey: ['tasks', userId],
-    queryFn: () => fetchTasks(userId!),
+    queryFn: () => fetchTasks(userId ?? OFFLINE_USER_ID),
     enabled: Boolean(userId),
     staleTime: 5_000
   });
@@ -29,7 +29,7 @@ export function useTasks() {
   }, [query.data, setTasks]);
 
   useEffect(() => {
-    if (!userId) return;
+    if (!userId || !isSupabaseConfigured || userId === OFFLINE_USER_ID) return;
     const channel = supabase
       .channel('tasks-changes')
       .on(
@@ -46,7 +46,7 @@ export function useTasks() {
   }, [queryClient, userId]);
 
   const createMutation = useMutation({
-    mutationFn: (payload: TaskPayload) => createTask(userId!, payload),
+    mutationFn: (payload: TaskPayload) => createTask(userId ?? OFFLINE_USER_ID, payload),
     onSuccess: (task) => {
       queryClient.setQueryData<Task[]>(['tasks', userId], (old) => (old ? [...old, task] : [task]));
       toast({ title: 'Tarefa criada', type: 'success' });
@@ -55,7 +55,8 @@ export function useTasks() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, payload }: { id: string; payload: Partial<TaskPayload> }) => updateTask(id, payload),
+    mutationFn: ({ id, payload }: { id: string; payload: Partial<TaskPayload> }) =>
+      updateTask(id, payload, userId ?? OFFLINE_USER_ID),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tasks', userId] });
       toast({ title: 'Tarefa atualizada', type: 'success' });
@@ -64,7 +65,7 @@ export function useTasks() {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id: string) => deleteTask(id),
+    mutationFn: (id: string) => deleteTask(id, userId ?? OFFLINE_USER_ID),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tasks', userId] });
       toast({ title: 'Tarefa removida', type: 'success' });
@@ -73,7 +74,8 @@ export function useTasks() {
   });
 
   const statusMutation = useMutation({
-    mutationFn: ({ id, status }: { id: string; status: TaskStatus }) => updateTaskStatus(id, status),
+    mutationFn: ({ id, status }: { id: string; status: TaskStatus }) =>
+      updateTaskStatus(id, status, userId ?? OFFLINE_USER_ID),
     onMutate: async ({ id, status }) => {
       await queryClient.cancelQueries({ queryKey: ['tasks', userId] });
       const prevTasks = queryClient.getQueryData<Task[]>(['tasks', userId]);

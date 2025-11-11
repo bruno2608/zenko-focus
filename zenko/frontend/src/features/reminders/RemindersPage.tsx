@@ -5,9 +5,21 @@ import Modal from '../../components/ui/Modal';
 import { useReminders } from './hooks';
 import ReminderForm from './ReminderForm';
 import { Reminder } from './types';
+import OfflineNotice from '../../components/OfflineNotice';
+import { OFFLINE_USER_ID, isSupabaseConfigured } from '../../lib/supabase';
 
 export default function RemindersPage() {
-  const { upcoming, past, view, setView, isLoading, createReminder, updateReminder, deleteReminder } = useReminders();
+  const {
+    userId,
+    upcoming,
+    past,
+    view,
+    setView,
+    isLoading,
+    createReminder,
+    updateReminder,
+    deleteReminder
+  } = useReminders();
   const [selected, setSelected] = useState<Reminder | undefined>();
   const [open, setOpen] = useState(false);
 
@@ -15,6 +27,9 @@ export default function RemindersPage() {
 
   return (
     <div className="space-y-4">
+      {!isSupabaseConfigured || userId === OFFLINE_USER_ID ? (
+        <OfflineNotice feature="Lembretes" />
+      ) : null}
       <header className="flex items-center justify-between">
         <h1 className="text-xl font-semibold">Lembretes</h1>
         <Button

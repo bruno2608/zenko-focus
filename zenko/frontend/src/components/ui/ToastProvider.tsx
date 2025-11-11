@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { ReactNode, useEffect } from 'react';
+import { generateId } from '../../lib/id';
 
 interface Toast {
   id: string;
@@ -18,7 +19,7 @@ export const useToastStore = create<ToastState>((set) => ({
   toasts: [],
   show: (toast) =>
     set((state) => ({
-      toasts: [...state.toasts, { ...toast, id: crypto.randomUUID() }]
+      toasts: [...state.toasts, { ...toast, id: generateId() }]
     })),
   dismiss: (id) => set((state) => ({ toasts: state.toasts.filter((t) => t.id !== id) }))
 }));
