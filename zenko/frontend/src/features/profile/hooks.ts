@@ -27,8 +27,34 @@ export function useProfile() {
     }
   }, [query.data?.theme_preference, setTheme, theme]);
 
+  const buildPayload = (payload: ProfilePayload): ProfilePayload => {
+    const snapshot =
+      (queryClient.getQueryData(['profile', userId ?? OFFLINE_USER_ID]) as Profile | undefined) ?? {
+        full_name: '',
+        focus_area: '',
+        objectives: '',
+        avatar_url: null,
+        notifications_enabled: true,
+        auto_move_done: true,
+        pomodoro_sound: true,
+        theme_preference: theme
+      };
+
+    return {
+      full_name: snapshot.full_name,
+      focus_area: snapshot.focus_area,
+      objectives: snapshot.objectives,
+      avatar_url: snapshot.avatar_url,
+      notifications_enabled: snapshot.notifications_enabled,
+      auto_move_done: snapshot.auto_move_done,
+      pomodoro_sound: snapshot.pomodoro_sound,
+      theme_preference: snapshot.theme_preference,
+      ...payload
+    };
+  };
+
   const mutation = useMutation({
-    mutationFn: (payload: ProfilePayload) => saveProfile(userId ?? OFFLINE_USER_ID, payload),
+    mutationFn: (payload: ProfilePayload) => saveProfile(userId ?? OFFLINE_USER_ID, buildPayload(payload)),
     onSuccess: (profile) => {
       queryClient.setQueryData(['profile', userId ?? OFFLINE_USER_ID], profile);
       toast({ title: 'Perfil atualizado', type: 'success' });

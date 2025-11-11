@@ -1,6 +1,9 @@
+import { FormEvent, useState } from 'react';
 import Button from '../../components/ui/Button';
 import Card from '../../components/ui/Card';
 import Select from '../../components/ui/Select';
+import Input from '../../components/ui/Input';
+import Modal from '../../components/ui/Modal';
 import { usePomodoro } from './hooks';
 import PomodoroHistory from './PomodoroHistory';
 import OfflineNotice from '../../components/OfflineNotice';
@@ -34,10 +37,24 @@ export default function PomodoroTimer() {
     isLoadingTasks
   } = usePomodoro();
 
-  const handleCustom = () => {
-    const minutes = Number(prompt('Quantos minutos?'));
-    if (!Number.isFinite(minutes) || minutes <= 0) return;
+  const [isCustomOpen, setIsCustomOpen] = useState(false);
+  const [customMinutes, setCustomMinutes] = useState('25');
+
+  const openCustomModal = () => {
+    setCustomMinutes(String(Math.max(1, Math.round(duration / 60))));
+    setIsCustomOpen(true);
+  };
+
+  const closeCustomModal = () => setIsCustomOpen(false);
+
+  const handleCustomSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const minutes = Number(customMinutes);
+    if (!Number.isFinite(minutes) || minutes <= 0) {
+      return;
+    }
     setMode('custom' as any, minutes * 60);
+    setIsCustomOpen(false);
   };
 
   return (
@@ -49,7 +66,7 @@ export default function PomodoroTimer() {
             <h2 className="text-2xl font-semibold text-slate-900 dark:text-white">Timer inteligente</h2>
             <p className="text-sm text-slate-600 dark:text-slate-300">Acelere seus ciclos com presets refinados e notificações pontuais.</p>
           </div>
-          <Button variant="secondary" onClick={handleCustom}>
+          <Button variant="secondary" onClick={openCustomModal}>
             Tempo customizado
           </Button>
         </div>
@@ -105,6 +122,34 @@ export default function PomodoroTimer() {
           <p className="text-xs text-slate-500 dark:text-slate-400">Duração configurada: {Math.round(duration / 60)} min</p>
         </Card>
       </section>
+      <Modal title="Configurar tempo personalizado" open={isCustomOpen} onClose={closeCustomModal}>
+        <form className="space-y-6" onSubmit={handleCustomSubmit}>
+          <div className="space-y-2">
+            <label htmlFor="custom-minutes" className="text-sm font-medium text-slate-800 dark:text-slate-200">
+              Defina a duração em minutos
+            </label>
+            <Input
+              id="custom-minutes"
+              type="number"
+              min={1}
+              step={1}
+              required
+              value={customMinutes}
+              onChange={(event) => setCustomMinutes(event.target.value)}
+              className="text-lg"
+            />
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              Personalize ciclos específicos para sprints maiores ou revisões rápidas.
+            </p>
+          </div>
+          <div className="flex justify-end gap-3">
+            <Button type="button" variant="ghost" onClick={closeCustomModal}>
+              Cancelar
+            </Button>
+            <Button type="submit">Aplicar</Button>
+          </div>
+        </form>
+      </Modal>
       <PomodoroHistory />
     </div>
   );

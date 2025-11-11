@@ -144,8 +144,8 @@ export default function TabsLayout() {
         <div className="absolute bottom-[-4rem] right-[-2rem] hidden h-80 w-80 rounded-full bg-zenko-accent/20 blur-[160px] dark:block" />
         <div className="absolute inset-x-0 top-0 h-56 bg-gradient-to-b from-white/60 via-white/40 to-transparent dark:hidden" />
       </div>
-      <div className="relative mx-auto flex min-h-screen w-full max-w-6xl flex-col gap-6 px-4 pb-28 pt-8 sm:px-6 lg:flex-row lg:pb-12 lg:pl-6 lg:pr-8">
-        <aside className="hidden w-64 shrink-0 flex-col rounded-3xl border border-slate-200/80 bg-white/80 p-6 text-sm backdrop-blur dark:border-white/10 dark:bg-white/5 lg:flex">
+      <div className="relative mx-auto flex min-h-screen w-full max-w-screen-2xl flex-col gap-6 px-4 pb-28 pt-8 sm:px-6 lg:flex-row lg:gap-8 lg:pb-12 xl:max-w-[90rem] xl:px-12">
+        <aside className="hidden w-72 shrink-0 flex-col rounded-3xl border border-slate-200/80 bg-white/80 p-6 text-sm backdrop-blur dark:border-white/10 dark:bg-white/5 lg:flex xl:w-80">
           <div className="mb-8 flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-zenko-primary to-zenko-secondary text-base font-semibold text-white">
               Z
@@ -183,26 +183,28 @@ export default function TabsLayout() {
           </div>
         </aside>
         <div className="relative flex-1">
-          <header className="mb-6 rounded-3xl border border-slate-200/70 bg-white/80 p-5 shadow-[0_20px_45px_-20px_rgba(15,23,42,0.15)] backdrop-blur dark:border-white/10 dark:bg-white/5">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-              <div>
-                <p className="text-xs uppercase tracking-[0.35em] text-slate-500 dark:text-zenko-muted">Zenko · Produtividade</p>
-                <h1 className="mt-2 text-3xl font-semibold text-slate-900 dark:text-white">{greetingTitle}</h1>
-                <p className="text-sm text-slate-600 dark:text-slate-300">{greetingSubtitle}</p>
-              </div>
-              <div className="flex items-center gap-3">
-                <div className="rounded-2xl border border-slate-200 bg-white/70 px-4 py-2 text-xs font-medium text-slate-600 shadow-sm backdrop-blur dark:border-white/10 dark:bg-white/10 dark:text-slate-200">
-                  {todayLabel}
+          <div className="relative flex h-full flex-col lg:min-h-[calc(100vh-10rem)]">
+            <header className="mb-6 rounded-3xl border border-slate-200/70 bg-white/80 p-5 shadow-[0_20px_45px_-20px_rgba(15,23,42,0.15)] backdrop-blur dark:border-white/10 dark:bg-white/5">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <p className="text-xs uppercase tracking-[0.35em] text-slate-500 dark:text-zenko-muted">Zenko · Produtividade</p>
+                  <h1 className="mt-2 text-3xl font-semibold text-slate-900 dark:text-white">{greetingTitle}</h1>
+                  <p className="text-sm text-slate-600 dark:text-slate-300">{greetingSubtitle}</p>
                 </div>
-                <div className="lg:hidden">
-                  <ThemeToggle />
+                <div className="flex items-center gap-3">
+                  <div className="rounded-2xl border border-slate-200 bg-white/70 px-4 py-2 text-xs font-medium text-slate-600 shadow-sm backdrop-blur dark:border-white/10 dark:bg-white/10 dark:text-slate-200">
+                    {todayLabel}
+                  </div>
+                  <div className="lg:hidden">
+                    <ThemeToggle />
+                  </div>
                 </div>
               </div>
-            </div>
-          </header>
-          <main className="flex-1 space-y-6 overflow-y-auto pb-6">
-            <Outlet />
-          </main>
+            </header>
+            <main className="flex-1 space-y-6 overflow-visible pb-6 lg:pb-8">
+              <Outlet />
+            </main>
+          </div>
         </div>
       </div>
       <nav className="fixed bottom-4 left-1/2 z-40 w-[calc(100%-2rem)] max-w-2xl -translate-x-1/2 rounded-3xl border border-slate-200/80 bg-white/90 p-2 shadow-lg shadow-slate-900/10 backdrop-blur dark:border-white/10 dark:bg-slate-950/80 lg:hidden">

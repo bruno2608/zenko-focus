@@ -4,6 +4,14 @@ export type ThemeMode = 'light' | 'dark';
 
 const STORAGE_KEY = 'zenko-theme';
 
+function applyTheme(theme: ThemeMode) {
+  if (typeof document === 'undefined') return;
+  const root = document.documentElement;
+  root.classList.toggle('dark', theme === 'dark');
+  root.dataset.theme = theme;
+  root.style.setProperty('color-scheme', theme);
+}
+
 function getInitialTheme(): ThemeMode {
   if (typeof window === 'undefined') {
     return 'dark';
@@ -26,11 +34,7 @@ interface ThemeState {
 
 const initialTheme = getInitialTheme();
 
-if (typeof document !== 'undefined') {
-  document.documentElement.classList.toggle('dark', initialTheme === 'dark');
-  document.documentElement.dataset.theme = initialTheme;
-  document.documentElement.style.setProperty('color-scheme', initialTheme);
-}
+applyTheme(initialTheme);
 
 export const useThemeStore = create<ThemeState>((set) => ({
   theme: initialTheme,
@@ -38,6 +42,7 @@ export const useThemeStore = create<ThemeState>((set) => ({
     if (typeof window !== 'undefined') {
       window.localStorage.setItem(STORAGE_KEY, theme);
     }
+    applyTheme(theme);
     set({ theme });
   },
   toggleTheme: () =>
@@ -46,6 +51,7 @@ export const useThemeStore = create<ThemeState>((set) => ({
       if (typeof window !== 'undefined') {
         window.localStorage.setItem(STORAGE_KEY, nextTheme);
       }
+      applyTheme(nextTheme);
       return { theme: nextTheme };
     })
 }));
