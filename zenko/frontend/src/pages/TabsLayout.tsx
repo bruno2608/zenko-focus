@@ -112,6 +112,7 @@ export default function TabsLayout() {
   const navigate = useNavigate();
   const { profile, isLoading: profileLoading, isSaving: profileSaving, updateProfile } = useProfile();
   const [showOnboarding, setShowOnboarding] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useEffect(() => {
     if (location.pathname === '') {
@@ -144,7 +145,7 @@ export default function TabsLayout() {
         <div className="absolute bottom-[-4rem] right-[-2rem] hidden h-80 w-80 rounded-full bg-zenko-accent/20 blur-[160px] dark:block" />
         <div className="absolute inset-x-0 top-0 h-56 bg-gradient-to-b from-white/60 via-white/40 to-transparent dark:hidden" />
       </div>
-      <div className="relative mx-auto flex min-h-screen w-full max-w-screen-2xl flex-col gap-6 px-4 pb-28 pt-8 sm:px-6 lg:flex-row lg:gap-8 lg:pb-12 xl:max-w-[90rem] xl:px-12">
+      <div className="relative mx-auto flex min-h-screen w-full max-w-screen-2xl flex-col gap-6 px-4 pb-[calc(8rem+env(safe-area-inset-bottom))] pt-[calc(2rem+env(safe-area-inset-top))] sm:px-6 lg:flex-row lg:gap-8 lg:pb-16 lg:pt-12 xl:max-w-[90rem] xl:px-12">
         <aside className="hidden w-72 shrink-0 flex-col rounded-3xl border border-slate-200/80 bg-white/80 p-6 text-sm backdrop-blur dark:border-white/10 dark:bg-white/5 lg:flex xl:w-80">
           <div className="mb-8 flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-zenko-primary to-zenko-secondary text-base font-semibold text-white">
@@ -184,6 +185,35 @@ export default function TabsLayout() {
         </aside>
         <div className="relative flex-1">
           <div className="relative flex h-full flex-col lg:min-h-[calc(100vh-10rem)]">
+            <div className="mb-4 flex items-center justify-between rounded-2xl border border-slate-200/80 bg-white/80 px-4 py-3 backdrop-blur dark:border-white/10 dark:bg-white/5 lg:hidden">
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => setMobileMenuOpen(true)}
+                  className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 bg-white/80 text-slate-700 transition hover:bg-white dark:border-white/10 dark:bg-white/10 dark:text-slate-200 dark:hover:bg-white/15"
+                  aria-label="Abrir menu de navegação"
+                >
+                  <svg
+                    className="h-5 w-5"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.6"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M4 7h16" />
+                    <path d="M4 12h16" />
+                    <path d="M4 17h16" />
+                  </svg>
+                </button>
+                <div>
+                  <p className="text-[11px] uppercase tracking-[0.35em] text-slate-500 dark:text-zenko-muted">Zenko</p>
+                  <p className="text-base font-semibold text-slate-900 dark:text-white">Produtividade unificada</p>
+                </div>
+              </div>
+              <ThemeToggle />
+            </div>
             <header className="mb-6 rounded-3xl border border-slate-200/70 bg-white/80 p-5 shadow-[0_20px_45px_-20px_rgba(15,23,42,0.15)] backdrop-blur dark:border-white/10 dark:bg-white/5">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div>
@@ -195,9 +225,6 @@ export default function TabsLayout() {
                   <div className="rounded-2xl border border-slate-200 bg-white/70 px-4 py-2 text-xs font-medium text-slate-600 shadow-sm backdrop-blur dark:border-white/10 dark:bg-white/10 dark:text-slate-200">
                     {todayLabel}
                   </div>
-                  <div className="lg:hidden">
-                    <ThemeToggle />
-                  </div>
                 </div>
               </div>
             </header>
@@ -207,7 +234,9 @@ export default function TabsLayout() {
           </div>
         </div>
       </div>
-      <nav className="fixed bottom-4 left-1/2 z-40 w-[calc(100%-2rem)] max-w-2xl -translate-x-1/2 rounded-3xl border border-slate-200/80 bg-white/90 p-2 shadow-lg shadow-slate-900/10 backdrop-blur dark:border-white/10 dark:bg-slate-950/80 lg:hidden">
+      <nav className="fixed left-1/2 z-40 w-[calc(100%-2rem)] max-w-2xl -translate-x-1/2 rounded-3xl border border-slate-200/80 bg-white/90 p-2 shadow-lg shadow-slate-900/10 backdrop-blur dark:border-white/10 dark:bg-slate-950/80 lg:hidden"
+        style={{ bottom: `max(1rem, calc(env(safe-area-inset-bottom) + 1rem))` }}
+      >
         <div className="grid grid-cols-5 gap-2">
           {tabs.map((tab) => (
             <NavLink
@@ -241,6 +270,66 @@ export default function TabsLayout() {
           setShowOnboarding(false);
         }}
       />
+      {mobileMenuOpen && (
+        <div className="fixed inset-0 z-50 flex flex-col bg-slate-950/70 px-4 pb-[calc(2rem+env(safe-area-inset-bottom))] pt-[calc(5rem+env(safe-area-inset-top))] backdrop-blur-lg lg:hidden">
+          <button
+            type="button"
+            onClick={() => setMobileMenuOpen(false)}
+            className="absolute right-6 top-[calc(env(safe-area-inset-top)+1.5rem)] inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-white/20 bg-white/10 text-white transition hover:bg-white/20"
+            aria-label="Fechar menu de navegação"
+          >
+            ×
+          </button>
+          <div className="mx-auto w-full max-w-md flex-1 overflow-y-auto rounded-3xl border border-white/10 bg-slate-900/70 p-6 shadow-[0_25px_80px_-20px_rgba(7,11,20,0.85)] backdrop-blur-xl">
+            <div className="mb-6 text-center">
+              <p className="text-xs uppercase tracking-[0.35em] text-white/70">Navegação</p>
+              <h2 className="mt-2 text-xl font-semibold text-white">Explore o Zenko</h2>
+            </div>
+            <nav className="space-y-3">
+              {tabs.map((tab) => (
+                <NavLink
+                  key={`mobile-${tab.to}`}
+                  to={tab.to}
+                  end={tab.to === '/'}
+                  onClick={() => setMobileMenuOpen(false)}
+                  className={({ isActive }) =>
+                    `flex items-center justify-between rounded-3xl border px-4 py-3 text-base font-semibold transition-all ${
+                      isActive
+                        ? 'border-zenko-primary/60 bg-gradient-to-r from-zenko-primary/40 via-zenko-secondary/30 to-zenko-primary/40 text-white'
+                        : 'border-white/10 bg-white/5 text-white/80 hover:border-zenko-primary/40 hover:bg-white/10 hover:text-white'
+                    }`
+                  }
+                >
+                  <span className="flex items-center gap-3">
+                    <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white/10 text-white">
+                      {tab.icon}
+                    </span>
+                    {tab.label}
+                  </span>
+                  <svg
+                    className="h-4 w-4"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="m9 18 6-6-6-6" />
+                  </svg>
+                </NavLink>
+              ))}
+            </nav>
+            <div className="mt-8 rounded-3xl border border-white/10 bg-white/5 p-4 text-left">
+              <p className="text-sm font-medium text-white/90">Preferências rápidas</p>
+              <div className="mt-3 flex items-center justify-between gap-3">
+                <span className="text-sm text-white/70">Tema do aplicativo</span>
+                <ThemeToggle />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
