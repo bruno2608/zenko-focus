@@ -486,7 +486,7 @@ export default function Kanban() {
                     >
                       <div className="flex items-start gap-3">
                         <label
-                          className={`mt-1 flex h-6 w-6 items-center justify-center rounded-full border border-slate-300 bg-white/80 text-zenko-primary shadow-sm transition dark:border-white/20 dark:bg-white/10 ${
+                          className={`mt-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-slate-300 bg-white/80 text-zenko-primary shadow-sm transition dark:border-white/20 dark:bg-white/10 ${
                             autoMoveToDone ? 'cursor-pointer hover:scale-[1.02]' : 'cursor-not-allowed opacity-50'
                           }`}
                           onClick={(event) => event.stopPropagation()}
