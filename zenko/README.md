@@ -26,9 +26,10 @@ Zenko é um aplicativo mobile-first de produtividade com quatro módulos integra
 
 1. Crie um novo projeto no [Supabase](https://supabase.com/).
 2. No Dashboard, copie a **Project URL** e a **anon public key**.
-3. Execute o script `schema.sql` na aba SQL do Supabase para criar tabelas, views e índices.
-4. No Storage, crie um bucket público chamado `attachments`.
-5. (Opcional) Configure regras de Storage para permitir upload/leitura autenticados.
+3. Em **Auth › Providers**, habilite a opção **Enable anonymous sign-ins** para permitir a autenticação anônima usada pelo app.
+4. Execute o script `schema.sql` na aba SQL do Supabase para criar tabelas, views e índices.
+5. No Storage, crie um bucket público chamado `attachments`.
+6. (Opcional) Configure regras de Storage para permitir upload/leitura autenticados.
 
 ## Variáveis de ambiente
 

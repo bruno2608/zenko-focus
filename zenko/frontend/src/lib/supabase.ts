@@ -1,8 +1,9 @@
 import { createClient } from '@supabase/supabase-js';
 import { del, get, set } from 'idb-keyval';
+import { useConnectivityStore } from '../store/connectivity';
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL ?? '';
-const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY ?? '';
+const SUPABASE_URL = (import.meta.env.VITE_SUPABASE_URL ?? '').trim();
+const SUPABASE_ANON_KEY = (import.meta.env.VITE_SUPABASE_ANON_KEY ?? '').trim();
 
 export const isSupabaseConfigured = Boolean(SUPABASE_URL && SUPABASE_ANON_KEY);
 export const OFFLINE_USER_ID = 'offline-user';
@@ -33,6 +34,14 @@ export const supabase = createClient(
     }
   }
 );
+
+export function isOfflineMode(userId?: string | null) {
+  if (!isSupabaseConfigured) return true;
+  const { status } = useConnectivityStore.getState();
+  if (status === 'checking') return false;
+  if (status !== 'online') return true;
+  return userId === OFFLINE_USER_ID;
+}
 
 export async function getCurrentUser() {
   try {

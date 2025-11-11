@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
-import { OFFLINE_USER_ID, isSupabaseConfigured, supabase } from '../../lib/supabase';
+import { OFFLINE_USER_ID, isOfflineMode, supabase } from '../../lib/supabase';
 import { useToastStore } from '../../components/ui/ToastProvider';
 import { useTasksStore } from './store';
 import { Task, TaskPayload, TaskStatus } from './types';
@@ -29,7 +29,7 @@ export function useTasks() {
   }, [query.data, setTasks]);
 
   useEffect(() => {
-    if (!userId || !isSupabaseConfigured || userId === OFFLINE_USER_ID) return;
+    if (!userId || isOfflineMode(userId)) return;
     const channel = supabase
       .channel('tasks-changes')
       .on(

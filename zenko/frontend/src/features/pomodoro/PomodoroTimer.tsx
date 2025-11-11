@@ -7,7 +7,8 @@ import Modal from '../../components/ui/Modal';
 import { usePomodoro } from './hooks';
 import PomodoroHistory from './PomodoroHistory';
 import OfflineNotice from '../../components/OfflineNotice';
-import { OFFLINE_USER_ID, isSupabaseConfigured } from '../../lib/supabase';
+import { isOfflineMode } from '../../lib/supabase';
+import { useConnectivityStore } from '../../store/connectivity';
 
 const presets = [
   { label: '25 min foco', mode: 'focus', duration: 25 * 60 },
@@ -39,6 +40,8 @@ export default function PomodoroTimer() {
 
   const [isCustomOpen, setIsCustomOpen] = useState(false);
   const [customMinutes, setCustomMinutes] = useState('25');
+  const connectivityStatus = useConnectivityStore((state) => state.status);
+  const showOffline = connectivityStatus === 'limited' || isOfflineMode(userId);
 
   const openCustomModal = () => {
     setCustomMinutes(String(Math.max(1, Math.round(duration / 60))));
@@ -59,7 +62,7 @@ export default function PomodoroTimer() {
 
   return (
     <div className="space-y-6">
-      {!isSupabaseConfigured || userId === OFFLINE_USER_ID ? <OfflineNotice feature="Pomodoro" /> : null}
+      {showOffline ? <OfflineNotice feature="Pomodoro" /> : null}
       <section className="space-y-4">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div>

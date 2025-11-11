@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { OFFLINE_USER_ID, isSupabaseConfigured, supabase } from '../../lib/supabase';
+import { OFFLINE_USER_ID, isOfflineMode, supabase } from '../../lib/supabase';
 import { useReminderStore } from './store';
 import { useToastStore } from '../../components/ui/ToastProvider';
 import { createReminder, deleteReminder, fetchReminders, updateReminder } from './api';
@@ -37,7 +37,7 @@ export function useReminders() {
   }, [query.data, setReminders]);
 
   useEffect(() => {
-    if (!userId || !isSupabaseConfigured || userId === OFFLINE_USER_ID) return;
+    if (!userId || isOfflineMode(userId)) return;
     const channel = supabase
       .channel('reminders-changes')
       .on(

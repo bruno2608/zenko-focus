@@ -5,7 +5,7 @@ import App from './App';
 import './index.css';
 import { isSupabaseConfigured, supabase } from './lib/supabase';
 import { initNotifications } from './lib/notifications';
-import { useToastStore } from './components/ui/ToastProvider';
+import { useConnectivityStore } from './store/connectivity';
 
 const queryClient = new QueryClient();
 
@@ -21,25 +21,33 @@ root.render(
 );
 
 async function bootstrap() {
-  if (isSupabaseConfigured) {
+  const setConnectivityStatus = useConnectivityStore.getState().setStatus;
+
+  if (!isSupabaseConfigured) {
+    setConnectivityStatus(
+      'limited',
+      'Defina VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY para conectar ao Supabase.'
+    );
+  } else {
+    setConnectivityStatus('checking');
     try {
       const {
-        data: { session }
+        data: { session },
+        error
       } = await supabase.auth.getSession();
 
+      if (error) throw error;
+
       if (!session) {
-        await supabase.auth.signInAnonymously();
+        const { error: signInError } = await supabase.auth.signInAnonymously();
+        if (signInError) throw signInError;
       }
+
+      setConnectivityStatus('online');
     } catch (error) {
       console.warn('Falha ao inicializar a autenticação anônima do Supabase.', error);
-      const message =
-        (error instanceof Error ? error.message : 'Falha ao conectar ao Supabase.') +
-        ' Alguns recursos permanecerão limitados até a configuração correta.';
-      useToastStore.getState().show({
-        title: 'Modo limitado',
-        description: message,
-        type: 'info'
-      });
+      const message = buildSupabaseErrorMessage(error);
+      setConnectivityStatus('limited', message);
     }
   }
 
@@ -50,8 +58,16 @@ async function bootstrap() {
   }
 }
 
-if (!isSupabaseConfigured) {
-  console.info('Supabase não configurado. Inicializando em modo offline.');
-}
-
 bootstrap();
+
+function buildSupabaseErrorMessage(error: unknown) {
+  const baseMessage =
+    error instanceof Error && error.message
+      ? error.message
+      : 'Falha ao conectar ao Supabase.';
+
+  return (
+    baseMessage +
+    ' Verifique se as credenciais estão corretas e se "Enable anonymous sign-ins" está ativo em Auth > Providers no Supabase.'
+  );
+}

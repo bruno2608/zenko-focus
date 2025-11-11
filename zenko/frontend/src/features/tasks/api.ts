@@ -1,13 +1,9 @@
-import { OFFLINE_USER_ID, isSupabaseConfigured, supabase } from '../../lib/supabase';
+import { OFFLINE_USER_ID, isOfflineMode, supabase } from '../../lib/supabase';
 import { generateId } from '../../lib/id';
 import { readOffline, writeOffline } from '../../lib/offline';
 import { Task, TaskPayload, TaskStatus } from './types';
 
 const OFFLINE_TASKS_KEY = 'tasks';
-
-function isOffline(userId: string) {
-  return !isSupabaseConfigured || userId === OFFLINE_USER_ID;
-}
 
 function loadOfflineTasks() {
   return readOffline<Task[]>(OFFLINE_TASKS_KEY, []);
@@ -27,7 +23,7 @@ async function toDataUrl(file: File) {
 }
 
 export async function fetchTasks(userId: string) {
-  if (isOffline(userId)) {
+  if (isOfflineMode(userId)) {
     return loadOfflineTasks();
   }
   const { data, error } = await supabase
@@ -40,7 +36,7 @@ export async function fetchTasks(userId: string) {
 }
 
 export async function createTask(userId: string, payload: TaskPayload) {
-  if (isOffline(userId)) {
+  if (isOfflineMode(userId)) {
     const now = new Date().toISOString();
     const task: Task = {
       id: generateId(),
@@ -70,7 +66,7 @@ export async function createTask(userId: string, payload: TaskPayload) {
 }
 
 export async function updateTask(taskId: string, payload: Partial<TaskPayload>, userId?: string) {
-  if (!isSupabaseConfigured || userId === OFFLINE_USER_ID) {
+  if (isOfflineMode(userId)) {
     const tasks = loadOfflineTasks();
     const updated = tasks.map((task) =>
       task.id === taskId
@@ -104,14 +100,14 @@ export async function updateTask(taskId: string, payload: Partial<TaskPayload>, 
 }
 
 export async function updateTaskStatus(taskId: string, status: TaskStatus, userId?: string) {
-  if (!isSupabaseConfigured || userId === OFFLINE_USER_ID) {
+  if (isOfflineMode(userId)) {
     return updateTask(taskId, { status }, userId);
   }
   return updateTask(taskId, { status }, userId);
 }
 
 export async function deleteTask(taskId: string, userId?: string) {
-  if (!isSupabaseConfigured || userId === OFFLINE_USER_ID) {
+  if (isOfflineMode(userId)) {
     const tasks = loadOfflineTasks().filter((task) => task.id !== taskId);
     persistOfflineTasks(tasks);
     return;
@@ -121,7 +117,7 @@ export async function deleteTask(taskId: string, userId?: string) {
 }
 
 export async function uploadAttachment(file: File) {
-  if (!isSupabaseConfigured) {
+  if (isOfflineMode()) {
     return { name: file.name, url: await toDataUrl(file) };
   }
   const filePath = `${generateId()}-${file.name}`;

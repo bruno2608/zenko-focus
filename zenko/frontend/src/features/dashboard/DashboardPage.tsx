@@ -2,11 +2,12 @@ import { useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, YAxis } from 'recharts';
 import Card from '../../components/ui/Card';
-import { OFFLINE_USER_ID, isSupabaseConfigured, supabase } from '../../lib/supabase';
+import { isOfflineMode, supabase } from '../../lib/supabase';
 import { fetchKpis, fetchTaskStatusDistribution, fetchTasksCompletedByDay } from './api';
 import { useSupabaseUserId } from '../../hooks/useSupabaseUser';
 import OfflineNotice from '../../components/OfflineNotice';
 import { useThemeStore } from '../../store/theme';
+import { useConnectivityStore } from '../../store/connectivity';
 
 const COLORS = ['#38bdf8', '#6366f1', '#22d3ee'];
 
@@ -14,6 +15,8 @@ export default function DashboardPage() {
   const userId = useSupabaseUserId();
   const theme = useThemeStore((state) => state.theme);
   const queryClient = useQueryClient();
+  const connectivityStatus = useConnectivityStore((state) => state.status);
+  const showOffline = connectivityStatus === 'limited' || isOfflineMode(userId);
 
   const kpiQuery = useQuery({
     queryKey: ['dashboard', userId],
@@ -34,7 +37,7 @@ export default function DashboardPage() {
   });
 
   useEffect(() => {
-    if (!userId || !isSupabaseConfigured || userId === OFFLINE_USER_ID) return;
+    if (!userId || isOfflineMode(userId)) return;
     const channel = supabase
       .channel('dashboard-live')
       .on(
@@ -85,7 +88,7 @@ export default function DashboardPage() {
           <p className="text-sm text-slate-600 dark:text-slate-300">Acompanhe resultados das suas ações sem precisar atualizar a página.</p>
         </div>
       </div>
-      {!isSupabaseConfigured || userId === OFFLINE_USER_ID ? <OfflineNotice feature="Dashboard" /> : null}
+      {showOffline ? <OfflineNotice feature="Dashboard" /> : null}
       <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
         <Card className="border-slate-200/80 bg-gradient-to-br from-zenko-primary/10 via-transparent to-zenko-secondary/10 dark:border-white/5 dark:from-zenko-primary/20 dark:to-zenko-secondary/20">
           <h3 className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-300">Tarefas totais</h3>

@@ -1,4 +1,4 @@
-import { OFFLINE_USER_ID, isSupabaseConfigured, supabase } from '../../lib/supabase';
+import { OFFLINE_USER_ID, isOfflineMode, supabase } from '../../lib/supabase';
 import { readOffline, writeOffline } from '../../lib/offline';
 import { Profile, ProfilePayload } from './types';
 
@@ -52,7 +52,7 @@ export async function fetchProfile(userId: string): Promise<Profile> {
     throw new Error('Usuário não identificado para carregar perfil.');
   }
 
-  if (!isSupabaseConfigured || userId === OFFLINE_USER_ID) {
+  if (isOfflineMode(userId)) {
     return readOfflineProfile(userId);
   }
 
@@ -83,7 +83,7 @@ export async function saveProfile(userId: string, payload: ProfilePayload): Prom
     throw new Error('Usuário não identificado para atualizar perfil.');
   }
 
-  if (!isSupabaseConfigured || userId === OFFLINE_USER_ID) {
+  if (isOfflineMode(userId)) {
     const base = readOfflineProfile(userId);
     const merged: Profile = {
       ...base,

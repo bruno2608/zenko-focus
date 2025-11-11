@@ -1,23 +1,36 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { RouterProvider } from 'react-router-dom';
 import Router from './routes/Router';
 import { ToastProvider, useToastStore } from './components/ui/ToastProvider';
 import { ThemeProvider } from './components/ui/ThemeProvider';
-import { isSupabaseConfigured } from './lib/supabase';
+import { useConnectivityStore } from './store/connectivity';
 
 function App() {
   const showToast = useToastStore((state) => state.show);
+  const { status, lastError } = useConnectivityStore((state) => state);
+  const lastMessageRef = useRef<string | null>(null);
 
   useEffect(() => {
-    if (!isSupabaseConfigured) {
-      showToast({
-        title: 'Configure o Supabase',
-        description:
-          'Defina VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY no arquivo .env para habilitar sincronização e autenticação.',
-        type: 'info'
-      });
+    if (status !== 'limited') {
+      lastMessageRef.current = null;
+      return;
     }
-  }, [showToast]);
+
+    const message =
+      lastError ??
+      'Sem conexão com o Supabase. Ajuste as credenciais ou tente novamente para habilitar a sincronização.';
+
+    if (lastMessageRef.current === message) {
+      return;
+    }
+
+    lastMessageRef.current = message;
+    showToast({
+      title: 'Conexão limitada',
+      description: message,
+      type: 'info'
+    });
+  }, [lastError, showToast, status]);
 
   return (
     <ThemeProvider>

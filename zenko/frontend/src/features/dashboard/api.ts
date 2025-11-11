@@ -1,4 +1,4 @@
-import { isSupabaseConfigured, OFFLINE_USER_ID, supabase } from '../../lib/supabase';
+import { isOfflineMode, OFFLINE_USER_ID, supabase } from '../../lib/supabase';
 import { readOffline } from '../../lib/offline';
 
 const OFFLINE_TASKS_KEY = 'tasks';
@@ -6,7 +6,7 @@ const OFFLINE_SESSIONS_KEY = 'pomodoro-sessions';
 const OFFLINE_REMINDERS_KEY = 'reminders';
 
 export async function fetchKpis(userId: string) {
-  if (!isSupabaseConfigured || userId === OFFLINE_USER_ID) {
+  if (isOfflineMode(userId)) {
     const tasks = readOffline<any[]>(OFFLINE_TASKS_KEY, []);
     const sessions = readOffline<any[]>(OFFLINE_SESSIONS_KEY, []);
     const reminders = readOffline<any[]>(OFFLINE_REMINDERS_KEY, []);
@@ -49,7 +49,7 @@ export async function fetchKpis(userId: string) {
 }
 
 export async function fetchTaskStatusDistribution(userId: string) {
-  if (!isSupabaseConfigured || userId === OFFLINE_USER_ID) {
+  if (isOfflineMode(userId)) {
     const tasks = readOffline<any[]>(OFFLINE_TASKS_KEY, []);
     const counts: Record<string, number> = { todo: 0, doing: 0, done: 0 };
     tasks.forEach((task) => {
@@ -70,7 +70,7 @@ export async function fetchTaskStatusDistribution(userId: string) {
 }
 
 export async function fetchTasksCompletedByDay(userId: string) {
-  if (!isSupabaseConfigured || userId === OFFLINE_USER_ID) {
+  if (isOfflineMode(userId)) {
     const tasks = readOffline<any[]>(OFFLINE_TASKS_KEY, []);
     const cutoff = new Date();
     cutoff.setDate(cutoff.getDate() - 6);

@@ -6,7 +6,8 @@ import { useReminders } from './hooks';
 import ReminderForm from './ReminderForm';
 import { Reminder } from './types';
 import OfflineNotice from '../../components/OfflineNotice';
-import { OFFLINE_USER_ID, isSupabaseConfigured } from '../../lib/supabase';
+import { isOfflineMode } from '../../lib/supabase';
+import { useConnectivityStore } from '../../store/connectivity';
 
 const toggleClass = (active: boolean) =>
   `flex-1 rounded-2xl px-4 py-2 text-sm font-medium transition ${
@@ -30,11 +31,13 @@ export default function RemindersPage() {
   const [selected, setSelected] = useState<Reminder | undefined>();
   const [open, setOpen] = useState(false);
 
+  const status = useConnectivityStore((state) => state.status);
+  const showOffline = status === 'limited' || isOfflineMode(userId);
   const list = view === 'upcoming' ? upcoming : past;
 
   return (
     <div className="space-y-6">
-      {!isSupabaseConfigured || userId === OFFLINE_USER_ID ? <OfflineNotice feature="Lembretes" /> : null}
+      {showOffline ? <OfflineNotice feature="Lembretes" /> : null}
       <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-2xl font-semibold text-slate-900 dark:text-white">Lembretes atentos</h2>

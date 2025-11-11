@@ -7,8 +7,9 @@ import { useTasks } from './hooks';
 import { Task, TaskStatus } from './types';
 import TaskForm from './TaskForm';
 import OfflineNotice from '../../components/OfflineNotice';
-import { OFFLINE_USER_ID, isSupabaseConfigured } from '../../lib/supabase';
+import { isOfflineMode } from '../../lib/supabase';
 import { useProfile } from '../profile/hooks';
+import { useConnectivityStore } from '../../store/connectivity';
 
 const columns: { key: TaskStatus; title: string; accent: string }[] = [
   {
@@ -34,6 +35,8 @@ export default function Kanban() {
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [draggingId, setDraggingId] = useState<string | null>(null);
+  const connectivityStatus = useConnectivityStore((state) => state.status);
+  const showOffline = connectivityStatus === 'limited' || isOfflineMode(userId);
 
   const autoMoveToDone = profile?.auto_move_done ?? true;
 
@@ -59,7 +62,7 @@ export default function Kanban() {
 
   return (
     <div className="space-y-6">
-      {!isSupabaseConfigured || userId === OFFLINE_USER_ID ? <OfflineNotice feature="Tarefas" /> : null}
+      {showOffline ? <OfflineNotice feature="Tarefas" /> : null}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-2xl font-semibold text-slate-900 dark:text-white">Quadro de tarefas</h2>

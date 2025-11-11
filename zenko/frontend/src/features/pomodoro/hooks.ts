@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { OFFLINE_USER_ID, isSupabaseConfigured, supabase } from '../../lib/supabase';
+import { OFFLINE_USER_ID, isOfflineMode, supabase } from '../../lib/supabase';
 import { usePomodoroStore } from './store';
 import { scheduleNotification } from '../../lib/notifications';
 import { useToastStore } from '../../components/ui/ToastProvider';
@@ -26,7 +26,7 @@ function saveOfflineSession(duration: number, taskId?: string) {
 }
 
 async function createSession(userId: string, duration: number, taskId?: string) {
-  if (!isSupabaseConfigured || userId === OFFLINE_USER_ID) {
+  if (isOfflineMode(userId)) {
     return saveOfflineSession(duration, taskId);
   }
   const { data, error } = await supabase

@@ -5,8 +5,9 @@ import Textarea from '../../components/ui/Textarea';
 import Button from '../../components/ui/Button';
 import Switch from '../../components/ui/Switch';
 import OfflineNotice from '../../components/OfflineNotice';
-import { isSupabaseConfigured, OFFLINE_USER_ID } from '../../lib/supabase';
+import { isOfflineMode } from '../../lib/supabase';
 import { useProfile } from './hooks';
+import { useConnectivityStore } from '../../store/connectivity';
 
 export default function ProfilePage() {
   const { profile, isLoading, isSaving, updateProfile, userId } = useProfile();
@@ -50,9 +51,12 @@ export default function ProfilePage() {
     });
   };
 
+  const connectivityStatus = useConnectivityStore((state) => state.status);
+  const showOffline = connectivityStatus === 'limited' || isOfflineMode(userId);
+
   return (
     <div className="space-y-6">
-      {!isSupabaseConfigured || userId === OFFLINE_USER_ID ? <OfflineNotice feature="Perfil" /> : null}
+      {showOffline ? <OfflineNotice feature="Perfil" /> : null}
       <header>
         <h2 className="text-2xl font-semibold text-slate-900 dark:text-white">Perfil e preferências</h2>
         <p className="text-sm text-slate-600 dark:text-slate-300">

@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import Card from '../../components/ui/Card';
-import { getCurrentUser, isSupabaseConfigured, supabase } from '../../lib/supabase';
+import { getCurrentUser, isOfflineMode, supabase } from '../../lib/supabase';
 import { usePomodoroStore } from './store';
 import { readOffline } from '../../lib/offline';
 
@@ -12,7 +12,7 @@ export default function PomodoroHistory() {
 
   useEffect(() => {
     let active = true;
-    if (!isSupabaseConfigured) {
+    if (isOfflineMode()) {
       const offline = readOffline<any[]>(OFFLINE_SESSIONS_KEY, []);
       if (active) {
         setHistory(
@@ -30,6 +30,7 @@ export default function PomodoroHistory() {
     }
 
     (async () => {
+      if (isOfflineMode()) return;
       const user = await getCurrentUser();
       if (!user) return;
       try {
