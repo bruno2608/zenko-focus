@@ -3,21 +3,26 @@ import { createStore, del, get, set, type Store } from 'idb-keyval';
 export type OfflineResource = 'tasks' | 'reminders' | 'pomodoro_sessions' | 'profiles';
 
 const DB_NAME = 'zenko-offline';
+const STORE_NAME = 'data';
 
-const stores = new Map<OfflineResource, Store>();
+let store: Store | null = null;
 
 function hasIndexedDb() {
   return typeof indexedDB !== 'undefined';
 }
 
-function getStore(resource: OfflineResource) {
+function getStore() {
   if (!hasIndexedDb()) {
     return null;
   }
-  if (!stores.has(resource)) {
-    stores.set(resource, createStore(DB_NAME, resource));
+  if (!store) {
+    store = createStore(DB_NAME, STORE_NAME);
   }
-  return stores.get(resource)!;
+  return store;
+}
+
+function buildKey(resource: OfflineResource, key: string) {
+  return `${resource}:${key}`;
 }
 
 export class OfflineStorageError extends Error {
@@ -36,6 +41,7 @@ export class OfflineStorageError extends Error {
       });
     }
   }
+  return false;
 }
 
 function isQuotaExceededError(error: unknown) {
@@ -50,12 +56,12 @@ function isQuotaExceededError(error: unknown) {
 }
 
 export async function readOffline<T>(resource: OfflineResource, key: string, fallback: T): Promise<T> {
-  const store = getStore(resource);
+  const store = getStore();
   if (!store) {
     return fallback;
   }
   try {
-    const value = await get(key, store);
+    const value = await get(buildKey(resource, key), store);
     return (value as T | undefined) ?? fallback;
   } catch (error) {
     console.warn('Falha ao ler dados offline, usando padrão.', error);
@@ -64,12 +70,12 @@ export async function readOffline<T>(resource: OfflineResource, key: string, fal
 }
 
 export async function writeOffline<T>(resource: OfflineResource, key: string, value: T): Promise<void> {
-  const store = getStore(resource);
+  const store = getStore();
   if (!store) {
     throw new OfflineStorageError('Armazenamento offline indisponível.', 'unavailable');
   }
   try {
-    await set(key, value, store);
+    await set(buildKey(resource, key), value, store);
   } catch (error) {
     if (isQuotaExceededError(error)) {
       throw new OfflineStorageError('Limite de armazenamento offline atingido.', 'quota_exceeded', { cause: error });
@@ -79,12 +85,12 @@ export async function writeOffline<T>(resource: OfflineResource, key: string, va
 }
 
 export async function removeOffline(resource: OfflineResource, key: string): Promise<void> {
-  const store = getStore(resource);
+  const store = getStore();
   if (!store) {
     return;
   }
   try {
-    await del(key, store);
+    await del(buildKey(resource, key), store);
   } catch (error) {
     console.warn('Não foi possível remover dado offline.', error);
   }
