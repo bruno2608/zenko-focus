@@ -79,7 +79,7 @@ export default function RemindersPage() {
                 <span
                   className={`rounded-full px-3 py-1 text-xs font-medium ${
                     reminder.sent
-                      ? 'bg-fuchsia-200/60 text-fuchsia-700 dark:bg-fuchsia-400/20 dark:text-fuchsia-200'
+                      ? 'bg-emerald-200/60 text-emerald-700 dark:bg-emerald-400/20 dark:text-emerald-200'
                       : 'bg-zenko-primary/10 text-zenko-primary dark:bg-zenko-primary/15'
                   }`}
                 >

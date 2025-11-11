@@ -9,16 +9,16 @@ html, body, #root {
 body {
   margin: 0;
   font-family: 'Inter', 'Poppins', sans-serif;
-  background: linear-gradient(180deg, rgba(244, 237, 255, 0.92) 0%, rgba(236, 233, 252, 0.98) 65%, rgba(252, 243, 255, 1) 100%);
-  color: #1f1236;
+  background: linear-gradient(180deg, rgba(248, 250, 252, 0.94) 0%, rgba(241, 245, 249, 0.98) 60%, rgba(226, 232, 240, 1) 100%);
+  color: #0f172a;
   transition: background 0.4s ease, color 0.4s ease;
 }
 
 .dark body {
-  background: radial-gradient(circle at top, rgba(192, 132, 252, 0.16), transparent 55%),
-    radial-gradient(circle at bottom right, rgba(244, 114, 182, 0.14), transparent 40%),
-    #120322;
-  color: #f5f3ff;
+  background: radial-gradient(circle at top, rgba(56, 189, 248, 0.16), transparent 55%),
+    radial-gradient(circle at bottom right, rgba(52, 211, 153, 0.12), transparent 45%),
+    #070b14;
+  color: #e2e8f0;
 }
 
 .zenko-select {
@@ -33,12 +33,12 @@ body {
 }
 
 .dark .zenko-select {
-  background-image: linear-gradient(135deg, rgba(168, 85, 247, 0.35), rgba(244, 114, 182, 0.2));
-  color: #f5f3ff;
+  background-image: linear-gradient(135deg, rgba(34, 211, 238, 0.32), rgba(56, 189, 248, 0.2));
+  color: #e2e8f0;
 }
 
 .dark .zenko-select option,
 .dark .zenko-select optgroup {
-  background-color: rgba(18, 3, 34, 0.92);
-  color: #f5f3ff;
+  background-color: rgba(7, 11, 20, 0.94);
+  color: #e2e8f0;
 }

@@ -9,7 +9,7 @@ import OfflineNotice from '../../components/OfflineNotice';
 import { useThemeStore } from '../../store/theme';
 import { useConnectivityStore } from '../../store/connectivity';
 
-const COLORS = ['#c084fc', '#a855f7', '#f472b6'];
+const COLORS = ['#38bdf8', '#22d3ee', '#34d399'];
 
 export default function DashboardPage() {
   const userId = useSupabaseUserId();
@@ -119,7 +119,7 @@ export default function DashboardPage() {
                 </Pie>
                 <Tooltip
                   contentStyle={{
-                    background: theme === 'dark' ? '#0f172a' : '#ffffff',
+                    background: theme === 'dark' ? '#070b14' : '#ffffff',
                     borderRadius: 16,
                     border: theme === 'dark' ? '1px solid rgba(148, 163, 184, 0.2)' : '1px solid rgba(148, 163, 184, 0.4)',
                     color: theme === 'dark' ? '#e2e8f0' : '#0f172a'
@@ -145,7 +145,7 @@ export default function DashboardPage() {
                 <Tooltip
                   labelFormatter={(value) => new Date(value as string).toLocaleDateString('pt-BR')}
                   contentStyle={{
-                    background: theme === 'dark' ? '#0f172a' : '#ffffff',
+                    background: theme === 'dark' ? '#070b14' : '#ffffff',
                     borderRadius: 16,
                     border: theme === 'dark' ? '1px solid rgba(148, 163, 184, 0.2)' : '1px solid rgba(148, 163, 184, 0.4)',
                     color: theme === 'dark' ? '#e2e8f0' : '#0f172a'
@@ -154,8 +154,8 @@ export default function DashboardPage() {
                 <Bar dataKey="count" radius={8} fill="url(#barGradient)" />
                 <defs>
                   <linearGradient id="barGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#c084fc" />
-                    <stop offset="100%" stopColor="#a855f7" />
+                    <stop offset="0%" stopColor="#38bdf8" />
+                    <stop offset="100%" stopColor="#22d3ee" />
                   </linearGradient>
                 </defs>
               </BarChart>
