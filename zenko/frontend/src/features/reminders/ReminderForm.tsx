@@ -6,6 +6,7 @@ import Input from '../../components/ui/Input';
 import Textarea from '../../components/ui/Textarea';
 import Button from '../../components/ui/Button';
 import { Reminder, ReminderPayload } from './types';
+import { toDatetimeLocal } from '../../lib/datetime';
 
 const schema = z.object({
   title: z.string().min(1, 'Informe um título'),
@@ -43,7 +44,7 @@ export default function ReminderForm({ reminder, onClose, onCreate, onUpdate, on
     reset({
       title: reminder.title,
       description: reminder.description ?? '',
-      remind_at: reminder.remind_at.slice(0, 16)
+      remind_at: toDatetimeLocal(reminder.remind_at)
     });
   }, [reminder, reset]);
 
