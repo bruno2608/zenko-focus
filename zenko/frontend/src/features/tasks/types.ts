@@ -21,6 +21,10 @@ export interface Task {
   description?: string;
   status: TaskStatus;
   due_date?: string | null;
+  start_date?: string | null;
+  due_time?: string | null;
+  due_reminder?: string | null;
+  due_recurrence?: string | null;
   labels: string[];
   checklist: ChecklistItem[];
   attachments: Attachment[];
@@ -33,6 +37,10 @@ export interface TaskPayload {
   description?: string;
   status: TaskStatus;
   due_date?: string | null;
+  start_date?: string | null;
+  due_time?: string | null;
+  due_reminder?: string | null;
+  due_recurrence?: string | null;
   labels?: string[];
   checklist?: ChecklistItem[];
   attachments?: Attachment[];
