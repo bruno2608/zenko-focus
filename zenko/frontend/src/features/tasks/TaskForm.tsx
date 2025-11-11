@@ -10,10 +10,29 @@ import { useTasks } from './hooks';
 import { Task } from './types';
 import AttachmentUploader from './AttachmentUploader';
 
+const futureDateMessage = 'Use uma data a partir de hoje';
+
 const schema = z.object({
   title: z.string().min(1, 'Título obrigatório'),
   description: z.string().optional(),
-  due_date: z.string().optional(),
+  due_date: z
+    .string()
+    .optional()
+    .superRefine((value, ctx) => {
+      if (!value) return;
+      const result = z.coerce.date().safeParse(value);
+      if (!result.success) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: futureDateMessage });
+        return;
+      }
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const dueDate = new Date(result.data);
+      dueDate.setHours(0, 0, 0, 0);
+      if (dueDate < today) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: futureDateMessage });
+      }
+    }),
   labels: z.string().optional(),
   status: z.enum(['todo', 'doing', 'done']),
   checklist: z.string().optional()
@@ -56,10 +75,13 @@ export default function TaskForm({ task, onClose }: { task?: Task; onClose: () =
   const attachments = watch('attachments') ?? [];
 
   const onSubmit = handleSubmit(async (data) => {
+    const description = data.description ? data.description : undefined;
+    const dueDateResult = data.due_date ? z.coerce.date().safeParse(data.due_date) : null;
+    const dueDateIso = dueDateResult?.success ? dueDateResult.data.toISOString() : null;
     const payload = {
       title: data.title,
-      description: data.description,
-      due_date: data.due_date ? new Date(data.due_date).toISOString() : null,
+      description,
+      due_date: dueDateIso,
       labels: data.labels?.split(',').map((label) => label.trim()).filter(Boolean) ?? [],
       status: data.status,
       checklist:
@@ -98,12 +120,15 @@ export default function TaskForm({ task, onClose }: { task?: Task; onClose: () =
       </div>
       <div>
         <label className="mb-1 block text-xs uppercase tracking-wide text-slate-500 dark:text-slate-300">Descrição</label>
-        <Textarea rows={3} {...register('description')} />
+        <Textarea rows={3} {...register('description', { setValueAs: (value) => (value === '' ? undefined : value) })} />
       </div>
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <div>
           <label className="mb-1 block text-xs uppercase tracking-wide text-slate-500 dark:text-slate-300">Prazo</label>
-          <Input type="date" {...register('due_date')} />
+          <Input type="date" {...register('due_date', { setValueAs: (value) => (value === '' ? undefined : value) })} />
+          {errors.due_date && (
+            <p className="mt-1 text-xs text-rose-600 dark:text-rose-300">{errors.due_date.message}</p>
+          )}
         </div>
         <div>
           <label className="mb-1 block text-xs uppercase tracking-wide text-slate-500 dark:text-slate-300">Status</label>
@@ -116,11 +141,11 @@ export default function TaskForm({ task, onClose }: { task?: Task; onClose: () =
       </div>
       <div>
         <label className="mb-1 block text-xs uppercase tracking-wide text-slate-500 dark:text-slate-300">Etiquetas (separadas por vírgula)</label>
-        <Input {...register('labels')} />
+        <Input {...register('labels', { setValueAs: (value) => (value === '' ? undefined : value) })} />
       </div>
       <div>
         <label className="mb-1 block text-xs uppercase tracking-wide text-slate-500 dark:text-slate-300">Checklist (uma linha por item)</label>
-        <Textarea rows={4} {...register('checklist')} />
+        <Textarea rows={4} {...register('checklist', { setValueAs: (value) => (value === '' ? undefined : value) })} />
       </div>
       <AttachmentUploader attachments={attachments} onChange={(next) => setValue('attachments', next)} />
       <div className="flex justify-end gap-2">
