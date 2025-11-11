@@ -8,10 +8,25 @@ import Button from '../../components/ui/Button';
 import { Reminder, ReminderPayload } from './types';
 import { toDatetimeLocal } from '../../lib/datetime';
 
+const futureDateMessage = 'Use uma data a partir de hoje';
+
 const schema = z.object({
   title: z.string().min(1, 'Informe um título'),
   description: z.string().optional(),
-  remind_at: z.string().min(1, 'Informe data e hora')
+  remind_at: z
+    .string()
+    .min(1, 'Informe data e hora')
+    .superRefine((value, ctx) => {
+      if (!value) return;
+      const result = z.coerce.date().safeParse(value);
+      if (!result.success) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: futureDateMessage });
+        return;
+      }
+      if (result.data < new Date()) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: futureDateMessage });
+      }
+    })
 });
 
 type FormValues = z.infer<typeof schema>;
@@ -49,10 +64,15 @@ export default function ReminderForm({ reminder, onClose, onCreate, onUpdate, on
   }, [reminder, reset]);
 
   const onSubmit = handleSubmit(async (data) => {
+    const description = data.description ? data.description : undefined;
+    const remindAtResult = z.coerce.date().safeParse(data.remind_at);
+    if (!remindAtResult.success) {
+      return;
+    }
     const payload = {
       title: data.title,
-      description: data.description,
-      remind_at: new Date(data.remind_at).toISOString()
+      description,
+      remind_at: remindAtResult.data.toISOString()
     };
     if (reminder) {
       await onUpdate({ id: reminder.id, payload });
@@ -79,7 +99,7 @@ export default function ReminderForm({ reminder, onClose, onCreate, onUpdate, on
       </div>
       <div>
         <label className="mb-1 block text-xs uppercase tracking-wide text-slate-500 dark:text-slate-300">Descrição</label>
-        <Textarea rows={3} {...register('description')} />
+        <Textarea rows={3} {...register('description', { setValueAs: (value) => (value === '' ? undefined : value) })} />
       </div>
       <div>
         <label className="mb-1 block text-xs uppercase tracking-wide text-slate-500 dark:text-slate-300">Data e hora</label>
