@@ -5,6 +5,7 @@ import PomodoroTimer from '../features/pomodoro/PomodoroTimer';
 import RemindersPage from '../features/reminders/RemindersPage';
 import DashboardPage from '../features/dashboard/DashboardPage';
 import ProfilePage from '../features/profile/ProfilePage';
+import PreferencesPage from '../features/preferences/PreferencesPage';
 
 const router = createBrowserRouter([
   {
@@ -15,7 +16,8 @@ const router = createBrowserRouter([
       { path: 'pomodoro', element: <PomodoroTimer /> },
       { path: 'reminders', element: <RemindersPage /> },
       { path: 'dashboard', element: <DashboardPage /> },
-      { path: 'perfil', element: <ProfilePage /> }
+      { path: 'perfil', element: <ProfilePage /> },
+      { path: 'preferencias', element: <PreferencesPage /> }
     ]
   }
 ]);

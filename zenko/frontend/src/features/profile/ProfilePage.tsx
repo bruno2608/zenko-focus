@@ -3,33 +3,22 @@ import Card from '../../components/ui/Card';
 import Input from '../../components/ui/Input';
 import Textarea from '../../components/ui/Textarea';
 import Button from '../../components/ui/Button';
-import Switch from '../../components/ui/Switch';
 import OfflineNotice from '../../components/OfflineNotice';
 import { isOfflineMode } from '../../lib/supabase';
 import { useProfile } from './hooks';
 import { useConnectivityStore } from '../../store/connectivity';
-import { useNotificationsStore } from '../../lib/notifications';
 
 export default function ProfilePage() {
   const { profile, isLoading, isSaving, updateProfile, userId } = useProfile();
-  const notificationPermission = useNotificationsStore((state) => state.permission);
   const [fullName, setFullName] = useState('');
   const [focusArea, setFocusArea] = useState('');
   const [objectives, setObjectives] = useState('');
-  const [themePreference, setThemePreference] = useState<'light' | 'dark'>('dark');
-  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
-  const [autoMoveDone, setAutoMoveDone] = useState(true);
-  const [pomodoroSound, setPomodoroSound] = useState(true);
 
   useEffect(() => {
     if (!profile) return;
     setFullName(profile.full_name);
     setFocusArea(profile.focus_area);
     setObjectives(profile.objectives);
-    setThemePreference(profile.theme_preference);
-    setNotificationsEnabled(profile.notifications_enabled);
-    setAutoMoveDone(profile.auto_move_done);
-    setPomodoroSound(profile.pomodoro_sound);
   }, [profile]);
 
   if (isLoading || !profile) {
@@ -45,28 +34,20 @@ export default function ProfilePage() {
     await updateProfile({
       full_name: fullName,
       focus_area: focusArea,
-      objectives,
-      theme_preference: themePreference,
-      notifications_enabled: notificationsEnabled,
-      auto_move_done: autoMoveDone,
-      pomodoro_sound: pomodoroSound
+      objectives
     });
   };
 
   const connectivityStatus = useConnectivityStore((state) => state.status);
   const showOffline = connectivityStatus === 'limited' || isOfflineMode(userId);
-  const notificationsBlocked = notificationPermission === 'denied';
-  const notificationsTooltip = notificationsBlocked
-    ? 'As notificações foram bloqueadas no navegador. Permita novamente nas configurações do site.'
-    : undefined;
 
   return (
     <div className="space-y-6">
       {showOffline ? <OfflineNotice feature="Perfil" /> : null}
       <header>
-        <h2 className="text-2xl font-semibold text-slate-900 dark:text-white">Perfil e preferências</h2>
+        <h2 className="text-2xl font-semibold text-slate-900 dark:text-white">Perfil</h2>
         <p className="text-sm text-slate-600 dark:text-slate-300">
-          Ajuste suas informações pessoais e como o Zenko deve se comportar durante o foco.
+          Ajuste suas informações pessoais que aparecem em mensagens e resumos do Zenko.
         </p>
       </header>
       <div className="grid gap-6 lg:grid-cols-[1.7fr,1fr]">
@@ -128,57 +109,6 @@ export default function ProfilePage() {
               </div>
             </div>
           </Card>
-          <Card className="space-y-5 p-6">
-            <div>
-              <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Preferências</h3>
-              <p className="text-sm text-slate-500 dark:text-slate-400">
-                Defina como o app deve reagir em lembretes, drag-and-drop e ciclos Pomodoro.
-              </p>
-            </div>
-            <div className="space-y-4">
-              <PreferenceToggle
-                label="Notificações ativas"
-                description="Receba alertas de lembretes e fim de ciclo Pomodoro."
-                checked={notificationsEnabled}
-                onCheckedChange={async (checked) => {
-                  setNotificationsEnabled(checked);
-                  await updateProfile({ notifications_enabled: checked });
-                }}
-                disabled={notificationsBlocked}
-                disabledReason={notificationsTooltip}
-              />
-              <PreferenceToggle
-                label="Mover automaticamente ao concluir"
-                description="Ao marcar uma tarefa como concluída ela vai direto para a coluna verde."
-                checked={autoMoveDone}
-                onCheckedChange={async (checked) => {
-                  setAutoMoveDone(checked);
-                  await updateProfile({ auto_move_done: checked });
-                }}
-              />
-              <PreferenceToggle
-                label="Som ao finalizar Pomodoro"
-                description="Em breve você poderá personalizar o alerta sonoro dos ciclos."
-                checked={pomodoroSound}
-                onCheckedChange={async (checked) => {
-                  setPomodoroSound(checked);
-                  await updateProfile({ pomodoro_sound: checked });
-                }}
-              />
-              <PreferenceToggle
-                label="Tema do aplicativo"
-                description="Ajuste rapidamente entre claro e escuro."
-                checked={themePreference === 'dark'}
-                onCheckedChange={async (checked) => {
-                  const nextTheme = checked ? 'dark' : 'light';
-                  setThemePreference(nextTheme);
-                  await updateProfile({ theme_preference: nextTheme });
-                }}
-                trueLabel="Escuro"
-                falseLabel="Claro"
-              />
-            </div>
-          </Card>
           <Card className="space-y-4 p-6">
             <div>
               <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Conquistas recentes</h3>
@@ -193,61 +123,6 @@ export default function ProfilePage() {
             </ul>
           </Card>
         </div>
-      </div>
-    </div>
-  );
-}
-
-interface PreferenceToggleProps {
-  label: string;
-  description: string;
-  checked: boolean;
-  onCheckedChange: (checked: boolean) => Promise<void>;
-  trueLabel?: string;
-  falseLabel?: string;
-  disabled?: boolean;
-  disabledReason?: string;
-}
-
-function PreferenceToggle({
-  label,
-  description,
-  checked,
-  onCheckedChange,
-  trueLabel,
-  falseLabel,
-  disabled = false,
-  disabledReason
-}: PreferenceToggleProps) {
-  const handleChange = async (next: boolean) => {
-    if (disabled) return;
-    await onCheckedChange(next);
-  };
-
-  return (
-    <div
-      data-preference-toggle={label}
-      className={`flex items-center justify-between gap-4 rounded-2xl border border-slate-200/80 bg-white/70 p-4 backdrop-blur transition-opacity dark:border-white/10 dark:bg-white/5 ${
-        disabled ? 'opacity-70' : ''
-      }`}
-      aria-disabled={disabled}
-    >
-      <div className="space-y-1">
-        <p className="text-sm font-medium text-slate-800 dark:text-slate-100">{label}</p>
-        <p className="text-xs text-slate-500 dark:text-slate-400">{description}</p>
-        {disabled && disabledReason ? (
-          <p className="text-xs font-medium text-amber-700 dark:text-amber-300">{disabledReason}</p>
-        ) : null}
-      </div>
-      <div className="flex items-center gap-3">
-        {falseLabel ? <span className="text-xs text-slate-500 dark:text-slate-400">{falseLabel}</span> : null}
-        <Switch
-          checked={checked}
-          onCheckedChange={handleChange}
-          disabled={disabled}
-          title={disabled ? disabledReason : undefined}
-        />
-        {trueLabel ? <span className="text-xs text-slate-500 dark:text-slate-400">{trueLabel}</span> : null}
       </div>
     </div>
   );
