@@ -168,7 +168,8 @@ export default function TaskForm({
       description: task ? 'task-description-edit' : 'task-description-new',
       dueDate: task ? 'task-due-date-edit' : 'task-due-date-new',
       status: task ? 'task-status-edit' : 'task-status-new',
-      labels: task ? 'task-labels-edit' : 'task-labels-new'
+      labels: task ? 'task-labels-edit' : 'task-labels-new',
+      labelManager: task ? 'task-label-manager-edit' : 'task-label-manager-new'
     }),
     [task]
   );
@@ -239,12 +240,6 @@ export default function TaskForm({
     () => new Set(labelPreview.map((label) => label.toLocaleLowerCase())),
     [labelPreview]
   );
-  const labelSuggestions = useMemo(() => {
-    if (savedLabels.length === 0) {
-      return [] as LabelDefinition[];
-    }
-    return savedLabels.filter((label) => !selectedLabelKeys.has(label.normalized));
-  }, [savedLabels, selectedLabelKeys]);
   const filteredLabels = useMemo(() => {
     const query = labelSearch.trim().toLocaleLowerCase();
     if (!query) {
@@ -381,7 +376,7 @@ export default function TaskForm({
     [setValue]
   );
 
-  const handleLabelSuggestionSelect = useCallback(
+  const applyLabel = useCallback(
     (label: string) => {
       const normalized = label.toLocaleLowerCase();
       const current = parseLabels(labelInput);
@@ -416,10 +411,10 @@ export default function TaskForm({
       setNewLabelName('');
       setLabelSearch('');
       if (applyToTask) {
-        handleLabelSuggestionSelect(trimmed);
+        applyLabel(trimmed);
       }
     },
-    [createLabelDefinition, handleLabelSuggestionSelect, newLabelColor, newLabelName]
+    [applyLabel, createLabelDefinition, newLabelColor, newLabelName]
   );
 
   const handleStartEditingLabel = useCallback((definition: LabelDefinition) => {
@@ -570,82 +565,84 @@ export default function TaskForm({
         </div>
       </div>
       <div>
-        <label
-          htmlFor={fieldIds.labels}
-          className="mb-1 block text-xs uppercase tracking-wide text-slate-500 dark:text-slate-300"
-        >
-          Etiquetas (separadas por vírgula)
-        </label>
-        <Input id={fieldIds.labels} {...register('labels')} />
-        {labelSuggestions.length > 0 ? (
-          <div className="mt-2 space-y-2">
-            <p className="text-[11px] uppercase tracking-wide text-slate-400 dark:text-slate-500">
-              Etiquetas salvas
-            </p>
-            <div className="flex flex-wrap gap-2">
-              {labelSuggestions.map((suggestion) => {
-                const colors = getLabelColors(suggestion.value, {
-                  colorId: suggestion.colorId
-                });
-                return (
-                  <button
-                    key={`suggestion-${suggestion.id}`}
-                    type="button"
-                    onClick={() => handleLabelSuggestionSelect(suggestion.value)}
-                    className="inline-flex items-center gap-2 rounded-md px-2 py-1 text-[11px] font-semibold uppercase tracking-wide shadow-sm transition hover:scale-[1.01] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/60"
-                    style={{
-                      backgroundColor: colors.background,
-                      color: colors.foreground
-                    }}
-                  >
-                    <span
-                      className="inline-block h-2 w-2 rounded-full"
-                      style={{ backgroundColor: colors.foreground, opacity: 0.5 }}
-                    />
-                    {suggestion.value}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        ) : null}
-        {labelPreview.length > 0 ? (
-          <div className="mt-2 flex flex-wrap gap-2">
-            {labelPreview.map((label, index) => {
-              const normalized = label.toLocaleLowerCase();
-              const definition = labelMap.get(normalized);
-              const colors = getLabelColors(label, {
-                colorId: definition?.colorId,
-                fallbackIndex: index
-              });
-              return (
+        <p className="mb-1 text-xs uppercase tracking-wide text-slate-500 dark:text-slate-300">
+          Etiquetas
+        </p>
+        <input id={fieldIds.labels} type="hidden" {...register('labels')} />
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          {labelPreview.length === 0 ? (
+            <span className="text-xs text-slate-500 dark:text-slate-400">
+              Nenhuma etiqueta selecionada.
+            </span>
+          ) : null}
+          {labelPreview.map((label, index) => {
+            const normalized = label.toLocaleLowerCase();
+            const definition = labelMap.get(normalized);
+            const colors = getLabelColors(label, {
+              colorId: definition?.colorId,
+              fallbackIndex: index
+            });
+            const displayValue = definition?.value ?? label;
+            return (
+              <span
+                key={`${definition?.id ?? label}-${index}`}
+                className="inline-flex items-center gap-2 rounded-md px-2 py-1 text-[11px] font-semibold uppercase tracking-wide shadow-sm"
+                style={{
+                  backgroundColor: colors.background,
+                  color: colors.foreground
+                }}
+              >
                 <span
-                  key={`${definition?.id ?? label}-${index}`}
-                  className="inline-flex items-center gap-2 rounded-md px-2 py-1 text-[11px] font-semibold uppercase tracking-wide shadow-sm"
+                  className="inline-block h-2 w-2 rounded-full"
+                  style={{ backgroundColor: colors.foreground, opacity: 0.5 }}
+                />
+                <span className="max-w-[8rem] truncate">{displayValue}</span>
+                <button
+                  type="button"
+                  onClick={() => handleLabelToggle(displayValue)}
+                  className="flex h-4 w-4 items-center justify-center rounded-full border text-xs leading-none transition hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
                   style={{
-                    backgroundColor: colors.background,
-                    color: colors.foreground
+                    color: colors.foreground,
+                    borderColor: `${colors.foreground}55`,
+                    backgroundColor: `${colors.foreground}1a`
                   }}
                 >
-                  <span
-                    className="inline-block h-2 w-2 rounded-full"
-                    style={{ backgroundColor: colors.foreground, opacity: 0.5 }}
-                  />
-                  {definition?.value ?? label}
-                </span>
-              );
-            })}
-          </div>
-        ) : null}
-        <button
-          type="button"
-          className="mt-3 inline-flex items-center rounded-md border border-slate-200 bg-white px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-slate-600 transition hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/50 dark:border-white/10 dark:bg-white/10 dark:text-slate-200 dark:hover:bg-white/20"
-          onClick={() => setLabelManagerOpen((open) => !open)}
-        >
-          {isLabelManagerOpen ? 'Fechar gerenciador de etiquetas' : 'Gerenciar etiquetas'}
-        </button>
+                  <span aria-hidden>×</span>
+                  <span className="sr-only">Remover etiqueta {displayValue}</span>
+                </button>
+              </span>
+            );
+          })}
+          <button
+            type="button"
+            onClick={() => setLabelManagerOpen((open) => !open)}
+            className="flex h-8 w-8 items-center justify-center rounded-md border border-slate-200 bg-white text-lg font-semibold text-slate-600 transition hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/50 dark:border-white/10 dark:bg-white/10 dark:text-slate-200 dark:hover:bg-white/20"
+            aria-label={
+              isLabelManagerOpen ? 'Fechar gerenciador de etiquetas' : 'Adicionar ou gerenciar etiquetas'
+            }
+            aria-expanded={isLabelManagerOpen}
+            aria-controls={fieldIds.labelManager}
+          >
+            <span aria-hidden>+</span>
+          </button>
+        </div>
         {isLabelManagerOpen ? (
-          <div className="mt-3 space-y-4 rounded-2xl border border-slate-200 bg-white/60 p-4 shadow-inner dark:border-white/10 dark:bg-white/5">
+          <div
+            id={fieldIds.labelManager}
+            className="mt-3 space-y-4 rounded-2xl border border-slate-200 bg-white/60 p-4 shadow-inner dark:border-white/10 dark:bg-white/5"
+          >
+            <div className="flex items-start justify-between gap-3">
+              <p className="text-[11px] uppercase tracking-wide text-slate-400 dark:text-slate-500">
+                Gerenciador de etiquetas
+              </p>
+              <button
+                type="button"
+                onClick={() => setLabelManagerOpen(false)}
+                className="rounded-md border border-slate-200 bg-white px-2 py-1 text-[11px] font-semibold uppercase tracking-wide text-slate-600 transition hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/50 dark:border-white/10 dark:bg-white/10 dark:text-slate-200 dark:hover:bg-white/20"
+              >
+                Fechar
+              </button>
+            </div>
             <div>
               <label className="mb-1 block text-[11px] uppercase tracking-wide text-slate-400 dark:text-slate-500" htmlFor="task-label-search">
                 Buscar etiquetas
