@@ -81,6 +81,10 @@ Servidor de saúde em `http://localhost:4000/health`.
   cd zenko/frontend
   pnpm test
   ```
+- **Unitários de sincronização offline** (Vitest):
+  ```bash
+  pnpm --dir frontend test --run tests/unit/offline.storage.spec.ts tests/unit/offline.queue.spec.ts
+  ```
 - **E2E** (Cypress):
   ```bash
   cd zenko/tests/e2e
@@ -88,6 +92,10 @@ Servidor de saúde em `http://localhost:4000/health`.
   pnpm cy:run
   ```
   > Ajuste a baseUrl no `cypress.config.ts` se necessário e garanta Supabase rodando.
+- **E2E offline (Cypress)** – fila e notificações:
+  ```bash
+  pnpm --dir tests/e2e cy:run --spec "specs/offline-sync.cy.ts,specs/reminders.cy.ts,specs/pomodoro.cy.ts"
+  ```
 
 ## Build de produção
 
