@@ -2,9 +2,10 @@ import { useEffect } from 'react';
 import Card from '../../components/ui/Card';
 import { getCurrentUser, isOfflineMode, supabase } from '../../lib/supabase';
 import { usePomodoroStore } from './store';
-import { readOffline } from '../../lib/offline';
+import { readOffline, type OfflineResource } from '../../lib/offline';
 
-const OFFLINE_SESSIONS_KEY = 'pomodoro-sessions';
+const POMODORO_RESOURCE: OfflineResource = 'pomodoro_sessions';
+const OFFLINE_SESSIONS_KEY = 'all';
 
 export default function PomodoroHistory() {
   const history = usePomodoroStore((state) => state.history);
@@ -13,17 +14,21 @@ export default function PomodoroHistory() {
   useEffect(() => {
     let active = true;
     if (isOfflineMode()) {
-      const offline = readOffline<any[]>(OFFLINE_SESSIONS_KEY, []);
-      if (active) {
-        setHistory(
-          offline.map((session) => ({
-            id: session.id,
-            started_at: session.started_at,
-            duration: session.duration_minutes,
-            task_id: session.task_id ?? undefined
-          }))
-        );
-      }
+      readOffline<any[]>(POMODORO_RESOURCE, OFFLINE_SESSIONS_KEY, [])
+        .then((offline) => {
+          if (!active) return;
+          setHistory(
+            offline.map((session) => ({
+              id: session.id,
+              started_at: session.started_at,
+              duration: session.duration_minutes,
+              task_id: session.task_id ?? undefined
+            }))
+          );
+        })
+        .catch((error) => {
+          console.warn('Não foi possível carregar o histórico offline de Pomodoro.', error);
+        });
       return () => {
         active = false;
       };
