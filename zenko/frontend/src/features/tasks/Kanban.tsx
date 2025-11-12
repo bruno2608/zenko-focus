@@ -799,8 +799,8 @@ export default function Kanban() {
                                       >
                                         <button
                                           type="button"
-                                          className={`h-11 w-11 rounded-full border border-transparent bg-white/60 text-slate-500 transition hover:border-zenko-primary/30 hover:text-zenko-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/60 dark:bg-slate-900/60 dark:text-slate-300 dark:hover:border-white/20 dark:hover:text-white ${
-                                            isMenuOpen ? 'border-zenko-primary/40 text-zenko-primary' : ''
+                                          className={`h-11 w-11 rounded-full border border-transparent bg-transparent text-slate-500 opacity-0 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/60 focus-visible:opacity-100 focus-visible:border-zenko-primary/40 focus-visible:bg-white/70 group-focus-within:opacity-100 group-hover:opacity-100 group-hover:border-slate-200/70 group-hover:bg-white/70 group-hover:text-slate-600 hover:border-zenko-primary/30 hover:bg-white/70 hover:text-zenko-primary dark:text-slate-300 dark:hover:border-white/20 dark:hover:bg-slate-900/60 dark:hover:text-white dark:group-hover:border-white/20 dark:group-hover:bg-slate-900/60 dark:group-hover:text-white ${
+                                            isMenuOpen ? 'opacity-100 border-zenko-primary/40 bg-white/70 text-zenko-primary dark:bg-slate-900/70' : ''
                                           }`}
                                           aria-haspopup="menu"
                                           aria-expanded={isMenuOpen}
