@@ -8,7 +8,7 @@ interface Props extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 const baseClass =
-  'inline-flex items-center justify-center rounded-2xl px-4 py-2 text-sm font-semibold transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-zenko-primary/60 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-slate-950 disabled:pointer-events-none disabled:opacity-50';
+  'inline-flex min-h-[44px] min-w-[44px] items-center justify-center gap-2 rounded-2xl px-4 py-2 text-sm font-semibold transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/60 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-slate-950 disabled:pointer-events-none disabled:opacity-50';
 
 const variantClasses: Record<Variant, string> = {
   primary:
