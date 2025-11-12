@@ -283,39 +283,6 @@ function LabelColorOptions({
   );
 }
 
-function LabelColorOptions({
-  selectedColorId,
-  onSelect
-}: {
-  selectedColorId: LabelColorId;
-  onSelect: (colorId: LabelColorId) => void;
-}) {
-  return (
-    <div className="flex flex-wrap gap-2">
-      {trelloPalette.map((option) => {
-        const isSelected = selectedColorId === option.id;
-        return (
-          <button
-            key={`palette-${option.id}`}
-            type="button"
-            onClick={() => onSelect(option.id)}
-            className={`flex h-8 w-8 items-center justify-center rounded-full border-2 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/60 ${
-              isSelected
-                ? 'border-slate-900/70 dark:border-white'
-                : 'border-transparent hover:border-slate-900/40 dark:hover:border-white/40'
-            }`}
-            style={{ backgroundColor: option.background }}
-            aria-pressed={isSelected}
-            aria-label={`Selecionar cor ${option.id}`}
-          >
-            {isSelected ? <span className="block h-2 w-2 rounded-full bg-white/90" /> : null}
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
 export default function TaskForm({
   task,
   onClose,
@@ -947,6 +914,143 @@ export default function TaskForm({
     [updateDescriptionDraft]
   );
 
+  const formattingGroups = useMemo(
+    () => [
+      [
+        {
+          command: 'bold' as const,
+          label: 'Negrito',
+          icon: <span className="text-[15px] font-semibold leading-none">B</span>
+        },
+        {
+          command: 'italic' as const,
+          label: 'Itálico',
+          icon: <span className="text-[15px] italic leading-none">I</span>
+        },
+        {
+          command: 'underline' as const,
+          label: 'Sublinhar',
+          icon: <span className="text-[15px] underline decoration-2 underline-offset-2">U</span>
+        },
+        {
+          command: 'strike' as const,
+          label: 'Tachado',
+          icon: <span className="text-[15px] leading-none line-through">S</span>
+        }
+      ],
+      [
+        {
+          command: 'code' as const,
+          label: 'Código inline',
+          icon: (
+            <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+              <polyline points="8 7 4 12 8 17" strokeLinecap="round" strokeLinejoin="round" />
+              <polyline points="16 7 20 12 16 17" strokeLinecap="round" strokeLinejoin="round" />
+              <line x1="11" y1="5" x2="13" y2="19" strokeLinecap="round" />
+            </svg>
+          )
+        },
+        {
+          command: 'codeblock' as const,
+          label: 'Bloco de código',
+          icon: (
+            <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+              <rect x="4" y="6" width="16" height="12" rx="2" />
+              <polyline points="9 10 7 12 9 14" strokeLinecap="round" strokeLinejoin="round" />
+              <polyline points="15 10 17 12 15 14" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          )
+        },
+        {
+          command: 'link' as const,
+          label: 'Link',
+          icon: (
+            <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+              <path
+                d="M9.5 14.5l-1.5 1.5a3 3 0 104.24 4.24l1.64-1.64"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+              <path
+                d="M14.5 9.5l1.5-1.5a3 3 0 10-4.24-4.24L10.12 5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+              <line x1="8.5" y1="15.5" x2="15.5" y2="8.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          )
+        }
+      ],
+      [
+        {
+          command: 'bullet' as const,
+          label: 'Lista com marcadores',
+          icon: (
+            <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+              <circle cx="6" cy="7" r="1.4" fill="currentColor" stroke="none" />
+              <circle cx="6" cy="12" r="1.4" fill="currentColor" stroke="none" />
+              <circle cx="6" cy="17" r="1.4" fill="currentColor" stroke="none" />
+              <line x1="10" y1="7" x2="19" y2="7" strokeLinecap="round" />
+              <line x1="10" y1="12" x2="19" y2="12" strokeLinecap="round" />
+              <line x1="10" y1="17" x2="19" y2="17" strokeLinecap="round" />
+            </svg>
+          )
+        },
+        {
+          command: 'number' as const,
+          label: 'Lista numerada',
+          icon: (
+            <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+              <text x="4" y="8" fontSize="6" fontWeight="600" fill="currentColor">
+                1
+              </text>
+              <text x="4" y="13" fontSize="6" fontWeight="600" fill="currentColor">
+                2
+              </text>
+              <text x="4" y="18" fontSize="6" fontWeight="600" fill="currentColor">
+                3
+              </text>
+              <line x1="10" y1="7" x2="19" y2="7" strokeLinecap="round" />
+              <line x1="10" y1="12" x2="19" y2="12" strokeLinecap="round" />
+              <line x1="10" y1="17" x2="19" y2="17" strokeLinecap="round" />
+            </svg>
+          )
+        },
+        {
+          command: 'checklist' as const,
+          label: 'Checklist',
+          icon: (
+            <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+              <rect x="4" y="5" width="5" height="5" rx="1" />
+              <polyline points="5.5 8 6.8 9.2 8.5 6.8" strokeLinecap="round" strokeLinejoin="round" />
+              <rect x="4" y="11" width="5" height="5" rx="1" />
+              <rect x="4" y="17" width="5" height="5" rx="1" />
+              <line x1="12" y1="7.5" x2="20" y2="7.5" strokeLinecap="round" />
+              <line x1="12" y1="13.5" x2="20" y2="13.5" strokeLinecap="round" />
+              <line x1="12" y1="19.5" x2="20" y2="19.5" strokeLinecap="round" />
+            </svg>
+          )
+        },
+        {
+          command: 'quote' as const,
+          label: 'Citação',
+          icon: (
+            <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+              <path d="M9 7H7a3 3 0 00-3 3v3h4v-2H6v-1a1 1 0 011-1h2V7z" fill="currentColor" stroke="none" />
+              <path d="M19 7h-2a3 3 0 00-3 3v3h4v-2h-2v-1a1 1 0 011-1h2V7z" fill="currentColor" stroke="none" />
+            </svg>
+          )
+        },
+        {
+          command: 'divider' as const,
+          label: 'Separador',
+          icon: <span className="block h-[2px] w-6 rounded-full bg-current" />
+        }
+      ]
+    ],
+    []
+  );
+
   const handleDescriptionSave = useCallback(async () => {
     if (!isEditingTask) {
       return;
@@ -1365,92 +1469,24 @@ export default function TaskForm({
           ) : null}
         </div>
         {!isEditingTask || isDescriptionEditing ? (
-          <div className="mt-3 space-y-3">
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={() => handleFormatting('bold')}
-                className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold uppercase tracking-wide text-slate-600 transition hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/50 dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:bg-white/15"
-              >
-                Negrito
-              </button>
-              <button
-                type="button"
-                onClick={() => handleFormatting('italic')}
-                className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold uppercase tracking-wide text-slate-600 transition hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/50 dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:bg-white/15"
-              >
-                Itálico
-              </button>
-              <button
-                type="button"
-                onClick={() => handleFormatting('underline')}
-                className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold uppercase tracking-wide text-slate-600 transition hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/50 dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:bg-white/15"
-              >
-                Sublinhado
-              </button>
-              <button
-                type="button"
-                onClick={() => handleFormatting('strike')}
-                className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold uppercase tracking-wide text-slate-600 transition hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/50 dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:bg-white/15"
-              >
-                Tachado
-              </button>
-              <button
-                type="button"
-                onClick={() => handleFormatting('code')}
-                className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold uppercase tracking-wide text-slate-600 transition hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/50 dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:bg-white/15"
-              >
-                Código
-              </button>
-              <button
-                type="button"
-                onClick={() => handleFormatting('codeblock')}
-                className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold uppercase tracking-wide text-slate-600 transition hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/50 dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:bg-white/15"
-              >
-                Bloco
-              </button>
-              <button
-                type="button"
-                onClick={() => handleFormatting('link')}
-                className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold uppercase tracking-wide text-slate-600 transition hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/50 dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:bg-white/15"
-              >
-                Link
-              </button>
-              <button
-                type="button"
-                onClick={() => handleFormatting('bullet')}
-                className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold uppercase tracking-wide text-slate-600 transition hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/50 dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:bg-white/15"
-              >
-                Lista
-              </button>
-              <button
-                type="button"
-                onClick={() => handleFormatting('number')}
-                className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold uppercase tracking-wide text-slate-600 transition hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/50 dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:bg-white/15"
-              >
-                Numerada
-              </button>
-              <button
-                type="button"
-                onClick={() => handleFormatting('checklist')}
-                className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold uppercase tracking-wide text-slate-600 transition hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/50 dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:bg-white/15"
-              >
-                Checklist
-              </button>
-              <button
-                type="button"
-                onClick={() => handleFormatting('quote')}
-                className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold uppercase tracking-wide text-slate-600 transition hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/50 dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:bg-white/15"
-              >
-                Citação
-              </button>
-              <button
-                type="button"
-                onClick={() => handleFormatting('divider')}
-                className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold uppercase tracking-wide text-slate-600 transition hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/50 dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:bg-white/15"
-              >
-                Separador
-              </button>
+          <div className="mt-3 space-y-4">
+            <div className="space-y-2">
+              {formattingGroups.map((group, groupIndex) => (
+                <div key={`format-group-${groupIndex}`} className="flex flex-wrap gap-2">
+                  {group.map(({ command, label, icon }) => (
+                    <button
+                      key={command}
+                      type="button"
+                      onClick={() => handleFormatting(command)}
+                      className="flex h-9 w-9 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:border-zenko-primary/40 hover:text-zenko-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/50 dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:border-zenko-primary/40 dark:hover:text-zenko-primary"
+                      aria-label={label}
+                      title={label}
+                    >
+                      {icon}
+                    </button>
+                  ))}
+                </div>
+              ))}
             </div>
             <Textarea
               id={fieldIds.description}
