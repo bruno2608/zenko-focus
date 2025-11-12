@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { ChangeEvent as ReactChangeEvent, DragEvent as ReactDragEvent } from 'react';
+import type { ChangeEvent as ReactChangeEvent, DragEvent as ReactDragEvent, JSX } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -47,6 +47,7 @@ interface CalendarDay {
   date: Date;
 }
 type FormatCommand =
+  | 'heading'
   | 'bold'
   | 'italic'
   | 'underline'
@@ -905,6 +906,26 @@ export default function TaskForm({
       };
 
       switch (command) {
+        case 'heading': {
+          if (selected) {
+            insert = selected
+              .split('\n')
+              .map((line) => {
+                const trimmed = line.trim();
+                if (!trimmed) {
+                  return line;
+                }
+                return `## ${trimmed.replace(/^#+\s*/, '')}`;
+              })
+              .join('\n');
+            cursorStart = selectionStart;
+            cursorEnd = selectionStart + insert.length;
+          } else {
+            insert = '## ';
+            cursorStart = cursorEnd = selectionStart + insert.length;
+          }
+          break;
+        }
         case 'bold':
           wrap('**', '**');
           break;
@@ -1008,75 +1029,47 @@ export default function TaskForm({
     [updateDescriptionDraft]
   );
 
-  const formattingGroups = useMemo(
-    () => [
+  const formattingToolbar = useMemo<
+    ReadonlyArray<
+      | { type: 'separator' }
+      | { type: 'command'; command: FormatCommand; label: string; icon: JSX.Element }
+    >
+  >(
+    () =>
       [
         {
+          type: 'command' as const,
+          command: 'heading' as const,
+          label: 'Cabeçalho',
+          icon: <span className="text-[13px] font-semibold tracking-wide">Aa</span>
+        },
+        {
+          type: 'command' as const,
           command: 'bold' as const,
           label: 'Negrito',
           icon: <span className="text-[15px] font-semibold leading-none">B</span>
         },
         {
+          type: 'command' as const,
           command: 'italic' as const,
           label: 'Itálico',
           icon: <span className="text-[15px] italic leading-none">I</span>
         },
         {
+          type: 'command' as const,
           command: 'underline' as const,
           label: 'Sublinhar',
           icon: <span className="text-[15px] underline decoration-2 underline-offset-2">U</span>
         },
         {
+          type: 'command' as const,
           command: 'strike' as const,
           label: 'Tachado',
           icon: <span className="text-[15px] leading-none line-through">S</span>
-        }
-      ],
-      [
-        {
-          command: 'code' as const,
-          label: 'Código inline',
-          icon: (
-            <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-              <polyline points="8 7 4 12 8 17" strokeLinecap="round" strokeLinejoin="round" />
-              <polyline points="16 7 20 12 16 17" strokeLinecap="round" strokeLinejoin="round" />
-              <line x1="11" y1="5" x2="13" y2="19" strokeLinecap="round" />
-            </svg>
-          )
         },
+        { type: 'separator' as const },
         {
-          command: 'codeblock' as const,
-          label: 'Bloco de código',
-          icon: (
-            <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-              <rect x="4" y="6" width="16" height="12" rx="2" />
-              <polyline points="9 10 7 12 9 14" strokeLinecap="round" strokeLinejoin="round" />
-              <polyline points="15 10 17 12 15 14" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          )
-        },
-        {
-          command: 'link' as const,
-          label: 'Link',
-          icon: (
-            <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-              <path
-                d="M9.5 14.5l-1.5 1.5a3 3 0 104.24 4.24l1.64-1.64"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-              <path
-                d="M14.5 9.5l1.5-1.5a3 3 0 10-4.24-4.24L10.12 5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-              <line x1="8.5" y1="15.5" x2="15.5" y2="8.5" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          )
-        }
-      ],
-      [
-        {
+          type: 'command' as const,
           command: 'bullet' as const,
           label: 'Lista com marcadores',
           icon: (
@@ -1091,6 +1084,7 @@ export default function TaskForm({
           )
         },
         {
+          type: 'command' as const,
           command: 'number' as const,
           label: 'Lista numerada',
           icon: (
@@ -1111,6 +1105,7 @@ export default function TaskForm({
           )
         },
         {
+          type: 'command' as const,
           command: 'checklist' as const,
           label: 'Checklist',
           icon: (
@@ -1125,7 +1120,53 @@ export default function TaskForm({
             </svg>
           )
         },
+        { type: 'separator' as const },
         {
+          type: 'command' as const,
+          command: 'link' as const,
+          label: 'Link',
+          icon: (
+            <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+              <path
+                d="M9.5 14.5l-1.5 1.5a3 3 0 104.24 4.24l1.64-1.64"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+              <path
+                d="M14.5 9.5l1.5-1.5a3 3 0 10-4.24-4.24L10.12 5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+              <line x1="8.5" y1="15.5" x2="15.5" y2="8.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          )
+        },
+        {
+          type: 'command' as const,
+          command: 'code' as const,
+          label: 'Código inline',
+          icon: (
+            <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+              <polyline points="8 7 4 12 8 17" strokeLinecap="round" strokeLinejoin="round" />
+              <polyline points="16 7 20 12 16 17" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          )
+        },
+        {
+          type: 'command' as const,
+          command: 'codeblock' as const,
+          label: 'Bloco de código',
+          icon: (
+            <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+              <rect x="4" y="6" width="16" height="12" rx="2" />
+              <polyline points="9 10 7 12 9 14" strokeLinecap="round" strokeLinejoin="round" />
+              <polyline points="15 10 17 12 15 14" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          )
+        },
+        { type: 'separator' as const },
+        {
+          type: 'command' as const,
           command: 'quote' as const,
           label: 'Citação',
           icon: (
@@ -1136,12 +1177,12 @@ export default function TaskForm({
           )
         },
         {
+          type: 'command' as const,
           command: 'divider' as const,
           label: 'Separador',
           icon: <span className="block h-[2px] w-6 rounded-full bg-current" />
         }
-      ]
-    ],
+      ],
     []
   );
 
@@ -2125,23 +2166,27 @@ export default function TaskForm({
             </div>
             {!isEditingTask || isDescriptionEditing ? (
               <div className="mt-3 space-y-4">
-                <div className="space-y-2">
-                  {formattingGroups.map((group, groupIndex) => (
-                    <div key={`format-group-${groupIndex}`} className="flex flex-wrap gap-2">
-                      {group.map(({ command, label, icon }) => (
+                <div className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-slate-600 shadow-sm dark:border-white/10 dark:bg-slate-800/60 dark:text-slate-200">
+                  <div className="flex flex-wrap items-center gap-1">
+                    {formattingToolbar.map((item, index) => {
+                      if (item.type === 'separator') {
+                        return <span key={`format-separator-${index}`} className="mx-1 h-6 w-px bg-slate-300 dark:bg-slate-700" />;
+                      }
+                      const { command, label, icon } = item;
+                      return (
                         <button
                           key={command}
                           type="button"
                           onClick={() => handleFormatting(command)}
-                          className="flex h-9 w-9 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:border-zenko-primary/40 hover:text-zenko-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/50 dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:border-zenko-primary/40 dark:hover:text-zenko-primary"
+                          className="inline-flex h-8 min-w-[2.25rem] items-center justify-center rounded px-2 text-sm font-medium transition hover:bg-white hover:text-zenko-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/40 dark:hover:bg-slate-700 dark:hover:text-zenko-primary"
                           aria-label={label}
                           title={label}
                         >
                           {icon}
                         </button>
-                      ))}
-                    </div>
-                  ))}
+                      );
+                    })}
+                  </div>
                 </div>
                 <Textarea
                   id={fieldIds.description}
