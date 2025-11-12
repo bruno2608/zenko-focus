@@ -77,26 +77,6 @@ const recurrenceLabels: Record<DueRecurrenceOption, string> = {
   monthly: 'Mensalmente'
 };
 
-const statusLabelsMap: Record<TaskStatus, string> = {
-  todo: 'A fazer',
-  doing: 'Fazendo',
-  done: 'Concluída'
-};
-
-const statusStyles: Record<TaskStatus, { dot: string; pill: string }> = {
-  todo: {
-    dot: 'bg-sky-500',
-    pill: 'bg-sky-100/80 text-sky-700 shadow-sm dark:bg-sky-500/10 dark:text-sky-200'
-  },
-  doing: {
-    dot: 'bg-amber-500',
-    pill: 'bg-amber-100/80 text-amber-700 shadow-sm dark:bg-amber-500/10 dark:text-amber-200'
-  },
-  done: {
-    dot: 'bg-emerald-500',
-    pill: 'bg-emerald-100/80 text-emerald-700 shadow-sm dark:bg-emerald-500/10 dark:text-emerald-200'
-  }
-};
 
 const monthLabels = [
   'janeiro',
@@ -160,6 +140,19 @@ function parseDateInput(value: string) {
 function toTimeInput(value?: string | null) {
   if (!value) return '';
   return value.slice(0, 5);
+}
+
+function formatDisplayDateValue(value: string) {
+  const date = parseDateInput(value);
+  if (!date) {
+    return null;
+  }
+
+  return new Intl.DateTimeFormat('pt-BR', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric'
+  }).format(date);
 }
 
 function normalizeDueTime(value?: string | null) {
@@ -350,7 +343,14 @@ export default function TaskForm({
   const [descriptionDraft, setDescriptionDraft] = useState(task?.description ?? '');
   const [isDescriptionEditing, setDescriptionEditing] = useState(!task || !(task?.description?.trim()));
   const [descriptionDirty, setDescriptionDirty] = useState(false);
+  const [isDateEditorOpen, setDateEditorOpen] = useState(false);
   const descriptionTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const labelsSectionRef = useRef<HTMLDivElement | null>(null);
+  const datesSectionRef = useRef<HTMLDivElement | null>(null);
+  const descriptionSectionRef = useRef<HTMLDivElement | null>(null);
+  const attachmentsSectionRef = useRef<HTMLDivElement | null>(null);
+  const checklistSectionRef = useRef<HTMLDivElement | null>(null);
+  const newChecklistInputRef = useRef<HTMLInputElement | null>(null);
   const isEditingTask = Boolean(task);
   const [isAutoSaving, setAutoSaving] = useState(false);
   const [autoSaveError, setAutoSaveError] = useState<string | null>(null);
@@ -470,6 +470,12 @@ export default function TaskForm({
   }, [register]);
 
   useEffect(() => {
+    if (errors.due_date || errors.due_time || errors.start_date) {
+      setDateEditorOpen(true);
+    }
+  }, [errors.due_date, errors.due_time, errors.start_date]);
+
+  useEffect(() => {
     mountedRef.current = true;
     return () => {
       mountedRef.current = false;
@@ -505,8 +511,17 @@ export default function TaskForm({
   const dueRecurrenceValue = (watch('due_recurrence') as DueRecurrenceOption | undefined) ?? 'never';
   const titleValue = watch('title') ?? '';
   const statusValue = (watch('status') ?? defaultStatus) as TaskStatus;
-  const statusLabel = statusLabelsMap[statusValue];
-  const statusStyle = statusStyles[statusValue];
+  const scrollToSection = useCallback((sectionRef: { current: HTMLElement | null }) => {
+    const element = sectionRef.current;
+    if (element && typeof element.scrollIntoView === 'function') {
+      element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, []);
+  const focusChecklistInput = useCallback(() => {
+    if (newChecklistInputRef.current) {
+      newChecklistInputRef.current.focus();
+    }
+  }, []);
   const calendarDays = useMemo(() => buildCalendarDays(calendarCursor), [calendarCursor]);
   const calendarHeading = useMemo(() => {
     const monthName = monthLabels[calendarCursor.month] ?? '';
@@ -518,6 +533,32 @@ export default function TaskForm({
   const dueDateParsed = useMemo(() => parseDateInput(dueDateValue), [dueDateValue]);
   const startTimestamp = startDateParsed?.getTime() ?? null;
   const dueTimestamp = dueDateParsed?.getTime() ?? null;
+  const dueDateTimeTimestamp = useMemo(() => {
+    if (!dueDateEnabled || !dueDateParsed) {
+      return null;
+    }
+    const base = new Date(dueDateParsed);
+    if (dueTimeValue) {
+      const [hours, minutes] = dueTimeValue.split(':').map(Number);
+      if (!Number.isNaN(hours) && !Number.isNaN(minutes)) {
+        base.setHours(hours, minutes, 0, 0);
+      }
+    }
+    return base.getTime();
+  }, [dueDateEnabled, dueDateParsed, dueTimeValue]);
+  const dueStatus = useMemo(() => {
+    if (!dueDateTimeTimestamp) {
+      return null;
+    }
+    const now = Date.now();
+    if (dueDateTimeTimestamp < now) {
+      return 'Atrasado';
+    }
+    if (dueDateTimeTimestamp - now <= 1000 * 60 * 60 * 24) {
+      return 'Em breve';
+    }
+    return 'No prazo';
+  }, [dueDateTimeTimestamp]);
   const startDateField = register('start_date');
   const dueDateField = register('due_date');
   const dueTimeField = register('due_time');
@@ -543,6 +584,37 @@ export default function TaskForm({
   const checklistCompleted = sanitizedChecklist.filter((item) => item.done).length;
   const checklistTotal = sanitizedChecklist.length;
   const checklistProgress = checklistTotal === 0 ? 0 : Math.round((checklistCompleted / checklistTotal) * 100);
+  const startDateSummary = useMemo(() => {
+    if (!startDateEnabled || !startDateValue) {
+      return null;
+    }
+    return formatDisplayDateValue(startDateValue);
+  }, [startDateEnabled, startDateValue]);
+  const dueDateSummary = useMemo(() => {
+    if (!dueDateEnabled || !dueDateValue) {
+      return null;
+    }
+    const formatted = formatDisplayDateValue(dueDateValue);
+    if (!formatted) {
+      return null;
+    }
+    return dueTimeValue ? `${formatted} às ${dueTimeValue}` : formatted;
+  }, [dueDateEnabled, dueDateValue, dueTimeValue]);
+  const dueReminderSummary = useMemo(() => {
+    if (!dueDateEnabled || dueReminderValue === 'none') {
+      return null;
+    }
+    return reminderLabels[dueReminderValue];
+  }, [dueDateEnabled, dueReminderValue]);
+  const dueRecurrenceSummary = useMemo(() => {
+    if (!dueDateEnabled || dueRecurrenceValue === 'never') {
+      return null;
+    }
+    return recurrenceLabels[dueRecurrenceValue];
+  }, [dueDateEnabled, dueRecurrenceValue]);
+  const hasDateSummary = Boolean(
+    startDateSummary || dueDateSummary || dueReminderSummary || dueRecurrenceSummary
+  );
 
   useEffect(() => {
     const dueDate = parseDateInput(dueDateValue);
@@ -647,6 +719,9 @@ export default function TaskForm({
   );
 
   const handleStartDateToggle = (enabled: boolean) => {
+    if (enabled) {
+      setDateEditorOpen(true);
+    }
     setStartDateEnabled(enabled);
     if (!enabled) {
       setValue('start_date', '', { shouldDirty: true, shouldValidate: true });
@@ -673,6 +748,9 @@ export default function TaskForm({
   };
 
   const handleDueDateToggle = (enabled: boolean) => {
+    if (enabled) {
+      setDateEditorOpen(true);
+    }
     setDueDateEnabled(enabled);
     if (!enabled) {
       setValue('due_date', '', { shouldDirty: true, shouldValidate: true });
@@ -1469,14 +1547,574 @@ export default function TaskForm({
         />
         {errors.title && <p className="mt-1 text-xs text-rose-600 dark:text-rose-300">{errors.title.message}</p>}
       </div>
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,0.9fr)] xl:items-start">
-        <div className="space-y-5">
-          <section className="rounded-3xl border border-slate-200 bg-white/60 p-4 shadow-inner dark:border-white/10 dark:bg-white/5">
+            <input type="hidden" {...statusField} value={statusValue} />
+      <div className="flex flex-col gap-6 lg:flex-row">
+        <div className="flex-1 space-y-5">
+          <section
+            ref={labelsSectionRef}
+            className="rounded-xl border border-slate-200/70 bg-white/80 p-4 shadow-sm dark:border-white/10 dark:bg-slate-900/40"
+          >
+            <header className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">Etiquetas</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Use cores para sinalizar o contexto deste card.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setLabelManagerOpen((open) => !open)}
+                className="rounded-lg border border-slate-200/80 bg-white px-3 py-1 text-xs font-semibold text-slate-600 transition hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/40 dark:border-white/20 dark:bg-white/5 dark:text-slate-200 dark:hover:bg-white/10"
+                aria-expanded={isLabelManagerOpen}
+                aria-controls={fieldIds.labelManager}
+              >
+                {isLabelManagerOpen ? 'Fechar' : 'Gerenciar'}
+              </button>
+            </header>
+            <input id={fieldIds.labels} type="hidden" {...register('labels')} />
+            <div className="mt-3 flex flex-wrap items-center gap-1.5">
+              {labelPreview.length === 0 ? (
+                <span className="text-xs text-slate-500 dark:text-slate-400">
+                  Nenhuma etiqueta aplicada.
+                </span>
+              ) : null}
+              {labelPreview.map((label, index) => {
+                const normalized = label.toLocaleLowerCase();
+                const definition = labelMap.get(normalized);
+                const colors = getLabelColors(label, {
+                  colorId: definition?.colorId,
+                  fallbackIndex: index
+                });
+                const displayValue = definition?.value ?? label;
+                return (
+                  <span
+                    key={`${definition?.id ?? label}-${index}`}
+                    className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-[11px] font-semibold uppercase tracking-wide shadow-sm"
+                    style={{
+                      backgroundColor: colors.background,
+                      color: colors.foreground
+                    }}
+                  >
+                    <span
+                      className="inline-block h-1.5 w-1.5 rounded-full"
+                      style={{ backgroundColor: colors.foreground, opacity: 0.5 }}
+                    />
+                    <span className="max-w-[7rem] truncate">{displayValue}</span>
+                    <button
+                      type="button"
+                      onClick={() => handleLabelToggle(displayValue)}
+                      className="flex h-4 w-4 items-center justify-center rounded-full border text-[10px] leading-none transition hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
+                      style={{
+                        color: colors.foreground,
+                        borderColor: `${colors.foreground}55`,
+                        backgroundColor: `${colors.foreground}1a`
+                      }}
+                    >
+                      <span aria-hidden>×</span>
+                      <span className="sr-only">Remover etiqueta {displayValue}</span>
+                    </button>
+                  </span>
+                );
+              })}
+            </div>
+            {isLabelManagerOpen ? (
+              <div
+                id={fieldIds.labelManager}
+                className="mt-4 space-y-4 rounded-lg border border-slate-200/70 bg-white/70 p-3 shadow-inner dark:border-white/10 dark:bg-white/5"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <p className="text-[11px] uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                    Biblioteca de etiquetas
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setLabelManagerOpen(false)}
+                    className="rounded-md border border-slate-200/80 bg-white px-2 py-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500 transition hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/40 dark:border-white/10 dark:bg-white/5 dark:text-slate-300 dark:hover:bg-white/10"
+                  >
+                    Concluir
+                  </button>
+                </div>
+                <div className="space-y-3">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-slate-600 dark:text-slate-300">Criar nova etiqueta</label>
+                    <Input
+                      value={newLabelName}
+                      onChange={(event) => setNewLabelName(event.target.value)}
+                      placeholder="Nome da etiqueta"
+                    />
+                    <div className="space-y-2">
+                      <p className="text-[11px] uppercase tracking-wide text-slate-500 dark:text-slate-400">Cor</p>
+                      <LabelColorOptions selectedColorId={newLabelColor} onSelect={setNewLabelColor} />
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <Button type="button" variant="secondary" onClick={() => handleCreateLabel(false)}>
+                        Criar
+                      </Button>
+                      <Button type="button" onClick={() => handleCreateLabel(true)} disabled={!newLabelName.trim()}>
+                        Criar e aplicar
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <p className="text-xs font-medium text-slate-600 dark:text-slate-300">Etiquetas existentes</p>
+                    <ul className="space-y-2">
+                      {filteredLabels.length === 0 ? (
+                        <li className="text-xs text-slate-500 dark:text-slate-400">
+                          Você ainda não salvou etiquetas personalizadas.
+                        </li>
+                      ) : (
+                        filteredLabels.map((label) => {
+                          const colors = getLabelColors(label.value, {
+                            colorId: label.colorId
+                          });
+                          const isApplied = selectedLabelKeys.has(label.normalized);
+                          const isEditing = editingLabel?.id === label.id;
+                          const trimmedValue = editingLabel?.value.trim() ?? '';
+                          const hasDuplicate =
+                            editingLabel && editingLabel.id === label.id
+                              ? filteredLabels.some(
+                                  (item) => item.id !== label.id && item.normalized === trimmedValue.toLocaleLowerCase()
+                                )
+                              : false;
+                          return (
+                            <li
+                              key={label.id}
+                              className="rounded-lg border border-slate-200/70 bg-white/80 p-2 dark:border-white/10 dark:bg-white/5"
+                            >
+                              {isEditing ? (
+                                (() => {
+                                  const colorsEdit = getLabelColors(editingLabel.value, {
+                                    colorId: editingLabel.colorId
+                                  });
+                                  return (
+                                    <div className="space-y-2">
+                                      <Input
+                                        value={editingLabel.value}
+                                        onChange={(event) => handleLabelEditChange(event.target.value)}
+                                      />
+                                      <div className="space-y-1">
+                                        <p className="text-[11px] uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                                          Cor
+                                        </p>
+                                        <LabelColorOptions
+                                          selectedColorId={editingLabel.colorId}
+                                          onSelect={handleLabelEditColorChange}
+                                        />
+                                      </div>
+                                      {trimmedValue.length === 0 ? (
+                                        <p className="text-xs text-rose-500 dark:text-rose-300">
+                                          Informe um nome para salvar a etiqueta.
+                                        </p>
+                                      ) : null}
+                                      {hasDuplicate ? (
+                                        <p className="text-xs text-rose-500 dark:text-rose-300">
+                                          Já existe uma etiqueta com este nome.
+                                        </p>
+                                      ) : null}
+                                      <div className="flex flex-wrap gap-2">
+                                        <Button type="button" variant="secondary" onClick={handleCancelLabelEdit}>
+                                          Cancelar
+                                        </Button>
+                                        <Button
+                                          type="button"
+                                          onClick={handleSaveLabelEdit}
+                                          disabled={trimmedValue.length === 0 || hasDuplicate}
+                                        >
+                                          Salvar
+                                        </Button>
+                                      </div>
+                                      <div
+                                        className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-[11px] font-semibold uppercase tracking-wide"
+                                        style={{
+                                          backgroundColor: colorsEdit.background,
+                                          color: colorsEdit.foreground
+                                        }}
+                                      >
+                                        <span
+                                          className="inline-block h-1.5 w-1.5 rounded-full"
+                                          style={{ backgroundColor: colorsEdit.foreground, opacity: 0.5 }}
+                                        />
+                                        {editingLabel.value || 'Pré-visualização'}
+                                      </div>
+                                    </div>
+                                  );
+                                })()
+                              ) : (
+                                <div className="flex flex-wrap items-center gap-2.5">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleLabelToggle(label.value)}
+                                    className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/60 ${
+                                      isApplied ? 'ring-2 ring-zenko-primary/70' : ''
+                                    }`}
+                                    style={{
+                                      backgroundColor: colors.background,
+                                      color: colors.foreground
+                                    }}
+                                  >
+                                    <span
+                                      className="inline-block h-1.5 w-1.5 rounded-full"
+                                      style={{ backgroundColor: colors.foreground, opacity: 0.5 }}
+                                    />
+                                    {label.value}
+                                  </button>
+                                  <div className="ml-auto flex gap-1.5">
+                                    <button
+                                      type="button"
+                                      onClick={() => handleStartEditingLabel(label)}
+                                      className="rounded-full border border-slate-200/80 bg-white px-2.5 py-1 text-[11px] font-medium text-slate-500 transition hover:bg-slate-100 hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/40 dark:border-white/10 dark:bg-white/5 dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-slate-100"
+                                    >
+                                      Editar
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleDeleteLabel(label)}
+                                      className="rounded-full border border-transparent bg-rose-100 px-2.5 py-1 text-[11px] font-medium text-rose-600 transition hover:bg-rose-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-400 dark:bg-rose-500/10 dark:text-rose-200 dark:hover:bg-rose-500/20"
+                                    >
+                                      Remover
+                                    </button>
+                                  </div>
+                                </div>
+                              )}
+                            </li>
+                          );
+                        })
+                      )}
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            ) : null}
+          </section>
+          <section
+            ref={datesSectionRef}
+            className="rounded-xl border border-slate-200/70 bg-white/80 p-4 shadow-sm dark:border-white/10 dark:bg-slate-900/40"
+          >
+            <header className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">Datas</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Mantenha início, prazo, lembretes e recorrência organizados.
+                </p>
+                {isEditingTask ? (
+                  <span
+                    className={`mt-1 inline-flex text-[11px] font-semibold uppercase tracking-wide ${
+                      autoSaveError
+                        ? 'text-rose-500 dark:text-rose-300'
+                        : isAutoSaving
+                          ? 'text-zenko-primary'
+                          : 'text-emerald-600 dark:text-emerald-400'
+                    }`}
+                  >
+                    {autoSaveError ? 'Erro ao salvar' : isAutoSaving ? 'Salvando...' : 'Atualizado'}
+                  </span>
+                ) : null}
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setDateEditorOpen((open) => !open);
+                  if (!isDateEditorOpen) {
+                    scrollToSection(datesSectionRef);
+                  }
+                }}
+                className="rounded-lg border border-slate-200/80 bg-white px-3 py-1 text-xs font-semibold uppercase tracking-wide text-slate-600 transition hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/40 dark:border-white/20 dark:bg-white/5 dark:text-slate-200 dark:hover:bg-white/10"
+              >
+                {isDateEditorOpen ? 'Concluir' : 'Editar'}
+              </button>
+            </header>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {startDateSummary ? (
+                <span className="inline-flex items-center gap-1.5 rounded-md bg-slate-100/80 px-2 py-1 text-xs font-medium text-slate-600 dark:bg-white/10 dark:text-slate-200">
+                  <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-300">Início</span>
+                  {startDateSummary}
+                </span>
+              ) : null}
+              {dueDateSummary ? (
+                <span className="inline-flex items-center gap-1.5 rounded-md bg-slate-100/80 px-2 py-1 text-xs font-medium text-slate-600 dark:bg-white/10 dark:text-slate-200">
+                  <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-300">Entrega</span>
+                  {dueDateSummary}
+                  {dueStatus ? (
+                    <span
+                      className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
+                        dueStatus === 'Atrasado'
+                          ? 'bg-rose-500/10 text-rose-600 dark:bg-rose-500/20 dark:text-rose-200'
+                          : dueStatus === 'Em breve'
+                            ? 'bg-amber-500/10 text-amber-600 dark:bg-amber-500/20 dark:text-amber-200'
+                            : 'bg-emerald-500/10 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-200'
+                      }`}
+                    >
+                      {dueStatus}
+                    </span>
+                  ) : null}
+                </span>
+              ) : null}
+              {dueReminderSummary ? (
+                <span className="inline-flex items-center gap-1.5 rounded-md bg-slate-100/80 px-2 py-1 text-xs font-medium text-slate-600 dark:bg-white/10 dark:text-slate-200">
+                  <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-300">Lembrete</span>
+                  {dueReminderSummary}
+                </span>
+              ) : null}
+              {dueRecurrenceSummary ? (
+                <span className="inline-flex items-center gap-1.5 rounded-md bg-slate-100/80 px-2 py-1 text-xs font-medium text-slate-600 dark:bg-white/10 dark:text-slate-200">
+                  <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-300">Recorrência</span>
+                  {dueRecurrenceSummary}
+                </span>
+              ) : null}
+              {!hasDateSummary ? (
+                <span className="text-xs text-slate-500 dark:text-slate-400">
+                  Nenhuma data definida para este card.
+                </span>
+              ) : null}
+            </div>
+            {isDateEditorOpen ? (
+              <div className="mt-4 space-y-4 border-t border-slate-200/70 pt-4 dark:border-white/10">
+                <div className="grid gap-3 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)]">
+                  <div className="rounded-lg border border-slate-200/70 bg-white/70 p-3 shadow-inner dark:border-white/10 dark:bg-white/5">
+                    <div className="flex items-center justify-between gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => shiftCalendarMonth(-1)}
+                        className="flex h-7 w-7 items-center justify-center rounded-full border border-transparent text-base text-slate-500 transition hover:border-slate-300 hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/40 dark:text-slate-300 dark:hover:border-white/20 dark:hover:bg-white/10"
+                        aria-label="Mês anterior"
+                      >
+                        ‹
+                      </button>
+                      <div className="text-center">
+                        <p className="text-sm font-semibold capitalize text-slate-700 dark:text-slate-200">{calendarHeading}</p>
+                        <p className="text-[11px] uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                          Escolha um dia para aplicar ao card.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => shiftCalendarMonth(1)}
+                        className="flex h-7 w-7 items-center justify-center rounded-full border border-transparent text-base text-slate-500 transition hover:border-slate-300 hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/40 dark:text-slate-300 dark:hover:border-white/20 dark:hover:bg-white/10"
+                        aria-label="Próximo mês"
+                      >
+                        ›
+                      </button>
+                    </div>
+                    <div className="mt-3 grid grid-cols-7 gap-1 text-center text-[10px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                      {weekDayLabels.map((weekday) => (
+                        <span key={`weekday-${weekday}`}>{weekday}</span>
+                      ))}
+                    </div>
+                    <div className="mt-1 grid grid-cols-7 gap-1 text-sm">
+                      {calendarDays.map((day) => {
+                        const isToday = day.iso === todayIso;
+                        const isStart = startDateParsed && day.iso === formatDateInput(startDateParsed);
+                        const isDue = dueDateParsed && day.iso === formatDateInput(dueDateParsed);
+                        const isInRange = (() => {
+                          if (startTimestamp === null || dueTimestamp === null) {
+                            return false;
+                          }
+                          return day.timestamp >= startTimestamp && day.timestamp <= dueTimestamp;
+                        })();
+                        const dayLabel = day.date.toLocaleDateString('pt-BR', {
+                          day: 'numeric',
+                          month: 'long',
+                          year: 'numeric',
+                          weekday: 'long'
+                        });
+                        const containerClasses = `relative flex items-center justify-center rounded-lg p-0.5 ${
+                          isInRange && !isStart && !isDue ? 'bg-zenko-primary/10 dark:bg-zenko-primary/25' : ''
+                        }`;
+                        let buttonClasses =
+                          'relative flex h-8 w-8 items-center justify-center rounded-full border border-transparent text-xs font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/40';
+                        if (isDue) {
+                          buttonClasses +=
+                            ' bg-gradient-to-br from-zenko-primary to-zenko-secondary text-white shadow-lg shadow-zenko-primary/20';
+                        } else if (isStart) {
+                          buttonClasses +=
+                            ' border-2 border-zenko-primary/70 bg-white text-zenko-primary dark:border-zenko-primary/50 dark:bg-slate-900/60 dark:text-zenko-primary/70';
+                        } else if (!day.inCurrentMonth) {
+                          buttonClasses += ' text-slate-400/80 dark:text-slate-500';
+                        } else {
+                          buttonClasses += ' text-slate-600 dark:text-slate-200';
+                        }
+                        if (isToday && !isDue && !isStart) {
+                          buttonClasses += ' border border-zenko-primary/40';
+                        }
+                        return (
+                          <div key={`${day.iso}-${day.inCurrentMonth ? 'current' : 'adjacent'}`} className={containerClasses}>
+                            <button
+                              type="button"
+                              onClick={() => handleCalendarSelect(day.iso)}
+                              className={buttonClasses}
+                              aria-label={dayLabel}
+                              aria-pressed={isStart || isDue}
+                              aria-current={isToday ? 'date' : undefined}
+                            >
+                              {day.day}
+                              {isDue ? (
+                                <span className="absolute -bottom-2 text-[8px] font-semibold uppercase tracking-wide text-white/90">
+                                  Prazo
+                                </span>
+                              ) : null}
+                              {isStart && !isDue ? (
+                                <span className="absolute -bottom-2 text-[8px] font-semibold uppercase tracking-wide text-zenko-primary">
+                                  Início
+                                </span>
+                              ) : null}
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <label className="flex items-center gap-3 text-sm font-medium text-slate-600 dark:text-slate-200">
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4 rounded border-slate-300 text-zenko-primary focus:ring-zenko-primary/50 dark:border-white/30"
+                          checked={startDateEnabled}
+                          onChange={(event) => handleStartDateToggle(event.target.checked)}
+                        />
+                        Data de início
+                      </label>
+                      <Input
+                        id={`${fieldIds.dueDate}-start`}
+                        name={startDateField.name}
+                        ref={startDateField.ref}
+                        onBlur={startDateField.onBlur}
+                        type="date"
+                        value={startDateValue}
+                        onChange={(event) => setValue('start_date', event.target.value, { shouldDirty: true })}
+                        disabled={!startDateEnabled}
+                        aria-label="Data de início"
+                        className="py-1.5 text-xs"
+                      />
+                      {errors.start_date ? (
+                        <p className="text-xs text-rose-500 dark:text-rose-300">{errors.start_date.message}</p>
+                      ) : null}
+                    </div>
+                    <div className="space-y-2">
+                      <label className="flex items-center gap-3 text-sm font-medium text-slate-600 dark:text-slate-200">
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4 rounded border-slate-300 text-zenko-primary focus:ring-zenko-primary/50 dark:border-white/30"
+                          checked={dueDateEnabled}
+                          onChange={(event) => handleDueDateToggle(event.target.checked)}
+                        />
+                        Data de entrega
+                      </label>
+                      <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-[minmax(0,1fr)_minmax(6rem,0.55fr)]">
+                        <Input
+                          id={fieldIds.dueDate}
+                          name={dueDateField.name}
+                          ref={dueDateField.ref}
+                          onBlur={dueDateField.onBlur}
+                          type="date"
+                          value={dueDateValue}
+                          onChange={(event) => setValue('due_date', event.target.value, { shouldDirty: true })}
+                          disabled={!dueDateEnabled}
+                          aria-label="Data de entrega"
+                          className="py-1.5 text-xs"
+                        />
+                        <Input
+                          id={`${fieldIds.dueDate}-time`}
+                          name={dueTimeField.name}
+                          ref={dueTimeField.ref}
+                          onBlur={dueTimeField.onBlur}
+                          type="time"
+                          value={dueTimeValue}
+                          onChange={(event) => setValue('due_time', event.target.value, { shouldDirty: true })}
+                          disabled={!dueDateEnabled}
+                          aria-label="Horário de entrega"
+                          className="py-1.5 text-xs"
+                        />
+                      </div>
+                      {errors.due_date ? (
+                        <p className="text-xs text-rose-500 dark:text-rose-300">{errors.due_date.message}</p>
+                      ) : null}
+                      {errors.due_time ? (
+                        <p className="text-xs text-rose-500 dark:text-rose-300">{errors.due_time.message}</p>
+                      ) : null}
+                    </div>
+                    <div className="grid gap-2.5 sm:grid-cols-2">
+                      <div className="space-y-1">
+                        <label className="text-[11px] uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                          Recorrência
+                        </label>
+                        <Select
+                          id={`${fieldIds.dueDate}-recurrence`}
+                          name={recurrenceField.name}
+                          ref={recurrenceField.ref}
+                          onBlur={recurrenceField.onBlur}
+                          value={dueRecurrenceValue}
+                          onChange={(event) => {
+                            const value = event.target.value as DueRecurrenceOption;
+                            setValue('due_recurrence', value, { shouldDirty: true });
+                          }}
+                          disabled={!dueDateEnabled}
+                          className="py-1.5 text-xs"
+                        >
+                          {dueRecurrenceOptions.map((option) => (
+                            <option key={option} value={option}>
+                              {recurrenceLabels[option]}
+                            </option>
+                          ))}
+                        </Select>
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[11px] uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                          Definir lembrete
+                        </label>
+                        <Select
+                          id={`${fieldIds.dueDate}-reminder`}
+                          name={reminderField.name}
+                          ref={reminderField.ref}
+                          onBlur={reminderField.onBlur}
+                          value={dueReminderValue}
+                          onChange={(event) => {
+                            const value = event.target.value as DueReminderOption;
+                            setValue('due_reminder', value, { shouldDirty: true });
+                          }}
+                          disabled={!dueDateEnabled}
+                          className="py-1.5 text-xs"
+                        >
+                          {dueReminderOptions.map((option) => (
+                            <option key={option} value={option}>
+                              {reminderLabels[option]}
+                            </option>
+                          ))}
+                        </Select>
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        type="button"
+                        onClick={handleDueSave}
+                        disabled={!isEditingTask || isAutoSaving}
+                        className="bg-gradient-to-r from-zenko-primary to-zenko-secondary text-white hover:from-zenko-primary/90 hover:to-zenko-secondary/90"
+                      >
+                        Salvar
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        onClick={handleDueClear}
+                        disabled={(!startDateEnabled && !dueDateEnabled) || isAutoSaving}
+                      >
+                        Remover
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : null}
+          </section>
+          <section
+            ref={descriptionSectionRef}
+            className="rounded-xl border border-slate-200/70 bg-white/80 p-4 shadow-sm dark:border-white/10 dark:bg-slate-900/40"
+          >
             <div className="flex items-start justify-between gap-4">
               <div>
-                <p className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-300">Descrição</p>
+                <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">Descrição</p>
                 <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                  Use Markdown para formatar detalhes, listas e destaques como no Trello.
+                  Use Markdown para destacar detalhes como no Trello.
                 </p>
               </div>
               {isEditingTask && descriptionDirty ? (
@@ -1566,10 +2204,27 @@ export default function TaskForm({
               </div>
             )}
           </section>
-          <section className="rounded-3xl border border-slate-200 bg-white/60 p-4 shadow-inner dark:border-white/10 dark:bg-white/5">
+          <section
+            ref={attachmentsSectionRef}
+            className="rounded-xl border border-slate-200/70 bg-white/80 p-4 shadow-sm dark:border-white/10 dark:bg-slate-900/40"
+          >
+            <AttachmentUploader
+              attachments={attachments}
+              onChange={(next) => {
+                setValue('attachments', next, { shouldDirty: true });
+                if (isEditingTask) {
+                  runAutoSave({ attachments: next });
+                }
+              }}
+            />
+          </section>
+          <section
+            ref={checklistSectionRef}
+            className="rounded-xl border border-slate-200/70 bg-white/80 p-4 shadow-sm dark:border-white/10 dark:bg-slate-900/40"
+          >
             <header className="flex items-center justify-between gap-4">
               <div>
-                <p className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-300">Checklist</p>
+                <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">Checklist</p>
                 <p className="text-xs text-slate-500 dark:text-slate-300">
                   {checklistCompleted}/{checklistTotal} itens concluídos
                 </p>
@@ -1687,6 +2342,9 @@ export default function TaskForm({
             </ul>
             <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center">
               <Input
+                ref={(element) => {
+                  newChecklistInputRef.current = element;
+                }}
                 value={newChecklistText}
                 onChange={(event) => setNewChecklistText(event.target.value)}
                 placeholder="Adicionar um item..."
@@ -1708,568 +2366,73 @@ export default function TaskForm({
               </Button>
             </div>
           </section>
-          <AttachmentUploader
-            attachments={attachments}
-            onChange={(next) => {
-              setValue('attachments', next, { shouldDirty: true });
-              if (isEditingTask) {
-                runAutoSave({ attachments: next });
-              }
-            }}
-          />
         </div>
-        <div className="space-y-5">
-          <section className="rounded-2xl border border-slate-200 bg-white/60 p-3.5 shadow-inner dark:border-white/10 dark:bg-white/5">
-            <header className="flex items-start justify-between gap-3">
-              <div>
-                <p className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-300">Datas</p>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                Controle início, prazo, lembretes e recorrência como no Trello.
-              </p>
-            </div>
-            {isEditingTask ? (
-              <span
-                className={`text-[11px] font-semibold uppercase tracking-wide ${
-                  autoSaveError
-                    ? 'text-rose-500 dark:text-rose-300'
-                    : isAutoSaving
-                      ? 'text-zenko-primary'
-                      : 'text-emerald-600 dark:text-emerald-400'
-                }`}
-              >
-                {autoSaveError ? 'Erro ao salvar' : isAutoSaving ? 'Salvando...' : 'Atualizado'}
-              </span>
-            ) : null}
-          </header>
-          <div className="mt-3 grid gap-3 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)]">
-            <div className="rounded-xl border border-slate-200 bg-white/80 p-3 shadow-sm dark:border-white/10 dark:bg-white/10">
-              <div className="flex items-center justify-between gap-1.5">
-                <button
-                  type="button"
-                  onClick={() => shiftCalendarMonth(-1)}
-                  className="flex h-7 w-7 items-center justify-center rounded-full border border-transparent text-base text-slate-500 transition hover:border-slate-300 hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/40 dark:text-slate-300 dark:hover:border-white/20 dark:hover:bg-white/10"
-                  aria-label="Mês anterior"
-                >
-                  ‹
-                </button>
-                <div className="text-center">
-                  <p className="text-sm font-semibold capitalize text-slate-700 dark:text-slate-200">{calendarHeading}</p>
-                  <p className="text-[11px] uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                    Escolha um dia para aplicar ao card.
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => shiftCalendarMonth(1)}
-                  className="flex h-7 w-7 items-center justify-center rounded-full border border-transparent text-base text-slate-500 transition hover:border-slate-300 hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/40 dark:text-slate-300 dark:hover:border-white/20 dark:hover:bg-white/10"
-                  aria-label="Próximo mês"
-                >
-                  ›
-                </button>
-              </div>
-              <div className="mt-2.5 flex flex-wrap items-center justify-between gap-1.5">
-                <div className="flex items-center gap-1 rounded-full bg-slate-100/80 p-1 text-[10px] font-semibold uppercase tracking-wide text-slate-600 shadow-inner dark:bg-white/10 dark:text-slate-200">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      handleDueDateToggle(true);
-                      setCalendarTarget('due');
-                    }}
-                    className={`rounded-full px-2.5 py-0.5 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/40 ${
-                      calendarTarget === 'due'
-                        ? 'bg-white text-zenko-primary shadow-sm dark:bg-white/90 dark:text-slate-900'
-                        : 'text-slate-600 hover:bg-white/70 dark:text-slate-200 dark:hover:bg-white/20'
-                    }`}
-                    aria-pressed={calendarTarget === 'due'}
-                  >
-                    Prazo
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      handleStartDateToggle(true);
-                      setCalendarTarget('start');
-                    }}
-                    className={`rounded-full px-2.5 py-0.5 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/40 ${
-                      calendarTarget === 'start'
-                        ? 'bg-white text-zenko-primary shadow-sm dark:bg-white/90 dark:text-slate-900'
-                        : 'text-slate-600 hover:bg-white/70 dark:text-slate-200 dark:hover:bg-white/20'
-                    }`}
-                    aria-pressed={calendarTarget === 'start'}
-                  >
-                    Início
-                  </button>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const today = new Date();
-                    setCalendarCursor({ year: today.getFullYear(), month: today.getMonth() });
-                  }}
-                  className="rounded-full border border-slate-200 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-600 transition hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/40 dark:border-white/10 dark:text-slate-200 dark:hover:bg-white/15"
-                >
-                  Hoje
-                </button>
-              </div>
-              <div className="mt-3 grid grid-cols-7 gap-1 text-center text-[9px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                {weekDayLabels.map((label) => (
-                  <span key={`weekday-${label}`} className="py-0.5">
-                    {label}
-                  </span>
-                ))}
-              </div>
-              <div className="mt-1 grid grid-cols-7 gap-1">
-                {calendarDays.map((day) => {
-                  const isStart = Boolean(startDateValue) && day.iso === startDateValue;
-                  const isDue = Boolean(dueDateValue) && day.iso === dueDateValue;
-                  const isInRange =
-                    startTimestamp !== null &&
-                    dueTimestamp !== null &&
-                    startTimestamp < dueTimestamp &&
-                    day.timestamp > startTimestamp &&
-                    day.timestamp < dueTimestamp;
-                  const isToday = day.iso === todayIso;
-                  const dayLabel = day.date.toLocaleDateString('pt-BR', {
-                    day: 'numeric',
-                    month: 'long',
-                    year: 'numeric',
-                    weekday: 'long'
-                  });
-                  const containerClasses = `relative flex items-center justify-center rounded-lg p-0.5 ${
-                    isInRange && !isStart && !isDue ? 'bg-zenko-primary/10 dark:bg-zenko-primary/25' : ''
-                  }`;
-                  let buttonClasses =
-                    'relative flex h-8 w-8 items-center justify-center rounded-full border border-transparent text-xs font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/40';
-                  if (isDue) {
-                    buttonClasses +=
-                      ' bg-gradient-to-br from-zenko-primary to-zenko-secondary text-white shadow-lg shadow-zenko-primary/20';
-                  } else if (isStart) {
-                    buttonClasses +=
-                      ' border-2 border-zenko-primary/70 bg-white text-zenko-primary dark:border-zenko-primary/50 dark:bg-slate-900/60 dark:text-zenko-primary/70';
-                  } else if (!day.inCurrentMonth) {
-                    buttonClasses += ' text-slate-400/80 dark:text-slate-500';
-                  } else {
-                    buttonClasses += ' text-slate-600 dark:text-slate-200';
-                  }
-                  if (isToday && !isDue && !isStart) {
-                    buttonClasses += ' border border-zenko-primary/40';
-                  }
-                  return (
-                    <div key={`${day.iso}-${day.inCurrentMonth ? 'current' : 'adjacent'}`} className={containerClasses}>
-                      <button
-                        type="button"
-                        onClick={() => handleCalendarSelect(day.iso)}
-                        className={buttonClasses}
-                        aria-label={dayLabel}
-                        aria-pressed={isStart || isDue}
-                        aria-current={isToday ? 'date' : undefined}
-                      >
-                        {day.day}
-                        {isDue ? (
-                          <span className="absolute -bottom-2 text-[8px] font-semibold uppercase tracking-wide text-white/90">
-                            Prazo
-                          </span>
-                        ) : null}
-                        {isStart && !isDue ? (
-                          <span className="absolute -bottom-2 text-[8px] font-semibold uppercase tracking-wide text-zenko-primary">
-                            Início
-                          </span>
-                        ) : null}
-                      </button>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <label className="flex items-center gap-3 text-sm font-medium text-slate-600 dark:text-slate-200">
-                  <input
-                    type="checkbox"
-                    className="h-4 w-4 rounded border-slate-300 text-zenko-primary focus:ring-zenko-primary/50 dark:border-white/30"
-                    checked={startDateEnabled}
-                    onChange={(event) => handleStartDateToggle(event.target.checked)}
-                  />
-                  Data de início
-                </label>
-                <Input
-                  id={`${fieldIds.dueDate}-start`}
-                  name={startDateField.name}
-                  ref={startDateField.ref}
-                  onBlur={startDateField.onBlur}
-                  type="date"
-                  value={startDateValue}
-                  onChange={(event) => setValue('start_date', event.target.value, { shouldDirty: true })}
-                  disabled={!startDateEnabled}
-                  aria-label="Data de início"
-                  className="py-1.5 text-xs"
-                />
-                {errors.start_date ? (
-                  <p className="text-xs text-rose-500 dark:text-rose-300">{errors.start_date.message}</p>
-                ) : null}
-              </div>
-              <div className="space-y-2">
-                <label className="flex items-center gap-3 text-sm font-medium text-slate-600 dark:text-slate-200">
-                  <input
-                    type="checkbox"
-                    className="h-4 w-4 rounded border-slate-300 text-zenko-primary focus:ring-zenko-primary/50 dark:border-white/30"
-                    checked={dueDateEnabled}
-                    onChange={(event) => handleDueDateToggle(event.target.checked)}
-                  />
-                  Data de entrega
-                </label>
-                <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-[minmax(0,1fr)_minmax(6rem,0.55fr)]">
-                  <Input
-                    id={fieldIds.dueDate}
-                    name={dueDateField.name}
-                    ref={dueDateField.ref}
-                    onBlur={dueDateField.onBlur}
-                    type="date"
-                    value={dueDateValue}
-                    onChange={(event) => setValue('due_date', event.target.value, { shouldDirty: true })}
-                    disabled={!dueDateEnabled}
-                    aria-label="Data de entrega"
-                    className="py-1.5 text-xs"
-                  />
-                  <Input
-                    id={`${fieldIds.dueDate}-time`}
-                    name={dueTimeField.name}
-                    ref={dueTimeField.ref}
-                    onBlur={dueTimeField.onBlur}
-                    type="time"
-                    value={dueTimeValue}
-                    onChange={(event) => setValue('due_time', event.target.value, { shouldDirty: true })}
-                    disabled={!dueDateEnabled}
-                    aria-label="Horário de entrega"
-                    className="py-1.5 text-xs"
-                  />
-                </div>
-                {errors.due_date ? (
-                  <p className="text-xs text-rose-500 dark:text-rose-300">{errors.due_date.message}</p>
-                ) : null}
-                {errors.due_time ? (
-                  <p className="text-xs text-rose-500 dark:text-rose-300">{errors.due_time.message}</p>
-                ) : null}
-              </div>
-              <div className="grid gap-2.5 sm:grid-cols-2">
-                <div className="space-y-1">
-                  <label className="text-[11px] uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                    Recorrência
-                  </label>
-                  <Select
-                    id={`${fieldIds.dueDate}-recurrence`}
-                    name={recurrenceField.name}
-                    ref={recurrenceField.ref}
-                    onBlur={recurrenceField.onBlur}
-                    value={dueRecurrenceValue}
-                    onChange={(event) => {
-                      const value = event.target.value as DueRecurrenceOption;
-                      setValue('due_recurrence', value, { shouldDirty: true });
-                    }}
-                    disabled={!dueDateEnabled}
-                    className="py-1.5 text-xs"
-                  >
-                    {dueRecurrenceOptions.map((option) => (
-                      <option key={option} value={option}>
-                        {recurrenceLabels[option]}
-                      </option>
-                    ))}
-                  </Select>
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[11px] uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                    Definir lembrete
-                  </label>
-                  <Select
-                    id={`${fieldIds.dueDate}-reminder`}
-                    name={reminderField.name}
-                    ref={reminderField.ref}
-                    onBlur={reminderField.onBlur}
-                    value={dueReminderValue}
-                    onChange={(event) => {
-                      const value = event.target.value as DueReminderOption;
-                      setValue('due_reminder', value, { shouldDirty: true });
-                    }}
-                    disabled={!dueDateEnabled}
-                    className="py-1.5 text-xs"
-                  >
-                    {dueReminderOptions.map((option) => (
-                      <option key={option} value={option}>
-                        {reminderLabels[option]}
-                      </option>
-                    ))}
-                  </Select>
-                </div>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  type="button"
-                  onClick={handleDueSave}
-                  disabled={!isEditingTask || isAutoSaving}
-                  className="bg-gradient-to-r from-zenko-primary to-zenko-secondary text-white hover:from-zenko-primary/90 hover:to-zenko-secondary/90"
-                >
-                  Salvar
-                </Button>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  onClick={handleDueClear}
-                  disabled={(!startDateEnabled && !dueDateEnabled) || isAutoSaving}
-                >
-                  Remover
-                </Button>
-              </div>
-            </div>
-          </div>
-          </section>
-          <section className="rounded-2xl border border-slate-200 bg-white/60 p-3.5 shadow-inner dark:border-white/10 dark:bg-white/5">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <p className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-300">Status atual</p>
-                <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                  Mova a tarefa entre as colunas para atualizar este estado.
-                </p>
-              </div>
-              <span
-                className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide ${statusStyle.pill}`}
-              >
-                <span className={`h-1.5 w-1.5 rounded-full ${statusStyle.dot}`} />
-                {statusLabel}
-              </span>
-            </div>
-            <input type="hidden" {...statusField} value={statusValue} />
-          </section>
-          <section className="rounded-2xl border border-slate-200 bg-white/60 p-3.5 shadow-inner dark:border-white/10 dark:bg-white/5">
-            <p className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-300">Etiquetas</p>
-            <input id={fieldIds.labels} type="hidden" {...register('labels')} />
-            <div className="mt-2 flex flex-wrap items-center gap-1.5">
-              {labelPreview.length === 0 ? (
-                <span className="text-xs text-slate-500 dark:text-slate-400">
-                  Nenhuma etiqueta selecionada.
-                </span>
-              ) : null}
-              {labelPreview.map((label, index) => {
-                const normalized = label.toLocaleLowerCase();
-                const definition = labelMap.get(normalized);
-                const colors = getLabelColors(label, {
-                  colorId: definition?.colorId,
-                  fallbackIndex: index
-                });
-                const displayValue = definition?.value ?? label;
-                return (
-                  <span
-                    key={`${definition?.id ?? label}-${index}`}
-                    className="inline-flex items-center gap-1.5 rounded-md px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide shadow-sm"
-                    style={{
-                      backgroundColor: colors.background,
-                      color: colors.foreground
-                    }}
-                  >
-                    <span
-                      className="inline-block h-1.5 w-1.5 rounded-full"
-                      style={{ backgroundColor: colors.foreground, opacity: 0.5 }}
-                    />
-                    <span className="max-w-[7rem] truncate">{displayValue}</span>
-                    <button
-                      type="button"
-                      onClick={() => handleLabelToggle(displayValue)}
-                      className="flex h-3.5 w-3.5 items-center justify-center rounded-full border text-[10px] leading-none transition hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
-                      style={{
-                        color: colors.foreground,
-                        borderColor: `${colors.foreground}55`,
-                        backgroundColor: `${colors.foreground}1a`
-                      }}
-                    >
-                      <span aria-hidden>×</span>
-                      <span className="sr-only">Remover etiqueta {displayValue}</span>
-                    </button>
-                  </span>
-                );
-              })}
+        <aside className="lg:w-64 space-y-4">
+          <div className="rounded-xl border border-slate-200/70 bg-white/80 p-4 shadow-sm dark:border-white/10 dark:bg-slate-900/40">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+              Atalhos do card
+            </p>
+            <div className="mt-3 space-y-2">
               <button
                 type="button"
-                onClick={() => setLabelManagerOpen((open) => !open)}
-                className="flex h-7 w-7 items-center justify-center rounded-md border border-slate-200 bg-white text-base font-semibold text-slate-600 transition hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/50 dark:border-white/10 dark:bg-white/10 dark:text-slate-200 dark:hover:bg-white/20"
-                aria-label={
-                  isLabelManagerOpen ? 'Fechar gerenciador de etiquetas' : 'Adicionar ou gerenciar etiquetas'
-                }
-                aria-expanded={isLabelManagerOpen}
-                aria-controls={fieldIds.labelManager}
+                onClick={() => {
+                  scrollToSection(labelsSectionRef);
+                  setLabelManagerOpen(true);
+                }}
+                className="flex w-full items-center justify-between rounded-lg bg-slate-100/80 px-3 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/40 dark:bg-white/10 dark:text-slate-200 dark:hover:bg-white/15"
               >
-                <span aria-hidden>+</span>
+                <span>Etiquetas</span>
+                <span aria-hidden>›</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setDateEditorOpen(true);
+                  scrollToSection(datesSectionRef);
+                }}
+                className="flex w-full items-center justify-between rounded-lg bg-slate-100/80 px-3 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/40 dark:bg-white/10 dark:text-slate-200 dark:hover:bg-white/15"
+              >
+                <span>Datas</span>
+                <span aria-hidden>›</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  scrollToSection(descriptionSectionRef);
+                  setDescriptionEditing(true);
+                  setTimeout(() => {
+                    descriptionTextareaRef.current?.focus();
+                  }, 120);
+                }}
+                className="flex w-full items-center justify-between rounded-lg bg-slate-100/80 px-3 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/40 dark:bg-white/10 dark:text-slate-200 dark:hover:bg-white/15"
+              >
+                <span>Descrição</span>
+                <span aria-hidden>›</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  scrollToSection(checklistSectionRef);
+                  setTimeout(() => {
+                    focusChecklistInput();
+                  }, 120);
+                }}
+                className="flex w-full items-center justify-between rounded-lg bg-slate-100/80 px-3 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/40 dark:bg-white/10 dark:text-slate-200 dark:hover:bg-white/15"
+              >
+                <span>Checklist</span>
+                <span aria-hidden>›</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => scrollToSection(attachmentsSectionRef)}
+                className="flex w-full items-center justify-between rounded-lg bg-slate-100/80 px-3 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/40 dark:bg-white/10 dark:text-slate-200 dark:hover:bg-white/15"
+              >
+                <span>Anexos</span>
+                <span aria-hidden>›</span>
               </button>
             </div>
-            {isLabelManagerOpen ? (
-              <div
-                id={fieldIds.labelManager}
-                className="mt-3 space-y-3 rounded-xl border border-slate-200 bg-white/70 p-3 shadow-inner dark:border-white/10 dark:bg-white/10"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <p className="text-[11px] uppercase tracking-wide text-slate-400 dark:text-slate-500">
-                    Gerenciador de etiquetas
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => setLabelManagerOpen(false)}
-                    className="rounded-md border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-slate-600 transition hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/50 dark:border-white/10 dark:bg-white/10 dark:text-slate-200 dark:hover:bg-white/20"
-                  >
-                    Fechar
-                  </button>
-                </div>
-                <div>
-                  <p className="text-[11px] uppercase tracking-wide text-slate-400 dark:text-slate-500">
-                    Nova etiqueta
-                  </p>
-                  <div className="mt-2 space-y-3">
-                    <Input
-                      value={newLabelName}
-                      onChange={(event) => setNewLabelName(event.target.value)}
-                      placeholder="Nome da etiqueta"
-                    />
-                    <div className="space-y-2">
-                      <p className="text-[11px] uppercase tracking-wide text-slate-400 dark:text-slate-500">
-                        Cor
-                      </p>
-                      <LabelColorOptions
-                        selectedColorId={newLabelColor}
-                        onSelect={(colorId) => setNewLabelColor(colorId)}
-                      />
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      <Button
-                        type="button"
-                        variant="secondary"
-                        disabled={!newLabelName.trim()}
-                        onClick={() => handleCreateLabel(false)}
-                      >
-                        Criar
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="secondary"
-                        disabled={!newLabelName.trim()}
-                        onClick={() => handleCreateLabel(true)}
-                      >
-                        Criar e aplicar
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-                <div>
-                  <p className="text-[11px] uppercase tracking-wide text-slate-400 dark:text-slate-500">
-                    Etiquetas disponíveis
-                  </p>
-                  <ul className="mt-2 space-y-2.5">
-                    {filteredLabels.length === 0 ? (
-                      <li className="text-xs text-slate-500 dark:text-slate-400">
-                        Nenhuma etiqueta encontrada.
-                      </li>
-                    ) : (
-                      filteredLabels.map((label) => {
-                        const colors = getLabelColors(label.value, { colorId: label.colorId });
-                        const isApplied = selectedLabelKeys.has(label.normalized);
-                        const isEditing = editingLabel?.id === label.id;
-                        return (
-                          <li
-                            key={label.id}
-                            className="rounded-xl border border-slate-200 bg-white/80 p-2.5 shadow-sm dark:border-white/10 dark:bg-white/10"
-                          >
-                            {isEditing && editingLabel ? (
-                              (() => {
-                                const trimmedValue = editingLabel.value.trim();
-                                const normalizedValue = trimmedValue.toLocaleLowerCase();
-                                const hasDuplicate =
-                                  trimmedValue.length > 0 &&
-                                  savedLabels.some(
-                                    (item) => item.id !== editingLabel.id && item.normalized === normalizedValue
-                                  );
-                                return (
-                                  <div className="space-y-3">
-                                    <Input
-                                      value={editingLabel.value}
-                                      onChange={(event) => handleLabelEditChange(event.target.value)}
-                                    />
-                                    <div className="space-y-2">
-                                      <p className="text-[11px] uppercase tracking-wide text-slate-400 dark:text-slate-500">
-                                        Cor
-                                      </p>
-                                      <LabelColorOptions
-                                        selectedColorId={editingLabel.colorId}
-                                        onSelect={handleLabelEditColorChange}
-                                      />
-                                    </div>
-                                    {trimmedValue.length === 0 ? (
-                                      <p className="text-xs text-rose-500 dark:text-rose-300">
-                                        Informe um nome para salvar a etiqueta.
-                                      </p>
-                                    ) : null}
-                                    {hasDuplicate ? (
-                                      <p className="text-xs text-rose-500 dark:text-rose-300">
-                                        Já existe uma etiqueta com este nome.
-                                      </p>
-                                    ) : null}
-                                    <div className="flex flex-wrap gap-2">
-                                      <Button type="button" variant="secondary" onClick={handleCancelLabelEdit}>
-                                        Cancelar
-                                      </Button>
-                                      <Button
-                                        type="button"
-                                        onClick={handleSaveLabelEdit}
-                                        disabled={trimmedValue.length === 0 || hasDuplicate}
-                                      >
-                                        Salvar
-                                      </Button>
-                                    </div>
-                                  </div>
-                                );
-                              })()
-                            ) : (
-                              <div className="flex flex-wrap items-center gap-2.5">
-                                <button
-                                  type="button"
-                                  onClick={() => handleLabelToggle(label.value)}
-                                  className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/60 ${
-                                    isApplied ? 'ring-2 ring-zenko-primary/70' : ''
-                                  }`}
-                                  style={{
-                                    backgroundColor: colors.background,
-                                    color: colors.foreground
-                                  }}
-                                >
-                                  <span
-                                    className="inline-block h-1.5 w-1.5 rounded-full"
-                                    style={{ backgroundColor: colors.foreground, opacity: 0.5 }}
-                                  />
-                                  {label.value}
-                                </button>
-                                <div className="ml-auto flex gap-1.5">
-                                  <button
-                                    type="button"
-                                    onClick={() => handleStartEditingLabel(label)}
-                                    className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-medium text-slate-500 transition hover:bg-slate-100 hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/50 dark:border-white/10 dark:bg-white/10 dark:text-slate-300 dark:hover:bg-white/20 dark:hover:text-slate-100"
-                                  >
-                                    Editar
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => handleDeleteLabel(label)}
-                                    className="rounded-full border border-transparent bg-rose-100 px-2.5 py-1 text-[11px] font-medium text-rose-600 transition hover:bg-rose-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-400 dark:bg-rose-500/10 dark:text-rose-200 dark:hover:bg-rose-500/20"
-                                  >
-                                    Remover
-                                  </button>
-                                </div>
-                              </div>
-                            )}
-                          </li>
-                        );
-                      })
-                    )}
-                  </ul>
-                </div>
-            </div>
-            ) : null}
-          </section>
-        </div>
+          </div>
+        </aside>
       </div>
       {submitError && (
         <p className="text-sm text-rose-600 dark:text-rose-300" role="alert">
