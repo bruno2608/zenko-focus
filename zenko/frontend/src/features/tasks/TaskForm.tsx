@@ -283,6 +283,39 @@ function LabelColorOptions({
   );
 }
 
+function LabelColorOptions({
+  selectedColorId,
+  onSelect
+}: {
+  selectedColorId: LabelColorId;
+  onSelect: (colorId: LabelColorId) => void;
+}) {
+  return (
+    <div className="flex flex-wrap gap-2">
+      {trelloPalette.map((option) => {
+        const isSelected = selectedColorId === option.id;
+        return (
+          <button
+            key={`palette-${option.id}`}
+            type="button"
+            onClick={() => onSelect(option.id)}
+            className={`flex h-8 w-8 items-center justify-center rounded-full border-2 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/60 ${
+              isSelected
+                ? 'border-slate-900/70 dark:border-white'
+                : 'border-transparent hover:border-slate-900/40 dark:hover:border-white/40'
+            }`}
+            style={{ backgroundColor: option.background }}
+            aria-pressed={isSelected}
+            aria-label={`Selecionar cor ${option.id}`}
+          >
+            {isSelected ? <span className="block h-2 w-2 rounded-full bg-white/90" /> : null}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function TaskForm({
   task,
   onClose,

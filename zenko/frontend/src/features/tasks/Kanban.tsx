@@ -94,6 +94,14 @@ export default function Kanban() {
   const connectivityStatus = useConnectivityStore((state) => state.status);
   const showOffline = connectivityStatus === 'limited' || isOfflineMode(userId);
   const autoMoveToDone = profile?.auto_move_done ?? true;
+  const labelDefinitions = useTasksStore((state) => state.labelsLibrary);
+  const labelDefinitionMap = useMemo(() => {
+    const map = new Map<string, LabelDefinition>();
+    labelDefinitions.forEach((definition) => {
+      map.set(definition.normalized, definition);
+    });
+    return map;
+  }, [labelDefinitions]);
 
   const labelDefinitions = useTasksStore((state) => state.labelsLibrary);
   const labelDefinitionMap = useMemo(() => {
