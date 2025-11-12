@@ -165,8 +165,8 @@ export default function TabsLayout() {
         <div className="absolute bottom-[-4rem] right-[-2rem] hidden h-80 w-80 rounded-full bg-zenko-accent/20 blur-[160px] dark:block" />
         <div className="absolute inset-x-0 top-0 h-56 bg-gradient-to-b from-white/60 via-white/40 to-transparent dark:hidden" />
       </div>
-      <div className="relative mx-auto flex min-h-screen w-full max-w-screen-2xl flex-col gap-6 px-4 pb-[calc(8rem+env(safe-area-inset-bottom))] pt-[calc(2rem+env(safe-area-inset-top))] sm:px-6 lg:flex-row lg:gap-8 lg:pb-16 lg:pt-12 xl:max-w-[90rem] xl:px-12">
-        <aside className="hidden w-72 shrink-0 flex-col rounded-3xl border border-slate-200/80 bg-white/80 p-6 text-sm backdrop-blur dark:border-white/10 dark:bg-white/5 lg:flex xl:w-80">
+      <div className="relative mx-auto flex min-h-screen w-full max-w-screen-2xl flex-col gap-6 px-4 pb-[calc(4rem+env(safe-area-inset-bottom))] pt-[calc(2rem+env(safe-area-inset-top))] sm:px-6 2xl:max-w-[90rem] 2xl:px-12 2xl:flex-row 2xl:gap-8 2xl:pb-16 2xl:pt-12">
+        <aside className="hidden w-72 shrink-0 flex-col rounded-3xl border border-slate-200/80 bg-white/80 p-6 text-sm backdrop-blur dark:border-white/10 dark:bg-white/5 2xl:flex 2xl:w-80">
           <div className="mb-8 flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-zenko-primary to-zenko-secondary text-base font-semibold text-white">
               Z
@@ -204,14 +204,15 @@ export default function TabsLayout() {
           </div>
         </aside>
         <div className="relative flex-1">
-          <div className="relative flex h-full flex-col lg:min-h-[calc(100vh-10rem)]">
-            <div className="mb-4 flex items-center justify-between rounded-2xl border border-slate-200/80 bg-white/80 px-4 py-3 backdrop-blur dark:border-white/10 dark:bg-white/5 lg:hidden">
+          <div className="relative flex h-full flex-col 2xl:min-h-[calc(100vh-10rem)]">
+            <div className="mb-4 flex items-center justify-between rounded-2xl border border-slate-200/80 bg-white/80 px-4 py-3 backdrop-blur dark:border-white/10 dark:bg-white/5 2xl:hidden">
               <div className="flex items-center gap-3">
                 <button
                   type="button"
                   onClick={() => setMobileMenuOpen(true)}
-                  className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 bg-white/80 text-slate-700 transition hover:bg-white dark:border-white/10 dark:bg-white/10 dark:text-slate-200 dark:hover:bg-white/15"
+                  className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 bg-white/80 text-slate-700 transition hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/60 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:border-white/10 dark:bg-white/10 dark:text-slate-200 dark:hover:bg-white/15 dark:focus-visible:ring-offset-slate-900"
                   aria-label="Abrir menu de navegação"
+                  aria-expanded={mobileMenuOpen}
                 >
                   <svg
                     className="h-5 w-5"
@@ -249,37 +250,12 @@ export default function TabsLayout() {
               </div>
             </header>
             <NotificationBanner />
-            <main className="flex-1 space-y-6 overflow-visible pb-6 lg:pb-8">
+            <main className="flex-1 space-y-6 overflow-visible pb-6 2xl:pb-8">
               <Outlet />
             </main>
           </div>
         </div>
       </div>
-      <nav className="fixed left-1/2 z-40 w-[calc(100%-2rem)] max-w-2xl -translate-x-1/2 rounded-3xl border border-slate-200/80 bg-white/90 p-2 shadow-lg shadow-slate-900/10 backdrop-blur dark:border-white/10 dark:bg-slate-950/80 lg:hidden"
-        style={{ bottom: `max(1rem, calc(env(safe-area-inset-bottom) + 1rem))` }}
-      >
-        <div className="grid grid-cols-5 gap-2">
-          {tabs.map((tab) => (
-            <NavLink
-              key={tab.to}
-              to={tab.to}
-              end={tab.to === '/'}
-              className={({ isActive }) =>
-                `flex flex-col items-center gap-1 rounded-2xl px-2 py-2 text-[11px] font-medium transition-all ${
-                  isActive
-                    ? 'bg-gradient-to-r from-zenko-primary/20 via-zenko-secondary/20 to-zenko-primary/20 text-zenko-primary shadow-lg shadow-zenko-secondary/20 dark:text-white'
-                    : 'text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'
-                }`
-              }
-            >
-              <span className="flex h-8 w-8 items-center justify-center rounded-2xl bg-zenko-primary/10 text-zenko-primary dark:bg-white/5">
-                {tab.icon}
-              </span>
-              {tab.label}
-            </NavLink>
-          ))}
-        </div>
-      </nav>
       <OnboardingDialog
         open={showOnboarding}
         loading={profileSaving}
@@ -290,11 +266,11 @@ export default function TabsLayout() {
         }}
       />
       {mobileMenuOpen && (
-        <div className="fixed inset-0 z-50 flex flex-col bg-slate-950/70 px-4 pb-[calc(2rem+env(safe-area-inset-bottom))] pt-[calc(5rem+env(safe-area-inset-top))] backdrop-blur-lg lg:hidden">
+        <div className="fixed inset-0 z-50 flex flex-col bg-slate-950/70 px-4 pb-[calc(2rem+env(safe-area-inset-bottom))] pt-[calc(5rem+env(safe-area-inset-top))] backdrop-blur-lg 2xl:hidden">
           <button
             type="button"
             onClick={() => setMobileMenuOpen(false)}
-            className="absolute right-6 top-[calc(env(safe-area-inset-top)+1.5rem)] inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-white/20 bg-white/10 text-white transition hover:bg-white/20"
+            className="absolute right-6 top-[calc(env(safe-area-inset-top)+1.5rem)] inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-white/20 bg-white/10 text-white transition hover:bg-white/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/80 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent"
             aria-label="Fechar menu de navegação"
           >
             ×
