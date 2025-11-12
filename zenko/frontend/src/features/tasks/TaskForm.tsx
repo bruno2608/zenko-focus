@@ -2154,36 +2154,20 @@ export default function TaskForm({
                   placeholder="Descreva o contexto, critérios e próximos passos..."
                   className="min-h-[8rem]"
                 />
-                <div className="flex flex-wrap gap-2">
-                  {isEditingTask ? (
-                    <>
-                      <Button
-                        type="button"
-                        onClick={handleDescriptionSave}
-                        disabled={isAutoSaving || !descriptionDirty}
-                      >
-                        Salvar
-                      </Button>
-                      <Button type="button" variant="secondary" onClick={handleDescriptionCancel}>
-                        Descartar alterações
-                      </Button>
-                    </>
-                  ) : null}
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    onClick={() => {
-                      if (typeof window !== 'undefined') {
-                        window.open(
-                          'https://support.atlassian.com/trello/docs/format-your-text-with-markdown/',
-                          '_blank'
-                        );
-                      }
-                    }}
-                  >
-                    Ajuda para formatação
-                  </Button>
-                </div>
+                {isEditingTask ? (
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      type="button"
+                      onClick={handleDescriptionSave}
+                      disabled={isAutoSaving || !descriptionDirty}
+                    >
+                      Salvar
+                    </Button>
+                    <Button type="button" variant="secondary" onClick={handleDescriptionCancel}>
+                      Descartar alterações
+                    </Button>
+                  </div>
+                ) : null}
               </div>
             ) : (
               <div className="mt-3 space-y-3">
