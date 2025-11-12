@@ -306,7 +306,6 @@ export default function TaskForm({
     | null
   >(null);
   const [isLabelManagerOpen, setLabelManagerOpen] = useState(false);
-  const [labelSearch, setLabelSearch] = useState('');
   const [newLabelName, setNewLabelName] = useState('');
   const [newLabelColor, setNewLabelColor] = useState<LabelColorId>(trelloPalette[0].id);
   const [editingLabel, setEditingLabel] = useState<{
@@ -515,13 +514,7 @@ export default function TaskForm({
     () => new Set(labelPreview.map((label) => label.toLocaleLowerCase())),
     [labelPreview]
   );
-  const filteredLabels = useMemo(() => {
-    const query = labelSearch.trim().toLocaleLowerCase();
-    if (!query) {
-      return savedLabels;
-    }
-    return savedLabels.filter((label) => label.value.toLocaleLowerCase().includes(query));
-  }, [labelSearch, savedLabels]);
+  const filteredLabels = savedLabels;
   const isCreateSubmitting = isCreatePending;
 
   const checklistCompleted = sanitizedChecklist.filter((item) => item.done).length;
@@ -1264,7 +1257,6 @@ export default function TaskForm({
       }
       createLabelDefinition(trimmed, newLabelColor);
       setNewLabelName('');
-      setLabelSearch('');
       if (applyToTask) {
         applyLabel(trimmed);
       }
@@ -1549,9 +1541,9 @@ export default function TaskForm({
           </div>
         )}
       </section>
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <section className="rounded-3xl border border-slate-200 bg-white/60 p-4 shadow-inner dark:border-white/10 dark:bg-white/5">
-          <header className="flex items-start justify-between gap-4">
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+        <section className="rounded-2xl border border-slate-200 bg-white/60 p-3.5 shadow-inner dark:border-white/10 dark:bg-white/5">
+          <header className="flex items-start justify-between gap-3">
             <div>
               <p className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-300">Datas</p>
               <p className="text-[11px] text-slate-500 dark:text-slate-400">
@@ -1572,13 +1564,13 @@ export default function TaskForm({
               </span>
             ) : null}
           </header>
-          <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
-            <div className="rounded-2xl border border-slate-200 bg-white/80 p-4 shadow-sm dark:border-white/10 dark:bg-white/10">
-              <div className="flex items-center justify-between gap-2">
+          <div className="mt-3 grid gap-3 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)]">
+            <div className="rounded-xl border border-slate-200 bg-white/80 p-3 shadow-sm dark:border-white/10 dark:bg-white/10">
+              <div className="flex items-center justify-between gap-1.5">
                 <button
                   type="button"
                   onClick={() => shiftCalendarMonth(-1)}
-                  className="flex h-8 w-8 items-center justify-center rounded-full border border-transparent text-lg text-slate-500 transition hover:border-slate-300 hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/40 dark:text-slate-300 dark:hover:border-white/20 dark:hover:bg-white/10"
+                  className="flex h-7 w-7 items-center justify-center rounded-full border border-transparent text-base text-slate-500 transition hover:border-slate-300 hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/40 dark:text-slate-300 dark:hover:border-white/20 dark:hover:bg-white/10"
                   aria-label="Mês anterior"
                 >
                   ‹
@@ -1592,21 +1584,21 @@ export default function TaskForm({
                 <button
                   type="button"
                   onClick={() => shiftCalendarMonth(1)}
-                  className="flex h-8 w-8 items-center justify-center rounded-full border border-transparent text-lg text-slate-500 transition hover:border-slate-300 hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/40 dark:text-slate-300 dark:hover:border-white/20 dark:hover:bg-white/10"
+                  className="flex h-7 w-7 items-center justify-center rounded-full border border-transparent text-base text-slate-500 transition hover:border-slate-300 hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/40 dark:text-slate-300 dark:hover:border-white/20 dark:hover:bg-white/10"
                   aria-label="Próximo mês"
                 >
                   ›
                 </button>
               </div>
-              <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-                <div className="flex items-center gap-1 rounded-full bg-slate-100/80 p-1 text-[11px] font-semibold uppercase tracking-wide text-slate-600 shadow-inner dark:bg-white/10 dark:text-slate-200">
+              <div className="mt-2.5 flex flex-wrap items-center justify-between gap-1.5">
+                <div className="flex items-center gap-1 rounded-full bg-slate-100/80 p-1 text-[10px] font-semibold uppercase tracking-wide text-slate-600 shadow-inner dark:bg-white/10 dark:text-slate-200">
                   <button
                     type="button"
                     onClick={() => {
                       handleDueDateToggle(true);
                       setCalendarTarget('due');
                     }}
-                    className={`rounded-full px-3 py-1 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/40 ${
+                    className={`rounded-full px-2.5 py-0.5 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/40 ${
                       calendarTarget === 'due'
                         ? 'bg-white text-zenko-primary shadow-sm dark:bg-white/90 dark:text-slate-900'
                         : 'text-slate-600 hover:bg-white/70 dark:text-slate-200 dark:hover:bg-white/20'
@@ -1621,7 +1613,7 @@ export default function TaskForm({
                       handleStartDateToggle(true);
                       setCalendarTarget('start');
                     }}
-                    className={`rounded-full px-3 py-1 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/40 ${
+                    className={`rounded-full px-2.5 py-0.5 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/40 ${
                       calendarTarget === 'start'
                         ? 'bg-white text-zenko-primary shadow-sm dark:bg-white/90 dark:text-slate-900'
                         : 'text-slate-600 hover:bg-white/70 dark:text-slate-200 dark:hover:bg-white/20'
@@ -1637,14 +1629,14 @@ export default function TaskForm({
                     const today = new Date();
                     setCalendarCursor({ year: today.getFullYear(), month: today.getMonth() });
                   }}
-                  className="rounded-full border border-slate-200 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-slate-600 transition hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/40 dark:border-white/10 dark:text-slate-200 dark:hover:bg-white/15"
+                  className="rounded-full border border-slate-200 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-600 transition hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/40 dark:border-white/10 dark:text-slate-200 dark:hover:bg-white/15"
                 >
                   Hoje
                 </button>
               </div>
-              <div className="mt-4 grid grid-cols-7 gap-1 text-center text-[10px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+              <div className="mt-3 grid grid-cols-7 gap-1 text-center text-[9px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
                 {weekDayLabels.map((label) => (
-                  <span key={`weekday-${label}`} className="py-1">
+                  <span key={`weekday-${label}`} className="py-0.5">
                     {label}
                   </span>
                 ))}
@@ -1666,11 +1658,11 @@ export default function TaskForm({
                     year: 'numeric',
                     weekday: 'long'
                   });
-                  const containerClasses = `relative flex items-center justify-center rounded-lg p-1 ${
+                  const containerClasses = `relative flex items-center justify-center rounded-lg p-0.5 ${
                     isInRange && !isStart && !isDue ? 'bg-zenko-primary/10 dark:bg-zenko-primary/25' : ''
                   }`;
                   let buttonClasses =
-                    'relative flex h-9 w-9 items-center justify-center rounded-full border border-transparent text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/40';
+                    'relative flex h-8 w-8 items-center justify-center rounded-full border border-transparent text-xs font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/40';
                   if (isDue) {
                     buttonClasses +=
                       ' bg-gradient-to-br from-zenko-primary to-zenko-secondary text-white shadow-lg shadow-zenko-primary/20';
@@ -1697,12 +1689,12 @@ export default function TaskForm({
                       >
                         {day.day}
                         {isDue ? (
-                          <span className="absolute -bottom-2 text-[9px] font-semibold uppercase tracking-wide text-white/90">
+                          <span className="absolute -bottom-2 text-[8px] font-semibold uppercase tracking-wide text-white/90">
                             Prazo
                           </span>
                         ) : null}
                         {isStart && !isDue ? (
-                          <span className="absolute -bottom-2 text-[9px] font-semibold uppercase tracking-wide text-zenko-primary">
+                          <span className="absolute -bottom-2 text-[8px] font-semibold uppercase tracking-wide text-zenko-primary">
                             Início
                           </span>
                         ) : null}
@@ -1733,6 +1725,7 @@ export default function TaskForm({
                   onChange={(event) => setValue('start_date', event.target.value, { shouldDirty: true })}
                   disabled={!startDateEnabled}
                   aria-label="Data de início"
+                  className="py-1.5 text-xs"
                 />
                 {errors.start_date ? (
                   <p className="text-xs text-rose-500 dark:text-rose-300">{errors.start_date.message}</p>
@@ -1748,7 +1741,7 @@ export default function TaskForm({
                   />
                   Data de entrega
                 </label>
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(8rem,0.6fr)]">
+                <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-[minmax(0,1fr)_minmax(6rem,0.55fr)]">
                   <Input
                     id={fieldIds.dueDate}
                     name={dueDateField.name}
@@ -1759,6 +1752,7 @@ export default function TaskForm({
                     onChange={(event) => setValue('due_date', event.target.value, { shouldDirty: true })}
                     disabled={!dueDateEnabled}
                     aria-label="Data de entrega"
+                    className="py-1.5 text-xs"
                   />
                   <Input
                     id={`${fieldIds.dueDate}-time`}
@@ -1770,6 +1764,7 @@ export default function TaskForm({
                     onChange={(event) => setValue('due_time', event.target.value, { shouldDirty: true })}
                     disabled={!dueDateEnabled}
                     aria-label="Horário de entrega"
+                    className="py-1.5 text-xs"
                   />
                 </div>
                 {errors.due_date ? (
@@ -1779,7 +1774,7 @@ export default function TaskForm({
                   <p className="text-xs text-rose-500 dark:text-rose-300">{errors.due_time.message}</p>
                 ) : null}
               </div>
-              <div className="grid gap-3 sm:grid-cols-2">
+              <div className="grid gap-2.5 sm:grid-cols-2">
                 <div className="space-y-1">
                   <label className="text-[11px] uppercase tracking-wide text-slate-500 dark:text-slate-400">
                     Recorrência
@@ -1795,6 +1790,7 @@ export default function TaskForm({
                       setValue('due_recurrence', value, { shouldDirty: true });
                     }}
                     disabled={!dueDateEnabled}
+                    className="py-1.5 text-xs"
                   >
                     {dueRecurrenceOptions.map((option) => (
                       <option key={option} value={option}>
@@ -1818,6 +1814,7 @@ export default function TaskForm({
                       setValue('due_reminder', value, { shouldDirty: true });
                     }}
                     disabled={!dueDateEnabled}
+                    className="py-1.5 text-xs"
                   >
                     {dueReminderOptions.map((option) => (
                       <option key={option} value={option}>
@@ -1886,7 +1883,7 @@ export default function TaskForm({
           Etiquetas
         </p>
         <input id={fieldIds.labels} type="hidden" {...register('labels')} />
-        <div className="mt-2 flex flex-wrap items-center gap-2">
+        <div className="mt-2 flex flex-wrap items-center gap-1.5">
           {labelPreview.length === 0 ? (
             <span className="text-xs text-slate-500 dark:text-slate-400">
               Nenhuma etiqueta selecionada.
@@ -1903,21 +1900,21 @@ export default function TaskForm({
             return (
               <span
                 key={`${definition?.id ?? label}-${index}`}
-                className="inline-flex items-center gap-2 rounded-md px-2 py-1 text-[11px] font-semibold uppercase tracking-wide shadow-sm"
+                className="inline-flex items-center gap-1.5 rounded-md px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide shadow-sm"
                 style={{
                   backgroundColor: colors.background,
                   color: colors.foreground
                 }}
               >
                 <span
-                  className="inline-block h-2 w-2 rounded-full"
+                  className="inline-block h-1.5 w-1.5 rounded-full"
                   style={{ backgroundColor: colors.foreground, opacity: 0.5 }}
                 />
-                <span className="max-w-[8rem] truncate">{displayValue}</span>
+                <span className="max-w-[7rem] truncate">{displayValue}</span>
                 <button
                   type="button"
                   onClick={() => handleLabelToggle(displayValue)}
-                  className="flex h-4 w-4 items-center justify-center rounded-full border text-xs leading-none transition hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
+                  className="flex h-3.5 w-3.5 items-center justify-center rounded-full border text-[10px] leading-none transition hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
                   style={{
                     color: colors.foreground,
                     borderColor: `${colors.foreground}55`,
@@ -1933,7 +1930,7 @@ export default function TaskForm({
           <button
             type="button"
             onClick={() => setLabelManagerOpen((open) => !open)}
-            className="flex h-8 w-8 items-center justify-center rounded-md border border-slate-200 bg-white text-lg font-semibold text-slate-600 transition hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/50 dark:border-white/10 dark:bg-white/10 dark:text-slate-200 dark:hover:bg-white/20"
+            className="flex h-7 w-7 items-center justify-center rounded-md border border-slate-200 bg-white text-base font-semibold text-slate-600 transition hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/50 dark:border-white/10 dark:bg-white/10 dark:text-slate-200 dark:hover:bg-white/20"
             aria-label={
               isLabelManagerOpen ? 'Fechar gerenciador de etiquetas' : 'Adicionar ou gerenciar etiquetas'
             }
@@ -1946,7 +1943,7 @@ export default function TaskForm({
         {isLabelManagerOpen ? (
           <div
             id={fieldIds.labelManager}
-            className="mt-3 space-y-4 rounded-2xl border border-slate-200 bg-white/60 p-4 shadow-inner dark:border-white/10 dark:bg-white/5"
+            className="mt-3 space-y-3 rounded-xl border border-slate-200 bg-white/70 p-3 shadow-inner dark:border-white/10 dark:bg-white/10"
           >
             <div className="flex items-start justify-between gap-3">
               <p className="text-[11px] uppercase tracking-wide text-slate-400 dark:text-slate-500">
@@ -1955,21 +1952,10 @@ export default function TaskForm({
               <button
                 type="button"
                 onClick={() => setLabelManagerOpen(false)}
-                className="rounded-md border border-slate-200 bg-white px-2 py-1 text-[11px] font-semibold uppercase tracking-wide text-slate-600 transition hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/50 dark:border-white/10 dark:bg-white/10 dark:text-slate-200 dark:hover:bg-white/20"
+                className="rounded-md border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-slate-600 transition hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/50 dark:border-white/10 dark:bg-white/10 dark:text-slate-200 dark:hover:bg-white/20"
               >
                 Fechar
               </button>
-            </div>
-            <div>
-              <label className="mb-1 block text-[11px] uppercase tracking-wide text-slate-400 dark:text-slate-500" htmlFor="task-label-search">
-                Buscar etiquetas
-              </label>
-              <Input
-                id="task-label-search"
-                value={labelSearch}
-                onChange={(event) => setLabelSearch(event.target.value)}
-                placeholder="Digite para filtrar..."
-              />
             </div>
             <div>
               <p className="text-[11px] uppercase tracking-wide text-slate-400 dark:text-slate-500">
@@ -2014,7 +2000,7 @@ export default function TaskForm({
               <p className="text-[11px] uppercase tracking-wide text-slate-400 dark:text-slate-500">
                 Etiquetas disponíveis
               </p>
-              <ul className="mt-3 space-y-3">
+              <ul className="mt-2 space-y-2.5">
                 {filteredLabels.length === 0 ? (
                   <li className="text-xs text-slate-500 dark:text-slate-400">
                     Nenhuma etiqueta encontrada.
@@ -2027,7 +2013,7 @@ export default function TaskForm({
                     return (
                       <li
                         key={label.id}
-                        className="rounded-2xl border border-slate-200 bg-white/60 p-3 shadow-sm dark:border-white/10 dark:bg-white/10"
+                        className="rounded-xl border border-slate-200 bg-white/80 p-2.5 shadow-sm dark:border-white/10 dark:bg-white/10"
                       >
                         {isEditing && editingLabel ? (
                           (() => {
@@ -2079,11 +2065,11 @@ export default function TaskForm({
                             );
                           })()
                         ) : (
-                          <div className="flex flex-wrap items-center gap-3">
+                          <div className="flex flex-wrap items-center gap-2.5">
                             <button
                               type="button"
                               onClick={() => handleLabelToggle(label.value)}
-                              className={`inline-flex items-center gap-2 rounded-md px-3 py-1 text-[11px] font-semibold uppercase tracking-wide transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/60 ${
+                              className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/60 ${
                                 isApplied ? 'ring-2 ring-zenko-primary/70' : ''
                               }`}
                               style={{
@@ -2092,23 +2078,23 @@ export default function TaskForm({
                               }}
                             >
                               <span
-                                className="inline-block h-2 w-2 rounded-full"
+                                className="inline-block h-1.5 w-1.5 rounded-full"
                                 style={{ backgroundColor: colors.foreground, opacity: 0.5 }}
                               />
                               {label.value}
                             </button>
-                            <div className="ml-auto flex gap-2">
+                            <div className="ml-auto flex gap-1.5">
                               <button
                                 type="button"
                                 onClick={() => handleStartEditingLabel(label)}
-                                className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-500 transition hover:bg-slate-100 hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/50 dark:border-white/10 dark:bg-white/10 dark:text-slate-300 dark:hover:bg-white/20 dark:hover:text-slate-100"
+                                className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-medium text-slate-500 transition hover:bg-slate-100 hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/50 dark:border-white/10 dark:bg-white/10 dark:text-slate-300 dark:hover:bg-white/20 dark:hover:text-slate-100"
                               >
                                 Editar
                               </button>
                               <button
                                 type="button"
                                 onClick={() => handleDeleteLabel(label)}
-                                className="rounded-full border border-transparent bg-rose-100 px-3 py-1 text-xs font-medium text-rose-600 transition hover:bg-rose-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-400 dark:bg-rose-500/10 dark:text-rose-200 dark:hover:bg-rose-500/20"
+                                className="rounded-full border border-transparent bg-rose-100 px-2.5 py-1 text-[11px] font-medium text-rose-600 transition hover:bg-rose-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-400 dark:bg-rose-500/10 dark:text-rose-200 dark:hover:bg-rose-500/20"
                               >
                                 Remover
                               </button>
