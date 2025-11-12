@@ -166,8 +166,8 @@ export default function TabsLayout() {
         <div className="absolute inset-x-0 top-0 h-56 bg-gradient-to-b from-white/60 via-white/40 to-transparent dark:hidden" />
       </div>
       <div className="relative mx-auto flex min-h-screen w-full max-w-screen-2xl flex-col gap-6 px-4 pb-[calc(4rem+env(safe-area-inset-bottom))] pt-[calc(2rem+env(safe-area-inset-top))] sm:px-6 xl:max-w-[90rem] xl:px-12 xl:pb-16 xl:pt-12">
-        <header className="flex flex-wrap items-center justify-between gap-4 rounded-3xl border border-slate-200/80 bg-white/80 px-4 py-3 backdrop-blur shadow-[0_20px_45px_-20px_rgba(15,23,42,0.15)] dark:border-white/10 dark:bg-white/5">
-          <div className="flex flex-1 items-center gap-3">
+        <header className="flex flex-col gap-4 rounded-3xl border border-slate-200/80 bg-white/80 px-4 py-3 backdrop-blur shadow-[0_20px_45px_-20px_rgba(15,23,42,0.15)] transition-[grid-template-columns] dark:border-white/10 dark:bg-white/5 xl:grid xl:grid-cols-[auto,1fr,auto] xl:items-center xl:gap-6">
+          <div className="flex flex-1 items-center gap-3 xl:flex-none">
             <button
               type="button"
               onClick={() => setMobileMenuOpen(true)}
@@ -194,7 +194,7 @@ export default function TabsLayout() {
               <p className="text-base font-semibold text-slate-900 dark:text-white">Produtividade unificada</p>
             </div>
           </div>
-          <nav className="order-last hidden w-full flex-wrap gap-2 xl:order-none xl:flex xl:w-auto xl:flex-nowrap xl:items-center xl:justify-center xl:gap-3">
+          <nav className="order-last hidden w-full flex-wrap justify-center gap-2 xl:order-none xl:flex xl:w-full xl:flex-nowrap xl:items-center xl:justify-center xl:gap-3">
             {tabs.map((tab) => (
               <NavLink
                 key={`top-${tab.to}`}
@@ -215,7 +215,7 @@ export default function TabsLayout() {
               </NavLink>
             ))}
           </nav>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center justify-end gap-3">
             <div className="rounded-2xl border border-slate-200 bg-white/70 px-4 py-2 text-xs font-medium text-slate-600 shadow-sm backdrop-blur dark:border-white/10 dark:bg-white/10 dark:text-slate-200">
               {todayLabel}
             </div>
