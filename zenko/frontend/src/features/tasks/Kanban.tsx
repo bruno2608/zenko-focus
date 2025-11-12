@@ -641,7 +641,7 @@ export default function Kanban() {
                     columnRefs.current[column.key] = node;
                   }}
                   {...provided.droppableProps}
-                  className={`min-w-[280px] snap-start space-y-3 rounded-3xl border border-slate-200 bg-gradient-to-br p-4 backdrop-blur transition-shadow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/60 dark:border-white/5 md:min-w-0 ${
+                  className={`group flex min-h-[22rem] min-w-[280px] snap-start flex-col rounded-3xl border border-slate-200 bg-gradient-to-br p-4 backdrop-blur transition-shadow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/60 dark:border-white/5 md:min-w-0 max-h-[calc(100vh-14rem)] md:max-h-[calc(100vh-11rem)] ${
                     column.accent
                   } ${snapshot.isDraggingOver ? 'ring-2 ring-zenko-primary/60 shadow-lg' : ''} ${
                     focusedColumn === column.key ? 'border-zenko-primary/40 shadow-lg' : ''
@@ -668,7 +668,11 @@ export default function Kanban() {
                       {column.tasks.length}
                     </span>
                   </header>
-                  <div className="space-y-3" role="list" aria-label={`Tarefas em ${column.title}`}>
+                  <div
+                    className="mt-3 flex-1 space-y-3 overflow-y-auto pr-1"
+                    role="list"
+                    aria-label={`Tarefas em ${column.title}`}
+                  >
                     {column.tasks.map((task, index) => {
                       const previousStatus = getAdjacentStatus(task.status, 'previous');
                       const nextStatus = getAdjacentStatus(task.status, 'next');
@@ -1030,6 +1034,7 @@ export default function Kanban() {
                         Arraste tarefas para esta coluna
                       </p>
                     )}
+                    {provided.placeholder}
                   </div>
                 </section>
               )}
