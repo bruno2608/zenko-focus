@@ -77,6 +77,27 @@ const recurrenceLabels: Record<DueRecurrenceOption, string> = {
   monthly: 'Mensalmente'
 };
 
+const statusLabelsMap: Record<TaskStatus, string> = {
+  todo: 'A fazer',
+  doing: 'Fazendo',
+  done: 'Concluída'
+};
+
+const statusStyles: Record<TaskStatus, { dot: string; pill: string }> = {
+  todo: {
+    dot: 'bg-sky-500',
+    pill: 'bg-sky-100/80 text-sky-700 shadow-sm dark:bg-sky-500/10 dark:text-sky-200'
+  },
+  doing: {
+    dot: 'bg-amber-500',
+    pill: 'bg-amber-100/80 text-amber-700 shadow-sm dark:bg-amber-500/10 dark:text-amber-200'
+  },
+  done: {
+    dot: 'bg-emerald-500',
+    pill: 'bg-emerald-100/80 text-emerald-700 shadow-sm dark:bg-emerald-500/10 dark:text-emerald-200'
+  }
+};
+
 const monthLabels = [
   'janeiro',
   'fevereiro',
@@ -483,7 +504,9 @@ export default function TaskForm({
   const dueReminderValue = (watch('due_reminder') as DueReminderOption | undefined) ?? 'none';
   const dueRecurrenceValue = (watch('due_recurrence') as DueRecurrenceOption | undefined) ?? 'never';
   const titleValue = watch('title') ?? '';
-  const statusValue = watch('status') ?? 'todo';
+  const statusValue = (watch('status') ?? defaultStatus) as TaskStatus;
+  const statusLabel = statusLabelsMap[statusValue];
+  const statusStyle = statusStyles[statusValue];
   const calendarDays = useMemo(() => buildCalendarDays(calendarCursor), [calendarCursor]);
   const calendarHeading = useMemo(() => {
     const monthName = monthLabels[calendarCursor.month] ?? '';
@@ -1419,7 +1442,7 @@ export default function TaskForm({
   };
 
   return (
-    <form className="space-y-4" onSubmit={onSubmit}>
+    <form className="space-y-5" onSubmit={onSubmit}>
       <div>
         <label
           htmlFor={fieldIds.title}
@@ -1446,106 +1469,260 @@ export default function TaskForm({
         />
         {errors.title && <p className="mt-1 text-xs text-rose-600 dark:text-rose-300">{errors.title.message}</p>}
       </div>
-      <section className="rounded-3xl border border-slate-200 bg-white/60 p-4 shadow-inner dark:border-white/10 dark:bg-white/5">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <p className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-300">Descrição</p>
-            <p className="text-[11px] text-slate-500 dark:text-slate-400">
-              Use Markdown para formatar detalhes, listas e destaques como no Trello.
-            </p>
-          </div>
-          {isEditingTask && descriptionDirty ? (
-            <span className="text-[11px] font-semibold uppercase tracking-wide text-amber-600 dark:text-amber-400">
-              Alterações não salvas
-            </span>
-          ) : null}
-        </div>
-        {!isEditingTask || isDescriptionEditing ? (
-          <div className="mt-3 space-y-4">
-            <div className="space-y-2">
-              {formattingGroups.map((group, groupIndex) => (
-                <div key={`format-group-${groupIndex}`} className="flex flex-wrap gap-2">
-                  {group.map(({ command, label, icon }) => (
-                    <button
-                      key={command}
-                      type="button"
-                      onClick={() => handleFormatting(command)}
-                      className="flex h-9 w-9 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:border-zenko-primary/40 hover:text-zenko-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/50 dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:border-zenko-primary/40 dark:hover:text-zenko-primary"
-                      aria-label={label}
-                      title={label}
-                    >
-                      {icon}
-                    </button>
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,0.9fr)] xl:items-start">
+        <div className="space-y-5">
+          <section className="rounded-3xl border border-slate-200 bg-white/60 p-4 shadow-inner dark:border-white/10 dark:bg-white/5">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-300">Descrição</p>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                  Use Markdown para formatar detalhes, listas e destaques como no Trello.
+                </p>
+              </div>
+              {isEditingTask && descriptionDirty ? (
+                <span className="text-[11px] font-semibold uppercase tracking-wide text-amber-600 dark:text-amber-400">
+                  Alterações não salvas
+                </span>
+              ) : null}
+            </div>
+            {!isEditingTask || isDescriptionEditing ? (
+              <div className="mt-3 space-y-4">
+                <div className="space-y-2">
+                  {formattingGroups.map((group, groupIndex) => (
+                    <div key={`format-group-${groupIndex}`} className="flex flex-wrap gap-2">
+                      {group.map(({ command, label, icon }) => (
+                        <button
+                          key={command}
+                          type="button"
+                          onClick={() => handleFormatting(command)}
+                          className="flex h-9 w-9 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:border-zenko-primary/40 hover:text-zenko-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/50 dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:border-zenko-primary/40 dark:hover:text-zenko-primary"
+                          aria-label={label}
+                          title={label}
+                        >
+                          {icon}
+                        </button>
+                      ))}
+                    </div>
                   ))}
                 </div>
-              ))}
-            </div>
-            <Textarea
-              id={fieldIds.description}
-              ref={(element) => {
-                descriptionTextareaRef.current = element;
-              }}
-              rows={8}
-              value={descriptionDraft}
-              onChange={handleDescriptionChange}
-              placeholder="Descreva o contexto, critérios e próximos passos..."
-              className="min-h-[8rem]"
-            />
-            <div className="flex flex-wrap gap-2">
-              {isEditingTask ? (
-                <>
+                <Textarea
+                  id={fieldIds.description}
+                  ref={(element) => {
+                    descriptionTextareaRef.current = element;
+                  }}
+                  rows={8}
+                  value={descriptionDraft}
+                  onChange={handleDescriptionChange}
+                  placeholder="Descreva o contexto, critérios e próximos passos..."
+                  className="min-h-[8rem]"
+                />
+                <div className="flex flex-wrap gap-2">
+                  {isEditingTask ? (
+                    <>
+                      <Button
+                        type="button"
+                        onClick={handleDescriptionSave}
+                        disabled={isAutoSaving || !descriptionDirty}
+                      >
+                        Salvar
+                      </Button>
+                      <Button type="button" variant="secondary" onClick={handleDescriptionCancel}>
+                        Descartar alterações
+                      </Button>
+                    </>
+                  ) : null}
                   <Button
                     type="button"
-                    onClick={handleDescriptionSave}
-                    disabled={isAutoSaving || !descriptionDirty}
+                    variant="secondary"
+                    onClick={() => {
+                      if (typeof window !== 'undefined') {
+                        window.open(
+                          'https://support.atlassian.com/trello/docs/format-your-text-with-markdown/',
+                          '_blank'
+                        );
+                      }
+                    }}
                   >
-                    Salvar
+                    Ajuda para formatação
                   </Button>
-                  <Button type="button" variant="secondary" onClick={handleDescriptionCancel}>
-                    Descartar alterações
+                </div>
+              </div>
+            ) : (
+              <div className="mt-3 space-y-3">
+                {descriptionDraft ? (
+                  <>
+                    <div className="whitespace-pre-wrap rounded-2xl border border-slate-200 bg-white/70 p-4 text-sm text-slate-700 shadow-inner dark:border-white/10 dark:bg-white/5 dark:text-slate-200">
+                      {descriptionDraft}
+                    </div>
+                    <Button type="button" variant="secondary" onClick={() => setDescriptionEditing(true)}>
+                      Editar descrição
+                    </Button>
+                  </>
+                ) : (
+                  <Button type="button" variant="secondary" onClick={() => setDescriptionEditing(true)}>
+                    Adicionar uma descrição
                   </Button>
-                </>
+                )}
+              </div>
+            )}
+          </section>
+          <section className="rounded-3xl border border-slate-200 bg-white/60 p-4 shadow-inner dark:border-white/10 dark:bg-white/5">
+            <header className="flex items-center justify-between gap-4">
+              <div>
+                <p className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-300">Checklist</p>
+                <p className="text-xs text-slate-500 dark:text-slate-300">
+                  {checklistCompleted}/{checklistTotal} itens concluídos
+                </p>
+              </div>
+              {checklistTotal > 0 ? (
+                <span className="rounded-full bg-zenko-primary/10 px-3 py-1 text-xs font-semibold text-zenko-primary dark:bg-white/10">
+                  {checklistProgress}%
+                </span>
               ) : null}
+            </header>
+            {checklistTotal > 0 ? (
+              <div className="mt-3 h-2 rounded-full bg-slate-200 dark:bg-white/10">
+                <div
+                  className="h-2 rounded-full bg-gradient-to-r from-zenko-primary to-zenko-secondary transition-all"
+                  style={{ width: `${checklistProgress}%` }}
+                />
+              </div>
+            ) : (
+              <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">
+                Organize suas etapas adicionando itens abaixo. Cada item pode ser marcado como concluído.
+              </p>
+            )}
+            <ul
+              className="mt-4 space-y-2"
+              onDragOver={(event) => {
+                if (!draggingChecklistId) return;
+                event.preventDefault();
+                event.dataTransfer.dropEffect = 'move';
+                if (checklistItems.length === 0) {
+                  setChecklistDropTarget({ id: null, position: 'after' });
+                }
+              }}
+              onDrop={(event) => handleChecklistDrop(event, null)}
+            >
+              {checklistItems.map((item) => {
+                const isDragging = draggingChecklistId === item.clientId;
+                const showBefore =
+                  checklistDropTarget?.id === item.clientId &&
+                  checklistDropTarget.position === 'before';
+                const showAfter =
+                  checklistDropTarget?.id === item.clientId &&
+                  checklistDropTarget.position === 'after';
+
+                return (
+                  <li
+                    key={item.clientId}
+                    className={`group relative flex items-start gap-3 rounded-2xl bg-white/80 px-3 py-2 shadow-sm transition hover:bg-white dark:bg-white/5 dark:hover:bg-white/10 ${
+                      isDragging ? 'opacity-60' : ''
+                    }`}
+                    onDragOver={(event) => handleChecklistDragOver(event, item.clientId)}
+                    onDrop={(event) => handleChecklistDrop(event, item.clientId)}
+                  >
+                    <span
+                      aria-hidden="true"
+                      className={`pointer-events-none absolute left-3 right-3 h-1 rounded-full bg-zenko-primary/60 transition-opacity ${
+                        showBefore ? 'top-0 -translate-y-1/2 opacity-100' : 'opacity-0'
+                      }`}
+                    />
+                    <button
+                      type="button"
+                      draggable
+                      onDragStart={(event) => handleChecklistDragStart(event, item.clientId)}
+                      onDragEnd={handleChecklistDragEnd}
+                      aria-label="Reordenar item do checklist"
+                      className="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-transparent bg-slate-100 text-lg leading-none text-slate-400 transition hover:bg-slate-200 hover:text-slate-600 active:cursor-grabbing active:bg-slate-200 dark:bg-white/10 dark:text-slate-500 dark:hover:bg-white/20 dark:hover:text-slate-200"
+                    >
+                      <span aria-hidden="true">⋮⋮</span>
+                    </button>
+                    <label className="relative mt-1 flex h-5 w-5 cursor-pointer items-center justify-center rounded border border-slate-300 bg-white text-zenko-primary shadow-sm transition dark:border-white/20 dark:bg-white/10">
+                      <input
+                        type="checkbox"
+                        className="peer sr-only"
+                        checked={item.done}
+                        onChange={(event) => handleChecklistToggle(item.clientId, event.target.checked)}
+                      />
+                      <span
+                        className={`pointer-events-none text-xs font-semibold transition-opacity ${
+                          item.done ? 'opacity-100' : 'opacity-0'
+                        }`}
+                      >
+                        ✓
+                      </span>
+                    </label>
+                    <div className="flex-1 space-y-1">
+                      <Input
+                        value={item.text}
+                        onChange={(event) => handleChecklistTextChange(item.clientId, event.target.value)}
+                        className={`w-full border-transparent bg-transparent px-0 text-sm font-medium text-slate-700 shadow-none focus:border-zenko-primary/40 focus:ring-0 dark:text-slate-200 ${
+                          item.done ? 'line-through opacity-75' : ''
+                        }`}
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleChecklistRemove(item.clientId)}
+                      className="mt-1 inline-flex rounded-full border border-transparent bg-slate-100 px-2 py-1 text-xs font-medium text-slate-500 transition hover:bg-rose-100 hover:text-rose-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/50 dark:bg-white/5 dark:hover:bg-rose-500/10 dark:hover:text-rose-200"
+                      aria-label={`Remover item ${item.text}`}
+                    >
+                      Remover
+                    </button>
+                    <span
+                      aria-hidden="true"
+                      className={`pointer-events-none absolute left-3 right-3 h-1 rounded-full bg-zenko-primary/60 transition-opacity ${
+                        showAfter ? 'bottom-0 translate-y-1/2 opacity-100' : 'opacity-0'
+                      }`}
+                    />
+                  </li>
+                );
+              })}
+              {checklistDropTarget?.id === null && (
+                <li className="relative flex items-center justify-center rounded-2xl border border-dashed border-zenko-primary/40 bg-white/60 py-3 text-xs font-medium text-zenko-primary dark:border-white/10 dark:bg-white/10">
+                  Solte aqui para posicionar ao final
+                </li>
+              )}
+            </ul>
+            <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center">
+              <Input
+                value={newChecklistText}
+                onChange={(event) => setNewChecklistText(event.target.value)}
+                placeholder="Adicionar um item..."
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') {
+                    event.preventDefault();
+                    handleAddChecklistItem();
+                  }
+                }}
+              />
               <Button
                 type="button"
                 variant="secondary"
-                onClick={() => {
-                  if (typeof window !== 'undefined') {
-                    window.open(
-                      'https://support.atlassian.com/trello/docs/format-your-text-with-markdown/',
-                      '_blank'
-                    );
-                  }
-                }}
+                className="border-none bg-gradient-to-r from-zenko-primary to-zenko-secondary text-white hover:from-zenko-primary/90 hover:to-zenko-secondary/90"
+                onClick={handleAddChecklistItem}
+                disabled={!newChecklistText.trim()}
               >
-                Ajuda para formatação
+                Adicionar item
               </Button>
             </div>
-          </div>
-        ) : (
-          <div className="mt-3 space-y-3">
-            {descriptionDraft ? (
-              <>
-                <div className="whitespace-pre-wrap rounded-2xl border border-slate-200 bg-white/70 p-4 text-sm text-slate-700 shadow-inner dark:border-white/10 dark:bg-white/5 dark:text-slate-200">
-                  {descriptionDraft}
-                </div>
-                <Button type="button" variant="secondary" onClick={() => setDescriptionEditing(true)}>
-                  Editar descrição
-                </Button>
-              </>
-            ) : (
-              <Button type="button" variant="secondary" onClick={() => setDescriptionEditing(true)}>
-                Adicionar uma descrição
-              </Button>
-            )}
-          </div>
-        )}
-      </section>
-      <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-        <section className="rounded-2xl border border-slate-200 bg-white/60 p-3.5 shadow-inner dark:border-white/10 dark:bg-white/5">
-          <header className="flex items-start justify-between gap-3">
-            <div>
-              <p className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-300">Datas</p>
+          </section>
+          <AttachmentUploader
+            attachments={attachments}
+            onChange={(next) => {
+              setValue('attachments', next, { shouldDirty: true });
+              if (isEditingTask) {
+                runAutoSave({ attachments: next });
+              }
+            }}
+          />
+        </div>
+        <div className="space-y-5">
+          <section className="rounded-2xl border border-slate-200 bg-white/60 p-3.5 shadow-inner dark:border-white/10 dark:bg-white/5">
+            <header className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-300">Datas</p>
               <p className="text-[11px] text-slate-500 dark:text-slate-400">
                 Controle início, prazo, lembretes e recorrência como no Trello.
               </p>
@@ -1844,423 +2021,256 @@ export default function TaskForm({
               </div>
             </div>
           </div>
-        </section>
-        <div>
-          <label
-            htmlFor={fieldIds.status}
-            className="mb-1 block text-xs uppercase tracking-wide text-slate-500 dark:text-slate-300"
-          >
-            Status
-          </label>
-          <Select
-            id={fieldIds.status}
-            name={statusField.name}
-            ref={statusField.ref}
-            value={statusValue}
-            onBlur={statusField.onBlur}
-            onChange={(event) => {
-              const value = event.target.value as TaskStatus;
-              setValue('status', value, { shouldDirty: true });
-              if (isEditingTask && value !== (task?.status ?? 'todo')) {
-                const nextOrder =
-                  typeof getNextSortOrder === 'function' ? getNextSortOrder(value) : undefined;
-                const updates: Partial<TaskPayload> = { status: value };
-                if (typeof nextOrder === 'number') {
-                  updates.sort_order = nextOrder;
-                }
-                runAutoSave(updates);
-              }
-            }}
-          >
-            <option value="todo">A fazer</option>
-            <option value="doing">Fazendo</option>
-            <option value="done">Concluída</option>
-          </Select>
-        </div>
-      </div>
-      <div>
-        <p className="mb-1 text-xs uppercase tracking-wide text-slate-500 dark:text-slate-300">
-          Etiquetas
-        </p>
-        <input id={fieldIds.labels} type="hidden" {...register('labels')} />
-        <div className="mt-2 flex flex-wrap items-center gap-1.5">
-          {labelPreview.length === 0 ? (
-            <span className="text-xs text-slate-500 dark:text-slate-400">
-              Nenhuma etiqueta selecionada.
-            </span>
-          ) : null}
-          {labelPreview.map((label, index) => {
-            const normalized = label.toLocaleLowerCase();
-            const definition = labelMap.get(normalized);
-            const colors = getLabelColors(label, {
-              colorId: definition?.colorId,
-              fallbackIndex: index
-            });
-            const displayValue = definition?.value ?? label;
-            return (
+          </section>
+          <section className="rounded-2xl border border-slate-200 bg-white/60 p-3.5 shadow-inner dark:border-white/10 dark:bg-white/5">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-300">Status atual</p>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                  Mova a tarefa entre as colunas para atualizar este estado.
+                </p>
+              </div>
               <span
-                key={`${definition?.id ?? label}-${index}`}
-                className="inline-flex items-center gap-1.5 rounded-md px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide shadow-sm"
-                style={{
-                  backgroundColor: colors.background,
-                  color: colors.foreground
-                }}
+                className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide ${statusStyle.pill}`}
               >
-                <span
-                  className="inline-block h-1.5 w-1.5 rounded-full"
-                  style={{ backgroundColor: colors.foreground, opacity: 0.5 }}
-                />
-                <span className="max-w-[7rem] truncate">{displayValue}</span>
-                <button
-                  type="button"
-                  onClick={() => handleLabelToggle(displayValue)}
-                  className="flex h-3.5 w-3.5 items-center justify-center rounded-full border text-[10px] leading-none transition hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
-                  style={{
-                    color: colors.foreground,
-                    borderColor: `${colors.foreground}55`,
-                    backgroundColor: `${colors.foreground}1a`
-                  }}
-                >
-                  <span aria-hidden>×</span>
-                  <span className="sr-only">Remover etiqueta {displayValue}</span>
-                </button>
+                <span className={`h-1.5 w-1.5 rounded-full ${statusStyle.dot}`} />
+                {statusLabel}
               </span>
-            );
-          })}
-          <button
-            type="button"
-            onClick={() => setLabelManagerOpen((open) => !open)}
-            className="flex h-7 w-7 items-center justify-center rounded-md border border-slate-200 bg-white text-base font-semibold text-slate-600 transition hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/50 dark:border-white/10 dark:bg-white/10 dark:text-slate-200 dark:hover:bg-white/20"
-            aria-label={
-              isLabelManagerOpen ? 'Fechar gerenciador de etiquetas' : 'Adicionar ou gerenciar etiquetas'
-            }
-            aria-expanded={isLabelManagerOpen}
-            aria-controls={fieldIds.labelManager}
-          >
-            <span aria-hidden>+</span>
-          </button>
-        </div>
-        {isLabelManagerOpen ? (
-          <div
-            id={fieldIds.labelManager}
-            className="mt-3 space-y-3 rounded-xl border border-slate-200 bg-white/70 p-3 shadow-inner dark:border-white/10 dark:bg-white/10"
-          >
-            <div className="flex items-start justify-between gap-3">
-              <p className="text-[11px] uppercase tracking-wide text-slate-400 dark:text-slate-500">
-                Gerenciador de etiquetas
-              </p>
+            </div>
+            <input type="hidden" {...statusField} value={statusValue} />
+          </section>
+          <section className="rounded-2xl border border-slate-200 bg-white/60 p-3.5 shadow-inner dark:border-white/10 dark:bg-white/5">
+            <p className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-300">Etiquetas</p>
+            <input id={fieldIds.labels} type="hidden" {...register('labels')} />
+            <div className="mt-2 flex flex-wrap items-center gap-1.5">
+              {labelPreview.length === 0 ? (
+                <span className="text-xs text-slate-500 dark:text-slate-400">
+                  Nenhuma etiqueta selecionada.
+                </span>
+              ) : null}
+              {labelPreview.map((label, index) => {
+                const normalized = label.toLocaleLowerCase();
+                const definition = labelMap.get(normalized);
+                const colors = getLabelColors(label, {
+                  colorId: definition?.colorId,
+                  fallbackIndex: index
+                });
+                const displayValue = definition?.value ?? label;
+                return (
+                  <span
+                    key={`${definition?.id ?? label}-${index}`}
+                    className="inline-flex items-center gap-1.5 rounded-md px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide shadow-sm"
+                    style={{
+                      backgroundColor: colors.background,
+                      color: colors.foreground
+                    }}
+                  >
+                    <span
+                      className="inline-block h-1.5 w-1.5 rounded-full"
+                      style={{ backgroundColor: colors.foreground, opacity: 0.5 }}
+                    />
+                    <span className="max-w-[7rem] truncate">{displayValue}</span>
+                    <button
+                      type="button"
+                      onClick={() => handleLabelToggle(displayValue)}
+                      className="flex h-3.5 w-3.5 items-center justify-center rounded-full border text-[10px] leading-none transition hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
+                      style={{
+                        color: colors.foreground,
+                        borderColor: `${colors.foreground}55`,
+                        backgroundColor: `${colors.foreground}1a`
+                      }}
+                    >
+                      <span aria-hidden>×</span>
+                      <span className="sr-only">Remover etiqueta {displayValue}</span>
+                    </button>
+                  </span>
+                );
+              })}
               <button
                 type="button"
-                onClick={() => setLabelManagerOpen(false)}
-                className="rounded-md border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-slate-600 transition hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/50 dark:border-white/10 dark:bg-white/10 dark:text-slate-200 dark:hover:bg-white/20"
+                onClick={() => setLabelManagerOpen((open) => !open)}
+                className="flex h-7 w-7 items-center justify-center rounded-md border border-slate-200 bg-white text-base font-semibold text-slate-600 transition hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/50 dark:border-white/10 dark:bg-white/10 dark:text-slate-200 dark:hover:bg-white/20"
+                aria-label={
+                  isLabelManagerOpen ? 'Fechar gerenciador de etiquetas' : 'Adicionar ou gerenciar etiquetas'
+                }
+                aria-expanded={isLabelManagerOpen}
+                aria-controls={fieldIds.labelManager}
               >
-                Fechar
+                <span aria-hidden>+</span>
               </button>
             </div>
-            <div>
-              <p className="text-[11px] uppercase tracking-wide text-slate-400 dark:text-slate-500">
-                Nova etiqueta
-              </p>
-              <div className="mt-2 space-y-3">
-                <Input
-                  value={newLabelName}
-                  onChange={(event) => setNewLabelName(event.target.value)}
-                  placeholder="Nome da etiqueta"
-                />
-                <div className="space-y-2">
+            {isLabelManagerOpen ? (
+              <div
+                id={fieldIds.labelManager}
+                className="mt-3 space-y-3 rounded-xl border border-slate-200 bg-white/70 p-3 shadow-inner dark:border-white/10 dark:bg-white/10"
+              >
+                <div className="flex items-start justify-between gap-3">
                   <p className="text-[11px] uppercase tracking-wide text-slate-400 dark:text-slate-500">
-                    Cor
+                    Gerenciador de etiquetas
                   </p>
-                  <LabelColorOptions
-                    selectedColorId={newLabelColor}
-                    onSelect={(colorId) => setNewLabelColor(colorId)}
-                  />
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  <Button
+                  <button
                     type="button"
-                    variant="secondary"
-                    disabled={!newLabelName.trim()}
-                    onClick={() => handleCreateLabel(false)}
+                    onClick={() => setLabelManagerOpen(false)}
+                    className="rounded-md border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-slate-600 transition hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/50 dark:border-white/10 dark:bg-white/10 dark:text-slate-200 dark:hover:bg-white/20"
                   >
-                    Criar
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    disabled={!newLabelName.trim()}
-                    onClick={() => handleCreateLabel(true)}
-                  >
-                    Criar e aplicar
-                  </Button>
+                    Fechar
+                  </button>
                 </div>
-              </div>
-            </div>
-            <div>
-              <p className="text-[11px] uppercase tracking-wide text-slate-400 dark:text-slate-500">
-                Etiquetas disponíveis
-              </p>
-              <ul className="mt-2 space-y-2.5">
-                {filteredLabels.length === 0 ? (
-                  <li className="text-xs text-slate-500 dark:text-slate-400">
-                    Nenhuma etiqueta encontrada.
-                  </li>
-                ) : (
-                  filteredLabels.map((label) => {
-                    const colors = getLabelColors(label.value, { colorId: label.colorId });
-                    const isApplied = selectedLabelKeys.has(label.normalized);
-                    const isEditing = editingLabel?.id === label.id;
-                    return (
-                      <li
-                        key={label.id}
-                        className="rounded-xl border border-slate-200 bg-white/80 p-2.5 shadow-sm dark:border-white/10 dark:bg-white/10"
+                <div>
+                  <p className="text-[11px] uppercase tracking-wide text-slate-400 dark:text-slate-500">
+                    Nova etiqueta
+                  </p>
+                  <div className="mt-2 space-y-3">
+                    <Input
+                      value={newLabelName}
+                      onChange={(event) => setNewLabelName(event.target.value)}
+                      placeholder="Nome da etiqueta"
+                    />
+                    <div className="space-y-2">
+                      <p className="text-[11px] uppercase tracking-wide text-slate-400 dark:text-slate-500">
+                        Cor
+                      </p>
+                      <LabelColorOptions
+                        selectedColorId={newLabelColor}
+                        onSelect={(colorId) => setNewLabelColor(colorId)}
+                      />
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        disabled={!newLabelName.trim()}
+                        onClick={() => handleCreateLabel(false)}
                       >
-                        {isEditing && editingLabel ? (
-                          (() => {
-                            const trimmedValue = editingLabel.value.trim();
-                            const normalizedValue = trimmedValue.toLocaleLowerCase();
-                            const hasDuplicate =
-                              trimmedValue.length > 0 &&
-                              savedLabels.some(
-                                (item) => item.id !== editingLabel.id && item.normalized === normalizedValue
-                              );
-                            return (
-                              <div className="space-y-3">
-                                <Input
-                                  value={editingLabel.value}
-                                  onChange={(event) => handleLabelEditChange(event.target.value)}
-                                />
-                                <div className="space-y-2">
-                                  <p className="text-[11px] uppercase tracking-wide text-slate-400 dark:text-slate-500">
-                                    Cor
-                                  </p>
-                                  <LabelColorOptions
-                                    selectedColorId={editingLabel.colorId}
-                                    onSelect={handleLabelEditColorChange}
+                        Criar
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        disabled={!newLabelName.trim()}
+                        onClick={() => handleCreateLabel(true)}
+                      >
+                        Criar e aplicar
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+                <div>
+                  <p className="text-[11px] uppercase tracking-wide text-slate-400 dark:text-slate-500">
+                    Etiquetas disponíveis
+                  </p>
+                  <ul className="mt-2 space-y-2.5">
+                    {filteredLabels.length === 0 ? (
+                      <li className="text-xs text-slate-500 dark:text-slate-400">
+                        Nenhuma etiqueta encontrada.
+                      </li>
+                    ) : (
+                      filteredLabels.map((label) => {
+                        const colors = getLabelColors(label.value, { colorId: label.colorId });
+                        const isApplied = selectedLabelKeys.has(label.normalized);
+                        const isEditing = editingLabel?.id === label.id;
+                        return (
+                          <li
+                            key={label.id}
+                            className="rounded-xl border border-slate-200 bg-white/80 p-2.5 shadow-sm dark:border-white/10 dark:bg-white/10"
+                          >
+                            {isEditing && editingLabel ? (
+                              (() => {
+                                const trimmedValue = editingLabel.value.trim();
+                                const normalizedValue = trimmedValue.toLocaleLowerCase();
+                                const hasDuplicate =
+                                  trimmedValue.length > 0 &&
+                                  savedLabels.some(
+                                    (item) => item.id !== editingLabel.id && item.normalized === normalizedValue
+                                  );
+                                return (
+                                  <div className="space-y-3">
+                                    <Input
+                                      value={editingLabel.value}
+                                      onChange={(event) => handleLabelEditChange(event.target.value)}
+                                    />
+                                    <div className="space-y-2">
+                                      <p className="text-[11px] uppercase tracking-wide text-slate-400 dark:text-slate-500">
+                                        Cor
+                                      </p>
+                                      <LabelColorOptions
+                                        selectedColorId={editingLabel.colorId}
+                                        onSelect={handleLabelEditColorChange}
+                                      />
+                                    </div>
+                                    {trimmedValue.length === 0 ? (
+                                      <p className="text-xs text-rose-500 dark:text-rose-300">
+                                        Informe um nome para salvar a etiqueta.
+                                      </p>
+                                    ) : null}
+                                    {hasDuplicate ? (
+                                      <p className="text-xs text-rose-500 dark:text-rose-300">
+                                        Já existe uma etiqueta com este nome.
+                                      </p>
+                                    ) : null}
+                                    <div className="flex flex-wrap gap-2">
+                                      <Button type="button" variant="secondary" onClick={handleCancelLabelEdit}>
+                                        Cancelar
+                                      </Button>
+                                      <Button
+                                        type="button"
+                                        onClick={handleSaveLabelEdit}
+                                        disabled={trimmedValue.length === 0 || hasDuplicate}
+                                      >
+                                        Salvar
+                                      </Button>
+                                    </div>
+                                  </div>
+                                );
+                              })()
+                            ) : (
+                              <div className="flex flex-wrap items-center gap-2.5">
+                                <button
+                                  type="button"
+                                  onClick={() => handleLabelToggle(label.value)}
+                                  className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/60 ${
+                                    isApplied ? 'ring-2 ring-zenko-primary/70' : ''
+                                  }`}
+                                  style={{
+                                    backgroundColor: colors.background,
+                                    color: colors.foreground
+                                  }}
+                                >
+                                  <span
+                                    className="inline-block h-1.5 w-1.5 rounded-full"
+                                    style={{ backgroundColor: colors.foreground, opacity: 0.5 }}
                                   />
-                                </div>
-                                {trimmedValue.length === 0 ? (
-                                  <p className="text-xs text-rose-500 dark:text-rose-300">
-                                    Informe um nome para salvar a etiqueta.
-                                  </p>
-                                ) : null}
-                                {hasDuplicate ? (
-                                  <p className="text-xs text-rose-500 dark:text-rose-300">
-                                    Já existe uma etiqueta com este nome.
-                                  </p>
-                                ) : null}
-                                <div className="flex flex-wrap gap-2">
-                                  <Button type="button" variant="secondary" onClick={handleCancelLabelEdit}>
-                                    Cancelar
-                                  </Button>
-                                  <Button
+                                  {label.value}
+                                </button>
+                                <div className="ml-auto flex gap-1.5">
+                                  <button
                                     type="button"
-                                    onClick={handleSaveLabelEdit}
-                                    disabled={trimmedValue.length === 0 || hasDuplicate}
+                                    onClick={() => handleStartEditingLabel(label)}
+                                    className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-medium text-slate-500 transition hover:bg-slate-100 hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/50 dark:border-white/10 dark:bg-white/10 dark:text-slate-300 dark:hover:bg-white/20 dark:hover:text-slate-100"
                                   >
-                                    Salvar
-                                  </Button>
+                                    Editar
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeleteLabel(label)}
+                                    className="rounded-full border border-transparent bg-rose-100 px-2.5 py-1 text-[11px] font-medium text-rose-600 transition hover:bg-rose-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-400 dark:bg-rose-500/10 dark:text-rose-200 dark:hover:bg-rose-500/20"
+                                  >
+                                    Remover
+                                  </button>
                                 </div>
                               </div>
-                            );
-                          })()
-                        ) : (
-                          <div className="flex flex-wrap items-center gap-2.5">
-                            <button
-                              type="button"
-                              onClick={() => handleLabelToggle(label.value)}
-                              className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/60 ${
-                                isApplied ? 'ring-2 ring-zenko-primary/70' : ''
-                              }`}
-                              style={{
-                                backgroundColor: colors.background,
-                                color: colors.foreground
-                              }}
-                            >
-                              <span
-                                className="inline-block h-1.5 w-1.5 rounded-full"
-                                style={{ backgroundColor: colors.foreground, opacity: 0.5 }}
-                              />
-                              {label.value}
-                            </button>
-                            <div className="ml-auto flex gap-1.5">
-                              <button
-                                type="button"
-                                onClick={() => handleStartEditingLabel(label)}
-                                className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-medium text-slate-500 transition hover:bg-slate-100 hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/50 dark:border-white/10 dark:bg-white/10 dark:text-slate-300 dark:hover:bg-white/20 dark:hover:text-slate-100"
-                              >
-                                Editar
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleDeleteLabel(label)}
-                                className="rounded-full border border-transparent bg-rose-100 px-2.5 py-1 text-[11px] font-medium text-rose-600 transition hover:bg-rose-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-400 dark:bg-rose-500/10 dark:text-rose-200 dark:hover:bg-rose-500/20"
-                              >
-                                Remover
-                              </button>
-                            </div>
-                          </div>
-                        )}
-                      </li>
-                    );
-                  })
-                )}
-              </ul>
+                            )}
+                          </li>
+                        );
+                      })
+                    )}
+                  </ul>
+                </div>
             </div>
-          </div>
-        ) : null}
-      </div>
-      <section className="rounded-3xl border border-slate-200 bg-white/60 p-4 shadow-inner dark:border-white/10 dark:bg-white/5">
-        <header className="flex items-center justify-between gap-4">
-          <div>
-            <p className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-300">Checklist</p>
-            <p className="text-xs text-slate-500 dark:text-slate-300">
-              {checklistCompleted}/{checklistTotal} itens concluídos
-            </p>
-          </div>
-          {checklistTotal > 0 ? (
-            <span className="rounded-full bg-zenko-primary/10 px-3 py-1 text-xs font-semibold text-zenko-primary dark:bg-white/10">
-              {checklistProgress}%
-            </span>
-          ) : null}
-        </header>
-        {checklistTotal > 0 ? (
-          <div className="mt-3 h-2 rounded-full bg-slate-200 dark:bg-white/10">
-            <div
-              className="h-2 rounded-full bg-gradient-to-r from-zenko-primary to-zenko-secondary transition-all"
-              style={{ width: `${checklistProgress}%` }}
-            />
-          </div>
-        ) : (
-          <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">
-            Organize suas etapas adicionando itens abaixo. Cada item pode ser marcado como concluído.
-          </p>
-        )}
-        <ul
-          className="mt-4 space-y-2"
-          onDragOver={(event) => {
-            if (!draggingChecklistId) return;
-            event.preventDefault();
-            event.dataTransfer.dropEffect = 'move';
-            if (checklistItems.length === 0) {
-              setChecklistDropTarget({ id: null, position: 'after' });
-            }
-          }}
-          onDrop={(event) => handleChecklistDrop(event, null)}
-        >
-          {checklistItems.map((item) => {
-            const isDragging = draggingChecklistId === item.clientId;
-            const showBefore =
-              checklistDropTarget?.id === item.clientId &&
-              checklistDropTarget.position === 'before';
-            const showAfter =
-              checklistDropTarget?.id === item.clientId &&
-              checklistDropTarget.position === 'after';
-
-            return (
-            <li
-              key={item.clientId}
-              className={`group relative flex items-start gap-3 rounded-2xl bg-white/80 px-3 py-2 shadow-sm transition hover:bg-white dark:bg-white/5 dark:hover:bg-white/10 ${
-                isDragging ? 'opacity-60' : ''
-              }`}
-              onDragOver={(event) => handleChecklistDragOver(event, item.clientId)}
-              onDrop={(event) => handleChecklistDrop(event, item.clientId)}
-            >
-              <span
-                aria-hidden="true"
-                className={`pointer-events-none absolute left-3 right-3 h-1 rounded-full bg-zenko-primary/60 transition-opacity ${
-                  showBefore ? 'top-0 -translate-y-1/2 opacity-100' : 'opacity-0'
-                }`}
-              />
-              <button
-                type="button"
-                draggable
-                onDragStart={(event) => handleChecklistDragStart(event, item.clientId)}
-                onDragEnd={handleChecklistDragEnd}
-                aria-label="Reordenar item do checklist"
-                className="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-transparent bg-slate-100 text-lg leading-none text-slate-400 transition hover:bg-slate-200 hover:text-slate-600 active:cursor-grabbing active:bg-slate-200 dark:bg-white/10 dark:text-slate-500 dark:hover:bg-white/20 dark:hover:text-slate-200"
-              >
-                <span aria-hidden="true">⋮⋮</span>
-              </button>
-              <label className="relative mt-1 flex h-5 w-5 cursor-pointer items-center justify-center rounded border border-slate-300 bg-white text-zenko-primary shadow-sm transition dark:border-white/20 dark:bg-white/10">
-                <input
-                  type="checkbox"
-                  className="peer sr-only"
-                  checked={item.done}
-                  onChange={(event) => handleChecklistToggle(item.clientId, event.target.checked)}
-                />
-                <span
-                  className={`pointer-events-none text-xs font-semibold transition-opacity ${
-                    item.done ? 'opacity-100' : 'opacity-0'
-                  }`}
-                >
-                  ✓
-                </span>
-              </label>
-              <div className="flex-1 space-y-1">
-                <Input
-                  value={item.text}
-                  onChange={(event) => handleChecklistTextChange(item.clientId, event.target.value)}
-                  className={`w-full border-transparent bg-transparent px-0 text-sm font-medium text-slate-700 shadow-none focus:border-zenko-primary/40 focus:ring-0 dark:text-slate-200 ${
-                    item.done ? 'line-through opacity-75' : ''
-                  }`}
-                />
-              </div>
-              <button
-                type="button"
-                onClick={() => handleChecklistRemove(item.clientId)}
-                className="mt-1 inline-flex rounded-full border border-transparent bg-slate-100 px-2 py-1 text-xs font-medium text-slate-500 transition hover:bg-rose-100 hover:text-rose-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/50 dark:bg-white/5 dark:hover:bg-rose-500/10 dark:hover:text-rose-200"
-                aria-label={`Remover item ${item.text}`}
-              >
-                Remover
-              </button>
-              <span
-                aria-hidden="true"
-                className={`pointer-events-none absolute left-3 right-3 h-1 rounded-full bg-zenko-primary/60 transition-opacity ${
-                  showAfter ? 'bottom-0 translate-y-1/2 opacity-100' : 'opacity-0'
-                }`}
-              />
-            </li>
-          );
-          })}
-          {checklistDropTarget?.id === null && (
-            <li className="relative flex items-center justify-center rounded-2xl border border-dashed border-zenko-primary/40 bg-white/60 py-3 text-xs font-medium text-zenko-primary dark:border-white/10 dark:bg-white/10">
-              Solte aqui para posicionar ao final
-            </li>
-          )}
-        </ul>
-        <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center">
-          <Input
-            value={newChecklistText}
-            onChange={(event) => setNewChecklistText(event.target.value)}
-            placeholder="Adicionar um item..."
-            onKeyDown={(event) => {
-              if (event.key === 'Enter') {
-                event.preventDefault();
-                handleAddChecklistItem();
-              }
-            }}
-          />
-          <Button
-            type="button"
-            variant="secondary"
-            className="border-none bg-gradient-to-r from-zenko-primary to-zenko-secondary text-white hover:from-zenko-primary/90 hover:to-zenko-secondary/90"
-            onClick={handleAddChecklistItem}
-            disabled={!newChecklistText.trim()}
-          >
-            Adicionar item
-          </Button>
+            ) : null}
+          </section>
         </div>
-      </section>
-      <AttachmentUploader
-        attachments={attachments}
-        onChange={(next) => {
-          setValue('attachments', next, { shouldDirty: true });
-          if (isEditingTask) {
-            runAutoSave({ attachments: next });
-          }
-        }}
-      />
+      </div>
       {submitError && (
         <p className="text-sm text-rose-600 dark:text-rose-300" role="alert">
           {submitError}
