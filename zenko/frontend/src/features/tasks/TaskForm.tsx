@@ -3162,13 +3162,13 @@ export default function TaskForm({
                     )}
                   </div>
                   {isDescriptionPreviewOverflowing && !isDescriptionPreviewExpanded ? (
-                    <div className="pointer-events-none absolute inset-x-0 bottom-0 z-40 flex justify-center pb-2 pt-12">
+                    <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 flex justify-center pb-2 pt-12">
                       <div className="absolute inset-0 rounded-b-2xl bg-gradient-to-t from-white via-white/85 to-transparent dark:from-slate-900 dark:via-slate-900/85" />
                       <button
                         type="button"
                         onClick={handleDescriptionPreviewToggle}
                         aria-expanded={isDescriptionPreviewExpanded}
-                        className="relative z-50 pointer-events-auto inline-flex items-center gap-2 rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-zenko-primary shadow-sm ring-1 ring-zenko-primary/30 transition hover:bg-zenko-primary hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary dark:bg-slate-800 dark:text-zenko-primary dark:hover:bg-zenko-primary dark:hover:text-slate-900"
+                        className="relative z-30 pointer-events-auto inline-flex items-center gap-2 rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-zenko-primary shadow-sm ring-1 ring-zenko-primary/30 transition hover:bg-zenko-primary hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary dark:bg-slate-800 dark:text-zenko-primary dark:hover:bg-zenko-primary dark:hover:text-slate-900"
                       >
                         Mostrar mais
                       </button>
@@ -3184,7 +3184,7 @@ export default function TaskForm({
                     onChange={handleDescriptionChange}
                     onPaste={handleDescriptionPaste}
                     placeholder="Descreva o contexto, critérios e próximos passos..."
-                    className={`absolute inset-0 z-30 h-full min-h-[8rem] w-full resize-none rounded-2xl border-transparent bg-transparent px-4 py-4 text-transparent caret-zenko-primary selection:bg-zenko-primary/20 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-zenko-primary/40 dark:focus:ring-zenko-primary/60 ${
+                    className={`absolute inset-0 z-20 h-full min-h-[8rem] w-full resize-none rounded-2xl border-transparent bg-transparent px-4 py-4 text-transparent caret-zenko-primary selection:bg-zenko-primary/20 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-zenko-primary/40 dark:focus:ring-zenko-primary/60 ${
                       isDescriptionPreviewOverflowing && !isDescriptionPreviewExpanded
                         ? 'overflow-hidden'
                         : 'overflow-auto'
