@@ -126,6 +126,8 @@ const inlinePatterns: ReadonlyArray<{ type: InlinePatternType; regex: RegExp }> 
 ];
 
 const DESCRIPTION_PREVIEW_COLLAPSED_HEIGHT = 320;
+const DESCRIPTION_PREVIEW_COLLAPSED_CONTAINER_HEIGHT =
+  DESCRIPTION_PREVIEW_COLLAPSED_HEIGHT + 32;
 
 function renderInlineTokens(text: string): ReactNode[] {
   let tokenIndex = 0;
@@ -3131,18 +3133,81 @@ export default function TaskForm({
                     onChange={handleInlineImageChange}
                   />
                 </div>
-                <Textarea
-                  id={fieldIds.description}
-                  ref={(element) => {
-                    descriptionTextareaRef.current = element;
-                  }}
-                  rows={8}
-                  value={descriptionDraft}
-                  onChange={handleDescriptionChange}
-                  onPaste={handleDescriptionPaste}
-                  placeholder="Descreva o contexto, critérios e próximos passos..."
-                  className="min-h-[8rem]"
-                />
+                <div
+                  className="relative rounded-2xl border border-slate-200 bg-white/70 p-4 text-sm text-slate-700 shadow-inner transition-[max-height] duration-300 ease-in-out dark:border-white/10 dark:bg-white/5 dark:text-slate-200"
+                  style={
+                    isDescriptionPreviewOverflowing && !isDescriptionPreviewExpanded
+                      ? { maxHeight: DESCRIPTION_PREVIEW_COLLAPSED_CONTAINER_HEIGHT }
+                      : undefined
+                  }
+                >
+                  <div
+                    ref={descriptionPreviewRef}
+                    aria-hidden="true"
+                    className="pointer-events-none space-y-3 leading-relaxed"
+                    style={
+                      isDescriptionPreviewOverflowing && !isDescriptionPreviewExpanded
+                        ? { maxHeight: DESCRIPTION_PREVIEW_COLLAPSED_HEIGHT, overflow: 'hidden' }
+                        : { overflow: 'visible' }
+                    }
+                  >
+                    {hasDescriptionPreview ? (
+                      descriptionPreviewBlocks.map((block, index) => (
+                        <Fragment key={`description-block-${index}`}>{block}</Fragment>
+                      ))
+                    ) : (
+                      <p className="text-sm italic text-slate-400 dark:text-slate-500">
+                        Descreva o contexto, critérios e próximos passos...
+                      </p>
+                    )}
+                  </div>
+                  {isDescriptionPreviewOverflowing && !isDescriptionPreviewExpanded ? (
+                    <div className="pointer-events-none absolute inset-x-0 bottom-0 z-40 flex justify-center pb-2 pt-12">
+                      <div className="absolute inset-0 rounded-b-2xl bg-gradient-to-t from-white via-white/85 to-transparent dark:from-slate-900 dark:via-slate-900/85" />
+                      <button
+                        type="button"
+                        onClick={handleDescriptionPreviewToggle}
+                        aria-expanded={isDescriptionPreviewExpanded}
+                        className="relative z-50 pointer-events-auto inline-flex items-center gap-2 rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-zenko-primary shadow-sm ring-1 ring-zenko-primary/30 transition hover:bg-zenko-primary hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary dark:bg-slate-800 dark:text-zenko-primary dark:hover:bg-zenko-primary dark:hover:text-slate-900"
+                      >
+                        Mostrar mais
+                      </button>
+                    </div>
+                  ) : null}
+                  <Textarea
+                    id={fieldIds.description}
+                    ref={(element) => {
+                      descriptionTextareaRef.current = element;
+                    }}
+                    rows={8}
+                    value={descriptionDraft}
+                    onChange={handleDescriptionChange}
+                    onPaste={handleDescriptionPaste}
+                    placeholder="Descreva o contexto, critérios e próximos passos..."
+                    className={`absolute inset-0 z-30 h-full min-h-[8rem] w-full resize-none rounded-2xl border-transparent bg-transparent px-4 py-4 text-transparent caret-zenko-primary selection:bg-zenko-primary/20 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-zenko-primary/40 dark:focus:ring-zenko-primary/60 ${
+                      isDescriptionPreviewOverflowing && !isDescriptionPreviewExpanded
+                        ? 'overflow-hidden'
+                        : 'overflow-auto'
+                    }`}
+                    style={
+                      isDescriptionPreviewOverflowing && !isDescriptionPreviewExpanded
+                        ? { maxHeight: DESCRIPTION_PREVIEW_COLLAPSED_HEIGHT }
+                        : undefined
+                    }
+                  />
+                </div>
+                {isDescriptionPreviewOverflowing && isDescriptionPreviewExpanded ? (
+                  <div className="flex justify-center pt-1">
+                    <button
+                      type="button"
+                      onClick={handleDescriptionPreviewToggle}
+                      aria-expanded={isDescriptionPreviewExpanded}
+                      className="inline-flex items-center gap-2 rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-zenko-primary shadow-sm ring-1 ring-zenko-primary/30 transition hover:bg-zenko-primary hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary dark:bg-slate-800 dark:text-zenko-primary dark:hover:bg-zenko-primary dark:hover:text-slate-900"
+                    >
+                      Mostrar menos
+                    </button>
+                  </div>
+                ) : null}
                 {isEditingTask ? (
                   <div className="flex flex-wrap gap-2">
                     <Button
@@ -3155,53 +3220,6 @@ export default function TaskForm({
                     <Button type="button" variant="secondary" onClick={handleDescriptionCancel}>
                       Descartar alterações
                     </Button>
-                  </div>
-                ) : null}
-                {hasDescriptionPreview ? (
-                  <div className="mt-2 space-y-2">
-                    <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-300">
-                      Pré-visualização
-                    </p>
-                    <div className="relative">
-                      <div
-                        ref={descriptionPreviewRef}
-                        className="space-y-3 rounded-2xl border border-slate-200 bg-white/70 p-4 text-sm text-slate-700 shadow-inner transition-[max-height] duration-300 ease-in-out dark:border-white/10 dark:bg-white/5 dark:text-slate-200"
-                        style={
-                          isDescriptionPreviewOverflowing && !isDescriptionPreviewExpanded
-                            ? { maxHeight: DESCRIPTION_PREVIEW_COLLAPSED_HEIGHT, overflow: 'hidden' }
-                            : { overflow: 'visible' }
-                        }
-                      >
-                        {descriptionPreviewBlocks.map((block, index) => (
-                          <Fragment key={`description-block-${index}`}>{block}</Fragment>
-                        ))}
-                      </div>
-                      {isDescriptionPreviewOverflowing && !isDescriptionPreviewExpanded ? (
-                        <div className="pointer-events-none absolute inset-x-0 bottom-0 flex justify-center pb-2 pt-12">
-                          <div className="absolute inset-0 rounded-b-2xl bg-gradient-to-t from-white via-white/85 to-transparent dark:from-slate-900 dark:via-slate-900/85" />
-                          <button
-                            type="button"
-                            onClick={handleDescriptionPreviewToggle}
-                            aria-expanded={isDescriptionPreviewExpanded}
-                            className="relative pointer-events-auto inline-flex items-center gap-2 rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-zenko-primary shadow-sm ring-1 ring-zenko-primary/30 transition hover:bg-zenko-primary hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary dark:bg-slate-800 dark:text-zenko-primary dark:hover:bg-zenko-primary dark:hover:text-slate-900"
-                          >
-                            Mostrar mais
-                          </button>
-                        </div>
-                      ) : null}
-                    </div>
-                    {isDescriptionPreviewOverflowing && isDescriptionPreviewExpanded ? (
-                      <div className="flex justify-center pt-1">
-                        <button
-                          type="button"
-                          onClick={handleDescriptionPreviewToggle}
-                          aria-expanded={isDescriptionPreviewExpanded}
-                          className="inline-flex items-center gap-2 rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-zenko-primary shadow-sm ring-1 ring-zenko-primary/30 transition hover:bg-zenko-primary hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary dark:bg-slate-800 dark:text-zenko-primary dark:hover:bg-zenko-primary dark:hover:text-slate-900"
-                        >
-                          Mostrar menos
-                        </button>
-                      </div>
-                    ) : null}
                   </div>
                 ) : null}
               </div>
