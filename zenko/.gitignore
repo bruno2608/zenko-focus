@@ -6,3 +6,4 @@ dist/
 coverage/
 .supabase/
 .cypress/
+*.tsbuildinfo
