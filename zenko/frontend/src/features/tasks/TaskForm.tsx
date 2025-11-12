@@ -1,6 +1,7 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type {
   ChangeEvent as ReactChangeEvent,
+  ClipboardEvent as ReactClipboardEvent,
   DragEvent as ReactDragEvent,
   FormEvent as ReactFormEvent,
   MouseEvent as ReactMouseEvent,
@@ -123,6 +124,8 @@ const inlinePatterns: ReadonlyArray<{ type: InlinePatternType; regex: RegExp }> 
   { type: 'strike', regex: /~~([^~]+)~~/ },
   { type: 'underline', regex: /<u>(.*?)<\/u>/ }
 ];
+
+const DESCRIPTION_PREVIEW_COLLAPSED_HEIGHT = 320;
 
 function renderInlineTokens(text: string): ReactNode[] {
   let tokenIndex = 0;
@@ -767,6 +770,9 @@ export default function TaskForm({
   const [isInlineImageUploading, setInlineImageUploading] = useState(false);
   const [linkDialog, setLinkDialog] = useState<LinkDialogState | null>(null);
   const [linkDialogError, setLinkDialogError] = useState<string | null>(null);
+  const descriptionPreviewRef = useRef<HTMLDivElement | null>(null);
+  const [isDescriptionPreviewOverflowing, setDescriptionPreviewOverflowing] = useState(false);
+  const [isDescriptionPreviewExpanded, setDescriptionPreviewExpanded] = useState(false);
   const toast = useToastStore((state) => state.show);
   const {
     register,
@@ -911,12 +917,17 @@ export default function TaskForm({
     }
   }, [task, descriptionDirty, isDescriptionEditing, descriptionDraft]);
 
+  useEffect(() => {
+    setDescriptionPreviewExpanded(false);
+  }, [task?.id]);
+
   const sanitizedChecklist = useMemo(() => sanitizeChecklistItems(checklistItems), [checklistItems]);
 
   const attachments = (watch('attachments') ?? []) as Attachment[];
   const descriptionPreviewBlocks = useMemo(() => parseDescriptionMarkdown(descriptionDraft), [
     descriptionDraft
   ]);
+  const hasDescriptionPreview = descriptionPreviewBlocks.length > 0;
   const labelInput = watch('labels') ?? '';
   const startDateValue = watch('start_date') ?? '';
   const dueDateValue = watch('due_date') ?? '';
@@ -925,6 +936,47 @@ export default function TaskForm({
   const dueRecurrenceValue = (watch('due_recurrence') as DueRecurrenceOption | undefined) ?? 'never';
   const titleValue = watch('title') ?? '';
   const statusValue = (watch('status') ?? defaultStatus) as TaskStatus;
+
+  useEffect(() => {
+    if (!hasDescriptionPreview) {
+      setDescriptionPreviewOverflowing(false);
+      if (isDescriptionPreviewExpanded) {
+        setDescriptionPreviewExpanded(false);
+      }
+      return;
+    }
+
+    const element = descriptionPreviewRef.current;
+    if (!element) {
+      setDescriptionPreviewOverflowing(false);
+      return;
+    }
+
+    const measure = () => {
+      setDescriptionPreviewOverflowing(element.scrollHeight > DESCRIPTION_PREVIEW_COLLAPSED_HEIGHT);
+    };
+
+    measure();
+
+    if (typeof ResizeObserver === 'undefined') {
+      return;
+    }
+
+    const observer = new ResizeObserver(() => {
+      requestAnimationFrame(measure);
+    });
+
+    observer.observe(element);
+
+    return () => {
+      observer.disconnect();
+    };
+  }, [
+    descriptionDraft,
+    hasDescriptionPreview,
+    isDescriptionEditing,
+    isDescriptionPreviewExpanded
+  ]);
   const scrollToSection = useCallback((sectionRef: { current: HTMLElement | null }) => {
     const element = sectionRef.current;
     if (element && typeof element.scrollIntoView === 'function') {
@@ -1292,6 +1344,105 @@ export default function TaskForm({
     [updateDescriptionDraft]
   );
 
+  const handleDescriptionPreviewToggle = useCallback(() => {
+    setDescriptionPreviewExpanded((prev) => !prev);
+  }, []);
+
+  const insertInlineImage = useCallback(
+    async (file: File, selectionOverride?: { start: number; end: number }) => {
+      if (!file.type.startsWith('image/')) {
+        toast({
+          title: 'Arquivo incompatível',
+          description: 'Escolha um arquivo de imagem para inserir.',
+          type: 'error'
+        });
+        return;
+      }
+
+      setInlineImageUploading(true);
+      try {
+        const uploaded = await uploadAttachment(file);
+        const currentAttachments = (getValues('attachments') ?? []) as Attachment[];
+        const nextAttachments = [...currentAttachments, uploaded] as Attachment[];
+        setValue('attachments', nextAttachments, { shouldDirty: true });
+        if (isEditingTask) {
+          await runAutoSave({ attachments: nextAttachments });
+        }
+
+        const textarea = descriptionTextareaRef.current;
+        const currentValue = textarea?.value ?? descriptionDraft;
+        const selection =
+          selectionOverride ??
+          (textarea
+            ? { start: textarea.selectionStart, end: textarea.selectionEnd }
+            : { start: currentValue.length, end: currentValue.length });
+
+        const altSource = uploaded.name || file.name || 'imagem';
+        const altText = altSource.replace(/\.[^./]+$/, '').replace(/[\[\]]/g, '').trim() || 'imagem';
+        const insertion = `![${altText}](${uploaded.url})`;
+        const nextValue =
+          currentValue.slice(0, selection.start) + insertion + currentValue.slice(selection.end);
+        updateDescriptionDraft(nextValue);
+
+        requestAnimationFrame(() => {
+          const element = descriptionTextareaRef.current;
+          if (element) {
+            const caret = selection.start + insertion.length;
+            element.focus();
+            element.setSelectionRange(caret, caret);
+          }
+        });
+
+        toast({ title: 'Imagem adicionada', type: 'success' });
+      } catch (error: any) {
+        toast({
+          title: 'Erro ao enviar imagem',
+          description: error?.message ?? 'Não foi possível anexar a imagem.',
+          type: 'error'
+        });
+      } finally {
+        setInlineImageUploading(false);
+      }
+    },
+    [
+      descriptionDraft,
+      getValues,
+      isEditingTask,
+      runAutoSave,
+      setValue,
+      toast,
+      updateDescriptionDraft
+    ]
+  );
+
+  const handleDescriptionPaste = useCallback(
+    async (event: ReactClipboardEvent<HTMLTextAreaElement>) => {
+      const clipboardData = event.clipboardData;
+      if (!clipboardData) {
+        return;
+      }
+      const imageFiles = Array.from(clipboardData.items)
+        .filter((item) => item.kind === 'file' && item.type.startsWith('image/'))
+        .map((item) => item.getAsFile())
+        .filter((file): file is File => Boolean(file));
+
+      if (imageFiles.length === 0) {
+        return;
+      }
+
+      event.preventDefault();
+
+      for (const file of imageFiles) {
+        const textarea = descriptionTextareaRef.current;
+        const selection = textarea
+          ? { start: textarea.selectionStart, end: textarea.selectionEnd }
+          : undefined;
+        await insertInlineImage(file, selection);
+      }
+    },
+    [insertInlineImage]
+  );
+
   const triggerInlineImageUpload = useCallback(() => {
     const textarea = descriptionTextareaRef.current;
     if (!textarea || isInlineImageUploading) {
@@ -1313,68 +1464,11 @@ export default function TaskForm({
         return;
       }
       const [file] = Array.from(files);
-      if (!file.type.startsWith('image/')) {
-        toast({
-          title: 'Arquivo incompatível',
-          description: 'Escolha um arquivo de imagem para inserir.',
-          type: 'error'
-        });
-        pendingInlineImageSelection.current = null;
-        return;
-      }
-
-      setInlineImageUploading(true);
-      try {
-        const uploaded = await uploadAttachment(file);
-        const currentAttachments = (getValues('attachments') ?? []) as Attachment[];
-        const nextAttachments = [...currentAttachments, uploaded] as Attachment[];
-        setValue('attachments', nextAttachments, { shouldDirty: true });
-        if (isEditingTask) {
-          await runAutoSave({ attachments: nextAttachments });
-        }
-
-        const altText = uploaded.name.replace(/\.[^./]+$/, '').replace(/[\[\]]/g, '').trim() || 'imagem';
-        const insertion = `![${altText}](${uploaded.url})`;
-        const textarea = descriptionTextareaRef.current;
-        const currentValue = textarea?.value ?? descriptionDraft;
-        const selection = pendingInlineImageSelection.current ?? {
-          start: textarea?.selectionStart ?? currentValue.length,
-          end: textarea?.selectionEnd ?? currentValue.length
-        };
-        const nextValue =
-          currentValue.slice(0, selection.start) +
-          insertion +
-          currentValue.slice(selection.end);
-        updateDescriptionDraft(nextValue);
-        requestAnimationFrame(() => {
-          const element = descriptionTextareaRef.current;
-          if (element) {
-            const caret = selection.start + insertion.length;
-            element.focus();
-            element.setSelectionRange(caret, caret);
-          }
-        });
-        toast({ title: 'Imagem adicionada', type: 'success' });
-      } catch (error: any) {
-        toast({
-          title: 'Erro ao enviar imagem',
-          description: error?.message ?? 'Não foi possível anexar a imagem.',
-          type: 'error'
-        });
-      } finally {
-        setInlineImageUploading(false);
-        pendingInlineImageSelection.current = null;
-      }
+      const selection = pendingInlineImageSelection.current ?? undefined;
+      pendingInlineImageSelection.current = null;
+      await insertInlineImage(file, selection);
     },
-    [
-      descriptionDraft,
-      getValues,
-      isEditingTask,
-      runAutoSave,
-      setValue,
-      toast,
-      updateDescriptionDraft
-    ]
+    [insertInlineImage]
   );
 
   const openLinkDialog = useCallback(() => {
@@ -3045,6 +3139,7 @@ export default function TaskForm({
                   rows={8}
                   value={descriptionDraft}
                   onChange={handleDescriptionChange}
+                  onPaste={handleDescriptionPaste}
                   placeholder="Descreva o contexto, critérios e próximos passos..."
                   className="min-h-[8rem]"
                 />
@@ -3062,16 +3157,98 @@ export default function TaskForm({
                     </Button>
                   </div>
                 ) : null}
+                {hasDescriptionPreview ? (
+                  <div className="mt-2 space-y-2">
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-300">
+                      Pré-visualização
+                    </p>
+                    <div className="relative">
+                      <div
+                        ref={descriptionPreviewRef}
+                        className="space-y-3 rounded-2xl border border-slate-200 bg-white/70 p-4 text-sm text-slate-700 shadow-inner transition-[max-height] duration-300 ease-in-out dark:border-white/10 dark:bg-white/5 dark:text-slate-200"
+                        style={
+                          isDescriptionPreviewOverflowing && !isDescriptionPreviewExpanded
+                            ? { maxHeight: DESCRIPTION_PREVIEW_COLLAPSED_HEIGHT, overflow: 'hidden' }
+                            : { overflow: 'visible' }
+                        }
+                      >
+                        {descriptionPreviewBlocks.map((block, index) => (
+                          <Fragment key={`description-block-${index}`}>{block}</Fragment>
+                        ))}
+                      </div>
+                      {isDescriptionPreviewOverflowing && !isDescriptionPreviewExpanded ? (
+                        <div className="pointer-events-none absolute inset-x-0 bottom-0 flex justify-center pb-2 pt-12">
+                          <div className="absolute inset-0 rounded-b-2xl bg-gradient-to-t from-white via-white/85 to-transparent dark:from-slate-900 dark:via-slate-900/85" />
+                          <button
+                            type="button"
+                            onClick={handleDescriptionPreviewToggle}
+                            aria-expanded={isDescriptionPreviewExpanded}
+                            className="relative pointer-events-auto inline-flex items-center gap-2 rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-zenko-primary shadow-sm ring-1 ring-zenko-primary/30 transition hover:bg-zenko-primary hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary dark:bg-slate-800 dark:text-zenko-primary dark:hover:bg-zenko-primary dark:hover:text-slate-900"
+                          >
+                            Mostrar mais
+                          </button>
+                        </div>
+                      ) : null}
+                    </div>
+                    {isDescriptionPreviewOverflowing && isDescriptionPreviewExpanded ? (
+                      <div className="flex justify-center pt-1">
+                        <button
+                          type="button"
+                          onClick={handleDescriptionPreviewToggle}
+                          aria-expanded={isDescriptionPreviewExpanded}
+                          className="inline-flex items-center gap-2 rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-zenko-primary shadow-sm ring-1 ring-zenko-primary/30 transition hover:bg-zenko-primary hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary dark:bg-slate-800 dark:text-zenko-primary dark:hover:bg-zenko-primary dark:hover:text-slate-900"
+                        >
+                          Mostrar menos
+                        </button>
+                      </div>
+                    ) : null}
+                  </div>
+                ) : null}
               </div>
             ) : (
               <div className="mt-3 space-y-3">
-                {descriptionPreviewBlocks.length > 0 ? (
+                {hasDescriptionPreview ? (
                   <>
-                    <div className="space-y-3 rounded-2xl border border-slate-200 bg-white/70 p-4 text-sm text-slate-700 shadow-inner dark:border-white/10 dark:bg-white/5 dark:text-slate-200">
-                      {descriptionPreviewBlocks.map((block, index) => (
-                        <Fragment key={`description-block-${index}`}>{block}</Fragment>
-                      ))}
+                    <div className="relative">
+                      <div
+                        ref={descriptionPreviewRef}
+                        className="space-y-3 rounded-2xl border border-slate-200 bg-white/70 p-4 text-sm text-slate-700 shadow-inner transition-[max-height] duration-300 ease-in-out dark:border-white/10 dark:bg-white/5 dark:text-slate-200"
+                        style={
+                          isDescriptionPreviewOverflowing && !isDescriptionPreviewExpanded
+                            ? { maxHeight: DESCRIPTION_PREVIEW_COLLAPSED_HEIGHT, overflow: 'hidden' }
+                            : { overflow: 'visible' }
+                        }
+                      >
+                        {descriptionPreviewBlocks.map((block, index) => (
+                          <Fragment key={`description-block-${index}`}>{block}</Fragment>
+                        ))}
+                      </div>
+                      {isDescriptionPreviewOverflowing && !isDescriptionPreviewExpanded ? (
+                        <div className="pointer-events-none absolute inset-x-0 bottom-0 flex justify-center pb-2 pt-12">
+                          <div className="absolute inset-0 rounded-b-2xl bg-gradient-to-t from-white via-white/85 to-transparent dark:from-slate-900 dark:via-slate-900/85" />
+                          <button
+                            type="button"
+                            onClick={handleDescriptionPreviewToggle}
+                            aria-expanded={isDescriptionPreviewExpanded}
+                            className="relative pointer-events-auto inline-flex items-center gap-2 rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-zenko-primary shadow-sm ring-1 ring-zenko-primary/30 transition hover:bg-zenko-primary hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary dark:bg-slate-800 dark:text-zenko-primary dark:hover:bg-zenko-primary dark:hover:text-slate-900"
+                          >
+                            Mostrar mais
+                          </button>
+                        </div>
+                      ) : null}
                     </div>
+                    {isDescriptionPreviewOverflowing && isDescriptionPreviewExpanded ? (
+                      <div className="flex justify-center pt-1">
+                        <button
+                          type="button"
+                          onClick={handleDescriptionPreviewToggle}
+                          aria-expanded={isDescriptionPreviewExpanded}
+                          className="inline-flex items-center gap-2 rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-zenko-primary shadow-sm ring-1 ring-zenko-primary/30 transition hover:bg-zenko-primary hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary dark:bg-slate-800 dark:text-zenko-primary dark:hover:bg-zenko-primary dark:hover:text-slate-900"
+                        >
+                          Mostrar menos
+                        </button>
+                      </div>
+                    ) : null}
                     <Button type="button" variant="secondary" onClick={() => setDescriptionEditing(true)}>
                       Editar descrição
                     </Button>
