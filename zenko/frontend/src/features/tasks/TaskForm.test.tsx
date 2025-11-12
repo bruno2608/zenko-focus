@@ -2,10 +2,12 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { vi } from 'vitest';
 import TaskForm from './TaskForm';
 import type { Task } from './types';
+import { useTasksStore } from './store';
 
 const createTaskMock = vi.fn();
 const updateTaskMock = vi.fn();
 const deleteTaskMock = vi.fn();
+const getNextSortOrderMock = vi.fn(() => 0);
 
 vi.mock('./hooks', () => ({
   useTasks: () => ({
@@ -22,6 +24,12 @@ describe('TaskForm', () => {
     createTaskMock.mockResolvedValue(undefined);
     updateTaskMock.mockResolvedValue(undefined);
     deleteTaskMock.mockResolvedValue(undefined);
+    getNextSortOrderMock.mockReturnValue(0);
+    useTasksStore.setState((state) => ({
+      filters: { ...state.filters, status: 'all', due: 'all', labels: [] },
+      labelsLibrary: [],
+      labelColorCursor: 0
+    }));
   });
 
   afterEach(() => {
@@ -29,30 +37,29 @@ describe('TaskForm', () => {
     vi.clearAllMocks();
   });
 
-  function getInputByLabelText(label: string) {
-    const labelElement = screen.getByText(label);
-    const container = labelElement.parentElement;
-    if (!container) {
-      throw new Error(`Label container not found for ${label}`);
-    }
-    const input = container.querySelector('input');
-    if (!input) {
-      throw new Error(`Input not found for label ${label}`);
-    }
-    return input as HTMLInputElement;
-  }
+  const baseProps = {
+    createTask: createTaskMock,
+    updateTask: updateTaskMock,
+    deleteTask: deleteTaskMock,
+    isCreatePending: false,
+    isUpdatePending: false,
+    getNextSortOrder: getNextSortOrderMock,
+    defaultStatus: 'todo'
+  } as const;
 
   it('blocks submission when due date is in the past', async () => {
     const onClose = vi.fn();
-    render(<TaskForm onClose={onClose} />);
+    render(<TaskForm {...baseProps} onClose={onClose} />);
 
-    const titleInput = getInputByLabelText('Título');
+    const titleInput = screen.getByLabelText('Título');
     fireEvent.change(titleInput, { target: { value: 'Nova tarefa' } });
 
-    const dueDateInput = getInputByLabelText('Prazo');
+    const dueToggle = screen.getByRole('checkbox', { name: 'Data de entrega' });
+    fireEvent.click(dueToggle);
+    const dueDateInput = screen.getByLabelText('Data de entrega');
     fireEvent.change(dueDateInput, { target: { value: '2024-01-09' } });
 
-    fireEvent.click(screen.getByRole('button', { name: 'Salvar' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Criar tarefa' }));
 
     expect(await screen.findByText('Use uma data a partir de hoje')).toBeInTheDocument();
     expect(createTaskMock).not.toHaveBeenCalled();
@@ -61,15 +68,17 @@ describe('TaskForm', () => {
 
   it('submits with formatted due date when valid future date is provided', async () => {
     const onClose = vi.fn();
-    render(<TaskForm onClose={onClose} />);
+    render(<TaskForm {...baseProps} onClose={onClose} />);
 
-    const titleInput = getInputByLabelText('Título');
+    const titleInput = screen.getByLabelText('Título');
     fireEvent.change(titleInput, { target: { value: 'Planejar viagem' } });
 
-    const dueDateInput = getInputByLabelText('Prazo');
+    const dueToggle = screen.getByRole('checkbox', { name: 'Data de entrega' });
+    fireEvent.click(dueToggle);
+    const dueDateInput = screen.getByLabelText('Data de entrega');
     fireEvent.change(dueDateInput, { target: { value: '2024-01-12' } });
 
-    fireEvent.click(screen.getByRole('button', { name: 'Salvar' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Criar tarefa' }));
 
     await waitFor(() => {
       expect(createTaskMock).toHaveBeenCalledTimes(1);
@@ -78,8 +87,33 @@ describe('TaskForm', () => {
     expect(createTaskMock).toHaveBeenCalledWith(
       expect.objectContaining({
         title: 'Planejar viagem',
-        due_date: '2024-01-12'
+        due_date: '2024-01-12',
+        sort_order: 0
       })
+    );
+    expect(onClose).toHaveBeenCalled();
+  });
+
+  it('permite salvar uma tarefa com prazo para o dia atual', async () => {
+    const onClose = vi.fn();
+    render(<TaskForm {...baseProps} onClose={onClose} />);
+
+    const titleInput = screen.getByLabelText('Título');
+    fireEvent.change(titleInput, { target: { value: 'Enviar relatório' } });
+
+    const dueToggle = screen.getByRole('checkbox', { name: 'Data de entrega' });
+    fireEvent.click(dueToggle);
+    const dueDateInput = screen.getByLabelText('Data de entrega');
+    fireEvent.change(dueDateInput, { target: { value: '2024-01-10' } });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Criar tarefa' }));
+
+    await waitFor(() => {
+      expect(createTaskMock).toHaveBeenCalledTimes(1);
+    });
+
+    expect(createTaskMock).toHaveBeenCalledWith(
+      expect.objectContaining({ due_date: '2024-01-10', sort_order: 0 })
     );
     expect(onClose).toHaveBeenCalled();
   });
@@ -96,16 +130,14 @@ describe('TaskForm', () => {
       labels: ['financeiro'],
       checklist: [],
       attachments: [],
+      sort_order: 0,
       created_at: '2024-01-01T10:00:00.000Z',
       updated_at: '2024-01-01T10:00:00.000Z'
     };
 
-    render(<TaskForm task={task} onClose={onClose} />);
+    render(<TaskForm {...baseProps} task={task} onClose={onClose} />);
 
-    const dueDateInput = getInputByLabelText('Prazo');
-    fireEvent.change(dueDateInput, { target: { value: '' } });
-
-    fireEvent.click(screen.getByRole('button', { name: 'Salvar' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Remover' }));
 
     await waitFor(() => {
       expect(updateTaskMock).toHaveBeenCalledTimes(1);
@@ -117,6 +149,6 @@ describe('TaskForm', () => {
         payload: expect.objectContaining({ due_date: null })
       })
     );
-    expect(onClose).toHaveBeenCalled();
+    expect(onClose).not.toHaveBeenCalled();
   });
 });

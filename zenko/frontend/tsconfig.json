@@ -1,7 +1,13 @@
 {
   "extends": "./tsconfig.node.json",
   "compilerOptions": {
-    "jsx": "react-jsx"
+    "jsx": "react-jsx",
+    "noEmit": true,
+    "baseUrl": ".",
+    "paths": {
+      "react-beautiful-dnd": ["./src/vendor/react-beautiful-dnd"],
+      "mousetrap": ["./src/vendor/mousetrap"]
+    }
   },
   "include": ["src", "tests", "vitest.setup.ts"],
   "references": [{ "path": "./tsconfig.node.json" }]
