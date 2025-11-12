@@ -246,6 +246,41 @@ interface Props {
   deleteTask: (id: string) => Promise<unknown>;
   isCreatePending: boolean;
   isUpdatePending: boolean;
+  defaultStatus?: TaskStatus;
+  getNextSortOrder?: (status: TaskStatus) => number;
+}
+
+function LabelColorOptions({
+  selectedColorId,
+  onSelect
+}: {
+  selectedColorId: LabelColorId;
+  onSelect: (colorId: LabelColorId) => void;
+}) {
+  return (
+    <div className="flex flex-wrap gap-2">
+      {trelloPalette.map((option) => {
+        const isSelected = selectedColorId === option.id;
+        return (
+          <button
+            key={`palette-${option.id}`}
+            type="button"
+            onClick={() => onSelect(option.id)}
+            className={`flex h-8 w-8 items-center justify-center rounded-full border-2 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/60 ${
+              isSelected
+                ? 'border-slate-900/70 dark:border-white'
+                : 'border-transparent hover:border-slate-900/40 dark:hover:border-white/40'
+            }`}
+            style={{ backgroundColor: option.background }}
+            aria-pressed={isSelected}
+            aria-label={`Selecionar cor ${option.id}`}
+          >
+            {isSelected ? <span className="block h-2 w-2 rounded-full bg-white/90" /> : null}
+          </button>
+        );
+      })}
+    </div>
+  );
 }
 
 function LabelColorOptions({
@@ -288,7 +323,9 @@ export default function TaskForm({
   updateTask,
   deleteTask,
   isCreatePending,
-  isUpdatePending
+  isUpdatePending,
+  defaultStatus = 'todo',
+  getNextSortOrder
 }: Props) {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [checklistItems, setChecklistItems] = useState<ChecklistEntry[]>(() => toChecklistEntries(task?.checklist));
@@ -353,7 +390,7 @@ export default function TaskForm({
       due_reminder: 'none',
       due_recurrence: 'never',
       labels: '',
-      status: 'todo',
+      status: task?.status ?? defaultStatus,
       attachments: []
     }
   });
@@ -387,7 +424,7 @@ export default function TaskForm({
         due_reminder: 'none',
         due_recurrence: 'never',
         labels: '',
-        status: 'todo',
+        status: defaultStatus,
         attachments: []
       });
       setChecklistItems([]);
@@ -429,7 +466,13 @@ export default function TaskForm({
     if (task.labels.length > 0) {
       registerLabels(task.labels);
     }
-  }, [task, reset, registerLabels]);
+  }, [task, defaultStatus, reset, registerLabels]);
+
+  useEffect(() => {
+    if (!task) {
+      setValue('status', defaultStatus);
+    }
+  }, [defaultStatus, setValue, task]);
 
   useEffect(() => {
     setSubmitError(null);
@@ -1227,6 +1270,16 @@ export default function TaskForm({
       attachments
     };
 
+    const resolvedSortOrder =
+      typeof getNextSortOrder === 'function' ? getNextSortOrder(data.status) : undefined;
+
+    if (!task && typeof resolvedSortOrder === 'number') {
+      payload.sort_order = resolvedSortOrder;
+    }
+    if (task && data.status !== task.status && typeof resolvedSortOrder === 'number') {
+      payload.sort_order = resolvedSortOrder;
+    }
+
     if (startDatePayload !== undefined) {
       payload.start_date = startDatePayload;
     }
@@ -1776,7 +1829,13 @@ export default function TaskForm({
               const value = event.target.value as TaskStatus;
               setValue('status', value, { shouldDirty: true });
               if (isEditingTask && value !== (task?.status ?? 'todo')) {
-                runAutoSave({ status: value });
+                const nextOrder =
+                  typeof getNextSortOrder === 'function' ? getNextSortOrder(value) : undefined;
+                const updates: Partial<TaskPayload> = { status: value };
+                if (typeof nextOrder === 'number') {
+                  updates.sort_order = nextOrder;
+                }
+                runAutoSave(updates);
               }
             }}
           >

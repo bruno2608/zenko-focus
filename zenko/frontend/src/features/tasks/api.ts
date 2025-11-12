@@ -15,6 +15,45 @@ const OFFLINE_ATTACHMENTS_INDEX_KEY = 'attachments-index';
 const OFFLINE_ATTACHMENT_PREFIX = 'attachment:';
 const MAX_OFFLINE_ATTACHMENTS = 50;
 
+const statusSequence: TaskStatus[] = ['todo', 'doing', 'done'];
+
+export interface TaskPositionChange {
+  id: string;
+  status: TaskStatus;
+  sort_order: number;
+}
+
+function ensureTaskSortOrder(tasks: Task[]): Task[] {
+  const grouped: Record<TaskStatus, Task[]> = {
+    todo: [],
+    doing: [],
+    done: []
+  };
+
+  tasks.forEach((task) => {
+    const list = grouped[task.status] ?? grouped.todo;
+    list.push(task);
+  });
+
+  const normalized = new Map<string, Task>();
+
+  statusSequence.forEach((status) => {
+    const list = grouped[status];
+    const ordered = [...list].sort((a, b) => {
+      const orderA = typeof a.sort_order === 'number' ? a.sort_order : Number.MAX_SAFE_INTEGER;
+      const orderB = typeof b.sort_order === 'number' ? b.sort_order : Number.MAX_SAFE_INTEGER;
+      if (orderA !== orderB) return orderA - orderB;
+      return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+    });
+
+    ordered.forEach((task, index) => {
+      normalized.set(task.id, { ...task, sort_order: index });
+    });
+  });
+
+  return tasks.map((task) => normalized.get(task.id) ?? task);
+}
+
 interface OfflineAttachmentPayload {
   metadata: {
     id: string;
@@ -173,7 +212,11 @@ async function loadOfflineTasks() {
       attachments: await hydrateAttachments(task.attachments ?? [])
     }))
   );
-  return tasks;
+  const normalized = tasks.map((task) => ({
+    ...task,
+    sort_order: typeof task.sort_order === 'number' ? task.sort_order : 0
+  }));
+  return ensureTaskSortOrder(normalized);
 }
 
 async function persistOfflineTasks(tasks: Task[]) {
@@ -190,13 +233,19 @@ export async function fetchTasks(userId: string) {
     .from('tasks')
     .select('*')
     .eq('user_id', userId)
+    .order('sort_order', { ascending: true })
     .order('created_at', { ascending: true });
   if (error) throw error;
-  return data as Task[];
+  return ensureTaskSortOrder((data as Task[]) ?? []);
 }
 
 export async function createTask(userId: string, payload: TaskPayload) {
   if (isOfflineMode(userId)) {
+    const tasks = await loadOfflineTasks();
+    const nextOrder =
+      typeof payload.sort_order === 'number'
+        ? payload.sort_order
+        : tasks.filter((task) => task.status === payload.status).length;
     const now = new Date().toISOString();
     const task: Task = {
       id: generateId(),
@@ -204,6 +253,7 @@ export async function createTask(userId: string, payload: TaskPayload) {
       title: payload.title,
       description: payload.description,
       status: payload.status,
+      sort_order: nextOrder,
       due_date: payload.due_date ?? null,
       start_date: payload.start_date ?? null,
       due_time: payload.due_time ?? null,
@@ -215,14 +265,13 @@ export async function createTask(userId: string, payload: TaskPayload) {
       created_at: now,
       updated_at: now
     };
-    const tasks = await loadOfflineTasks();
-    tasks.push(task);
-    await persistOfflineTasks(tasks);
-    return task;
+    const updated = ensureTaskSortOrder([...tasks, task]);
+    await persistOfflineTasks(updated);
+    return updated.find((item) => item.id === task.id) ?? task;
   }
   const { data, error } = await supabase
     .from('tasks')
-    .insert({ ...payload, user_id: userId })
+    .insert({ ...payload, user_id: userId, sort_order: payload.sort_order ?? 0 })
     .select()
     .single();
   if (error) throw error;
@@ -246,12 +295,15 @@ export async function updateTask(taskId: string, payload: Partial<TaskPayload>, 
             due_reminder: payload.due_reminder ?? task.due_reminder,
             due_recurrence: payload.due_recurrence ?? task.due_recurrence,
             status: payload.status ?? task.status,
+            sort_order:
+              typeof payload.sort_order === 'number' ? payload.sort_order : task.sort_order,
             updated_at: new Date().toISOString()
           }
         : task
     );
-    await persistOfflineTasks(updated);
-    const next = updated.find((task) => task.id === taskId);
+    const normalized = ensureTaskSortOrder(updated);
+    await persistOfflineTasks(normalized);
+    const next = normalized.find((task) => task.id === taskId);
     if (!next) {
       throw new Error('Tarefa não encontrada no cache offline.');
     }
@@ -267,17 +319,49 @@ export async function updateTask(taskId: string, payload: Partial<TaskPayload>, 
   return data as Task;
 }
 
-export async function updateTaskStatus(taskId: string, status: TaskStatus, userId?: string) {
-  if (isOfflineMode(userId)) {
-    return updateTask(taskId, { status }, userId);
+export async function updateTaskStatus(taskId: string, status: TaskStatus, userId?: string, sort_order?: number) {
+  const payload: Partial<TaskPayload> = { status };
+  if (typeof sort_order === 'number') {
+    payload.sort_order = sort_order;
   }
-  return updateTask(taskId, { status }, userId);
+  return updateTask(taskId, payload, userId);
+}
+
+export async function updateTaskPositions(changes: TaskPositionChange[], userId?: string) {
+  if (changes.length === 0) return;
+  if (isOfflineMode(userId)) {
+    const tasks = await loadOfflineTasks();
+    const map = new Map(changes.map((change) => [change.id, change]));
+    const updated = tasks.map((task) => {
+      const change = map.get(task.id);
+      if (!change) {
+        return task;
+      }
+      return {
+        ...task,
+        status: change.status,
+        sort_order: change.sort_order,
+        updated_at: new Date().toISOString()
+      };
+    });
+    const normalized = ensureTaskSortOrder(updated);
+    await persistOfflineTasks(normalized);
+    return;
+  }
+  const payload = changes.map((change) => ({
+    id: change.id,
+    status: change.status,
+    sort_order: change.sort_order,
+    updated_at: new Date().toISOString()
+  }));
+  const { error } = await supabase.from('tasks').upsert(payload, { onConflict: 'id' });
+  if (error) throw error;
 }
 
 export async function deleteTask(taskId: string, userId?: string) {
   if (isOfflineMode(userId)) {
     const tasks = (await loadOfflineTasks()).filter((task) => task.id !== taskId);
-    await persistOfflineTasks(tasks);
+    await persistOfflineTasks(ensureTaskSortOrder(tasks));
     return;
   }
   const { error } = await supabase.from('tasks').delete().eq('id', taskId);

@@ -7,6 +7,7 @@ import { useTasksStore } from './store';
 const createTaskMock = vi.fn();
 const updateTaskMock = vi.fn();
 const deleteTaskMock = vi.fn();
+const getNextSortOrderMock = vi.fn(() => 0);
 
 vi.mock('./hooks', () => ({
   useTasks: () => ({
@@ -23,6 +24,7 @@ describe('TaskForm', () => {
     createTaskMock.mockResolvedValue(undefined);
     updateTaskMock.mockResolvedValue(undefined);
     deleteTaskMock.mockResolvedValue(undefined);
+    getNextSortOrderMock.mockReturnValue(0);
     useTasksStore.setState((state) => ({
       filters: { ...state.filters, status: 'all', due: 'all', labels: [] },
       labelsLibrary: [],
@@ -40,7 +42,9 @@ describe('TaskForm', () => {
     updateTask: updateTaskMock,
     deleteTask: deleteTaskMock,
     isCreatePending: false,
-    isUpdatePending: false
+    isUpdatePending: false,
+    getNextSortOrder: getNextSortOrderMock,
+    defaultStatus: 'todo'
   } as const;
 
   it('blocks submission when due date is in the past', async () => {
@@ -83,7 +87,8 @@ describe('TaskForm', () => {
     expect(createTaskMock).toHaveBeenCalledWith(
       expect.objectContaining({
         title: 'Planejar viagem',
-        due_date: '2024-01-12'
+        due_date: '2024-01-12',
+        sort_order: 0
       })
     );
     expect(onClose).toHaveBeenCalled();
@@ -108,7 +113,7 @@ describe('TaskForm', () => {
     });
 
     expect(createTaskMock).toHaveBeenCalledWith(
-      expect.objectContaining({ due_date: '2024-01-10' })
+      expect.objectContaining({ due_date: '2024-01-10', sort_order: 0 })
     );
     expect(onClose).toHaveBeenCalled();
   });
@@ -125,6 +130,7 @@ describe('TaskForm', () => {
       labels: ['financeiro'],
       checklist: [],
       attachments: [],
+      sort_order: 0,
       created_at: '2024-01-01T10:00:00.000Z',
       updated_at: '2024-01-01T10:00:00.000Z'
     };

@@ -28,6 +28,7 @@ create table if not exists tasks (
   labels text[] default '{}',
   checklist jsonb default '[]',
   attachments jsonb default '[]',
+  sort_order int not null default 0,
   created_at timestamptz default now(),
   updated_at timestamptz default now()
 );
