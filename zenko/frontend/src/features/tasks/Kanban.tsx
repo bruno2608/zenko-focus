@@ -43,6 +43,17 @@ const columnTitles: Record<TaskStatus, string> = {
 
 const statusOrder: TaskStatus[] = ['todo', 'doing', 'done'];
 
+function useLabelDefinitionMap() {
+  const labelsLibrary = useTasksStore((state) => state.labelsLibrary);
+  return useMemo(() => {
+    const map = new Map<string, LabelDefinition>();
+    labelsLibrary.forEach((definition) => {
+      map.set(definition.normalized, definition);
+    });
+    return map;
+  }, [labelsLibrary]);
+}
+
 const getAdjacentStatus = (current: TaskStatus, direction: 'next' | 'previous'): TaskStatus | null => {
   const index = statusOrder.indexOf(current);
   if (index === -1) return null;
@@ -259,6 +270,36 @@ export default function Kanban() {
     });
     return map;
   }, [kanbanLabelsLibrary]);
+
+  const tasksById = useMemo(() => {
+    const map = new Map<string, Task>();
+    tasks.forEach((task) => {
+      map.set(task.id, task);
+    });
+    return map;
+  }, [tasks]);
+
+  const columnsMap = useMemo(() => {
+    const map: Record<TaskStatus, Task[]> = {
+      todo: [],
+      doing: [],
+      done: []
+    };
+    tasks.forEach((task) => {
+      map[task.status].push(task);
+    });
+    statusOrder.forEach((status) => {
+      map[status].sort((a, b) => {
+        if (a.sort_order !== b.sort_order) {
+          return a.sort_order - b.sort_order;
+        }
+        return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+      });
+    });
+    return map;
+  }, [tasks]);
+
+  const labelDefinitionMap = useLabelDefinitionMap();
 
   const tasksById = useMemo(() => {
     const map = new Map<string, Task>();
