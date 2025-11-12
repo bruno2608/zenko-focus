@@ -7,6 +7,8 @@ interface ModalProps {
   onClose: () => void;
   children: ReactNode;
   description?: string;
+  onBack?: () => void;
+  backLabel?: string;
 }
 
 const focusableSelector =
@@ -23,12 +25,15 @@ export default function Modal({
   open,
   onClose,
   children,
-  description = 'Preencha os campos para atualizar sua produtividade.'
+  description = 'Preencha os campos para atualizar sua produtividade.',
+  onBack,
+  backLabel
 }: ModalProps) {
   const dialogRef = useRef<HTMLDivElement>(null);
   const previouslyFocusedElement = useRef<Element | null>(null);
   const titleId = useId();
   const descriptionId = useId();
+  const shouldCloseOnPointerUp = useRef(false);
 
   useEffect(() => {
     if (!open) {
@@ -123,7 +128,21 @@ export default function Modal({
   const describedBy = description ? descriptionId : undefined;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/30 px-4 py-6 backdrop-blur-sm transition-colors dark:bg-slate-950/80 sm:items-center">
+    <div
+      className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/30 px-4 py-6 backdrop-blur-sm transition-colors dark:bg-slate-950/80 sm:items-center"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) {
+          shouldCloseOnPointerUp.current = true;
+        }
+      }}
+      onMouseUp={(event) => {
+        if (shouldCloseOnPointerUp.current && event.target === event.currentTarget) {
+          onClose();
+        }
+        shouldCloseOnPointerUp.current = false;
+      }}
+      role="presentation"
+    >
       <div
         ref={dialogRef}
         role="dialog"
@@ -135,25 +154,47 @@ export default function Modal({
       >
         <div className="flex max-h-[calc(100vh-4rem)] flex-col">
           <div className="flex items-start justify-between gap-3 px-6 pb-4 pt-6">
-            <div>
+            <div className="flex flex-1 items-start gap-3">
+              {onBack ? (
+                <Button
+                  variant="ghost"
+                  className="h-11 w-11 rounded-full border border-transparent text-slate-500 transition hover:border-slate-300 hover:text-slate-900 focus-visible:ring-zenko-primary/50 dark:text-slate-300 dark:hover:border-white/20 dark:hover:text-white"
+                  aria-label={backLabel ?? 'Voltar'}
+                  onClick={onBack}
+                >
+                  <svg
+                    className="h-5 w-5"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <polyline points="15 18 9 12 15 6" />
+                  </svg>
+                </Button>
+              ) : null}
               <h2 id={titleId} className="text-lg font-semibold text-slate-900 dark:text-white">
                 {title}
               </h2>
-              {description && (
-                <p id={descriptionId} className="text-xs text-slate-500 dark:text-slate-400">
-                  {description}
-                </p>
-              )}
             </div>
             <Button
               variant="ghost"
               className="text-2xl leading-none text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
               aria-label="Fechar"
               onClick={onClose}
+              title="Fechar"
             >
               ×
             </Button>
           </div>
+          {description ? (
+            <p id={descriptionId} className="px-6 text-xs text-slate-500 dark:text-slate-400">
+              {description}
+            </p>
+          ) : null}
           <div className="flex-1 overflow-y-auto px-6 pb-6">
             {children}
           </div>
