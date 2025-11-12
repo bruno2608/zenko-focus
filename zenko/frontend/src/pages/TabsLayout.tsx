@@ -1,7 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { format } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
 import ThemeToggle from '../components/ui/ThemeToggle';
 import OnboardingDialog from '../features/profile/OnboardingDialog';
 import { useProfile } from '../features/profile/hooks';
@@ -146,11 +144,6 @@ export default function TabsLayout() {
     }
   }, [profileLoading, profile]);
 
-  const todayLabel = useMemo(() => {
-    const formatted = format(new Date(), "EEEE, d 'de' MMMM", { locale: ptBR });
-    return formatted.charAt(0).toUpperCase() + formatted.slice(1);
-  }, []);
-
   const greetingTitle = profile?.full_name
     ? `Olá, ${profile.full_name.split(' ')[0]}!`
     : 'Foco elegante para o seu dia';
@@ -215,10 +208,7 @@ export default function TabsLayout() {
               </NavLink>
             ))}
           </nav>
-          <div className="flex items-center justify-end gap-3">
-            <div className="rounded-2xl border border-slate-200 bg-white/70 px-4 py-2 text-xs font-medium text-slate-600 shadow-sm backdrop-blur dark:border-white/10 dark:bg-white/10 dark:text-slate-200">
-              {todayLabel}
-            </div>
+          <div className="flex items-center justify-end">
             <ThemeToggle />
           </div>
         </header>
