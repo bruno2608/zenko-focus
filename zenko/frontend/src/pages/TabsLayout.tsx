@@ -249,6 +249,30 @@ export default function TabsLayout() {
                 </div>
               </div>
             </header>
+            <nav
+              className="-mt-2 mb-4 hidden items-center gap-2 overflow-x-auto rounded-3xl border border-slate-200/80 bg-white/80 p-2 text-sm shadow-[0_12px_35px_-20px_rgba(15,23,42,0.35)] backdrop-blur dark:border-white/10 dark:bg-white/5 lg:flex 2xl:hidden"
+              aria-label="Navegação principal"
+            >
+              {tabs.map((tab) => (
+                <NavLink
+                  key={`toolbar-${tab.to}`}
+                  to={tab.to}
+                  end={tab.to === '/'}
+                  className={({ isActive }) =>
+                    `flex items-center gap-2 whitespace-nowrap rounded-2xl px-3 py-2 transition-all ${
+                      isActive
+                        ? 'bg-gradient-to-r from-zenko-primary/20 via-zenko-secondary/20 to-zenko-primary/20 text-zenko-primary shadow-lg shadow-zenko-secondary/10 dark:text-white'
+                        : 'text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'
+                    }`
+                  }
+                >
+                  <span className="flex h-9 w-9 items-center justify-center rounded-2xl bg-zenko-primary/10 text-zenko-primary dark:bg-white/10">
+                    {tab.icon}
+                  </span>
+                  {tab.label}
+                </NavLink>
+              ))}
+            </nav>
             <NotificationBanner />
             <main className="flex-1 space-y-6 overflow-visible pb-6 2xl:pb-8">
               <Outlet />
