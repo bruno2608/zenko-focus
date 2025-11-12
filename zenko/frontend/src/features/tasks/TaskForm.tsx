@@ -488,18 +488,19 @@ export default function TaskForm({
 
   useEffect(() => {
     const currentId = task?.id ?? null;
+    const nextDescription = task?.description ?? '';
     if (lastTaskIdRef.current !== currentId) {
       lastTaskIdRef.current = currentId;
-      setDescriptionDraft(task?.description ?? '');
+      setDescriptionDraft(nextDescription);
       setDescriptionEditing(!task || !(task?.description && task.description.trim().length > 0));
       setDescriptionDirty(false);
       return;
     }
 
-    if (!descriptionDirty && !isDescriptionEditing) {
-      setDescriptionDraft(task?.description ?? '');
+    if (!descriptionDirty && !isDescriptionEditing && descriptionDraft !== nextDescription) {
+      setDescriptionDraft(nextDescription);
     }
-  }, [task, descriptionDirty, isDescriptionEditing]);
+  }, [task, descriptionDirty, isDescriptionEditing, descriptionDraft]);
 
   const sanitizedChecklist = useMemo(() => sanitizeChecklistItems(checklistItems), [checklistItems]);
 
@@ -516,11 +517,6 @@ export default function TaskForm({
     const element = sectionRef.current;
     if (element && typeof element.scrollIntoView === 'function') {
       element.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
-  }, []);
-  const focusChecklistInput = useCallback(() => {
-    if (newChecklistInputRef.current) {
-      newChecklistInputRef.current.focus();
     }
   }, []);
   const calendarDays = useMemo(() => buildCalendarDays(calendarCursor), [calendarCursor]);
@@ -1196,10 +1192,11 @@ export default function TaskForm({
       setDescriptionDraft(normalized);
       setDescriptionDirty(false);
       setDescriptionEditing(false);
+      setValue('description', normalized, { shouldDirty: false });
     } catch (error) {
       // runAutoSave already surfaces the error via autoSaveError
     }
-  }, [descriptionDraft, isEditingTask, runAutoSave]);
+  }, [descriptionDraft, isEditingTask, runAutoSave, setValue]);
 
   const handleDescriptionCancel = useCallback(() => {
     if (!task) {
@@ -1589,8 +1586,7 @@ export default function TaskForm({
         {errors.title && <p className="mt-1 text-xs text-rose-600 dark:text-rose-300">{errors.title.message}</p>}
       </div>
             <input type="hidden" {...statusField} value={statusValue} />
-      <div className="flex flex-col gap-6 lg:flex-row">
-        <div className="flex-1 space-y-5">
+      <div className="space-y-5">
           <section
             ref={labelsSectionRef}
             className="rounded-xl border border-slate-200/70 bg-white/80 p-4 shadow-sm dark:border-white/10 dark:bg-slate-900/40"
@@ -2234,20 +2230,6 @@ export default function TaskForm({
             )}
           </section>
           <section
-            ref={attachmentsSectionRef}
-            className="rounded-xl border border-slate-200/70 bg-white/80 p-4 shadow-sm dark:border-white/10 dark:bg-slate-900/40"
-          >
-            <AttachmentUploader
-              attachments={attachments}
-              onChange={(next) => {
-                setValue('attachments', next, { shouldDirty: true });
-                if (isEditingTask) {
-                  runAutoSave({ attachments: next });
-                }
-              }}
-            />
-          </section>
-          <section
             ref={checklistSectionRef}
             className="rounded-xl border border-slate-200/70 bg-white/80 p-4 shadow-sm dark:border-white/10 dark:bg-slate-900/40"
           >
@@ -2395,74 +2377,21 @@ export default function TaskForm({
               </Button>
             </div>
           </section>
+          <section
+            ref={attachmentsSectionRef}
+            className="rounded-xl border border-slate-200/70 bg-white/80 p-4 shadow-sm dark:border-white/10 dark:bg-slate-900/40"
+          >
+            <AttachmentUploader
+              attachments={attachments}
+              onChange={(next) => {
+                setValue('attachments', next, { shouldDirty: true });
+                if (isEditingTask) {
+                  runAutoSave({ attachments: next });
+                }
+              }}
+            />
+          </section>
         </div>
-        <aside className="lg:w-64 space-y-4">
-          <div className="rounded-xl border border-slate-200/70 bg-white/80 p-4 shadow-sm dark:border-white/10 dark:bg-slate-900/40">
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-              Atalhos do card
-            </p>
-            <div className="mt-3 space-y-2">
-              <button
-                type="button"
-                onClick={() => {
-                  scrollToSection(labelsSectionRef);
-                  setLabelManagerOpen(true);
-                }}
-                className="flex w-full items-center justify-between rounded-lg bg-slate-100/80 px-3 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/40 dark:bg-white/10 dark:text-slate-200 dark:hover:bg-white/15"
-              >
-                <span>Etiquetas</span>
-                <span aria-hidden>›</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setDateEditorOpen(true);
-                  scrollToSection(datesSectionRef);
-                }}
-                className="flex w-full items-center justify-between rounded-lg bg-slate-100/80 px-3 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/40 dark:bg-white/10 dark:text-slate-200 dark:hover:bg-white/15"
-              >
-                <span>Datas</span>
-                <span aria-hidden>›</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  scrollToSection(descriptionSectionRef);
-                  setDescriptionEditing(true);
-                  setTimeout(() => {
-                    descriptionTextareaRef.current?.focus();
-                  }, 120);
-                }}
-                className="flex w-full items-center justify-between rounded-lg bg-slate-100/80 px-3 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/40 dark:bg-white/10 dark:text-slate-200 dark:hover:bg-white/15"
-              >
-                <span>Descrição</span>
-                <span aria-hidden>›</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  scrollToSection(checklistSectionRef);
-                  setTimeout(() => {
-                    focusChecklistInput();
-                  }, 120);
-                }}
-                className="flex w-full items-center justify-between rounded-lg bg-slate-100/80 px-3 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/40 dark:bg-white/10 dark:text-slate-200 dark:hover:bg-white/15"
-              >
-                <span>Checklist</span>
-                <span aria-hidden>›</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => scrollToSection(attachmentsSectionRef)}
-                className="flex w-full items-center justify-between rounded-lg bg-slate-100/80 px-3 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/40 dark:bg-white/10 dark:text-slate-200 dark:hover:bg-white/15"
-              >
-                <span>Anexos</span>
-                <span aria-hidden>›</span>
-              </button>
-            </div>
-          </div>
-        </aside>
-      </div>
       {submitError && (
         <p className="text-sm text-rose-600 dark:text-rose-300" role="alert">
           {submitError}
