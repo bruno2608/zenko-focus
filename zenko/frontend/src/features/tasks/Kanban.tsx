@@ -177,6 +177,43 @@ export default function Kanban() {
     return map;
   }, [tasks]);
 
+  const labelDefinitionsList = useTasksStore((state) => state.labelsLibrary);
+  const labelDefinitionMap = useMemo(() => {
+    const map = new Map<string, LabelDefinition>();
+    labelDefinitionsList.forEach((definition) => {
+      map.set(definition.normalized, definition);
+    });
+    return map;
+  }, [labelDefinitionsList]);
+
+  const tasksById = useMemo(() => {
+    const map = new Map<string, Task>();
+    tasks.forEach((task) => {
+      map.set(task.id, task);
+    });
+    return map;
+  }, [tasks]);
+
+  const columnsMap = useMemo(() => {
+    const map: Record<TaskStatus, Task[]> = {
+      todo: [],
+      doing: [],
+      done: []
+    };
+    tasks.forEach((task) => {
+      map[task.status].push(task);
+    });
+    statusOrder.forEach((status) => {
+      map[status].sort((a, b) => {
+        if (a.sort_order !== b.sort_order) {
+          return a.sort_order - b.sort_order;
+        }
+        return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+      });
+    });
+    return map;
+  }, [tasks]);
+
   const columnsData = useMemo(() => {
     return columns.map((column) => ({
       ...column,
