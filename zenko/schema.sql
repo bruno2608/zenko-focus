@@ -21,9 +21,14 @@ create table if not exists tasks (
   description text,
   status text not null check (status in ('todo','doing','done')) default 'todo',
   due_date date,
+  start_date date,
+  due_time time,
+  due_reminder text,
+  due_recurrence text,
   labels text[] default '{}',
   checklist jsonb default '[]',
   attachments jsonb default '[]',
+  sort_order int not null default 0,
   created_at timestamptz default now(),
   updated_at timestamptz default now()
 );
