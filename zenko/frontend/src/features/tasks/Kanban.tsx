@@ -186,6 +186,21 @@ export default function Kanban() {
   }, [columnsMap, focusedColumn, ensureHighlight]);
 
   useEffect(() => {
+    if (!selectedTask) {
+      return;
+    }
+    const latest = tasksById.get(selectedTask.id);
+    if (!latest) {
+      setSelectedTask(null);
+      setModalOpen(false);
+      return;
+    }
+    if (latest !== selectedTask) {
+      setSelectedTask(latest);
+    }
+  }, [selectedTask, tasksById, setSelectedTask, setModalOpen]);
+
+  useEffect(() => {
     if (!highlightedTaskId) return;
     if (!tasksById.has(highlightedTaskId)) {
       setHighlightedTaskId(null);
