@@ -6,22 +6,24 @@ import { useProfile } from '../profile/hooks';
 import { useNotificationsStore } from '../../lib/notifications';
 import { useConnectivityStore } from '../../store/connectivity';
 import { isOfflineMode } from '../../lib/supabase';
+import { useThemeStore } from '../../store/theme';
 
 export default function PreferencesPage() {
   const { profile, isLoading, updateProfile, userId } = useProfile();
   const notificationPermission = useNotificationsStore((state) => state.permission);
-  const [themePreference, setThemePreference] = useState<'light' | 'dark'>('dark');
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [autoMoveDone, setAutoMoveDone] = useState(true);
   const [pomodoroSound, setPomodoroSound] = useState(true);
+  const themeMode = useThemeStore((state) => state.theme);
+  const setThemeMode = useThemeStore((state) => state.setTheme);
 
   useEffect(() => {
     if (!profile) return;
-    setThemePreference(profile.theme_preference);
     setNotificationsEnabled(profile.notifications_enabled);
     setAutoMoveDone(profile.auto_move_done);
     setPomodoroSound(profile.pomodoro_sound);
-  }, [profile]);
+    setThemeMode(profile.theme_preference);
+  }, [profile, setThemeMode]);
 
   if (isLoading || !profile) {
     return <Card className="h-64 animate-pulse bg-white/40 dark:bg-slate-900/40" />;
@@ -83,10 +85,10 @@ export default function PreferencesPage() {
           <PreferenceToggle
             label="Tema do aplicativo"
             description="Ajuste rapidamente entre claro e escuro."
-            checked={themePreference === 'dark'}
+            checked={themeMode === 'dark'}
             onCheckedChange={async (checked) => {
               const nextTheme = checked ? 'dark' : 'light';
-              setThemePreference(nextTheme);
+              setThemeMode(nextTheme);
               await updateProfile({ theme_preference: nextTheme });
             }}
             trueLabel="Escuro"
