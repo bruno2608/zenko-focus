@@ -1,5 +1,12 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { ChangeEvent as ReactChangeEvent, DragEvent as ReactDragEvent, JSX } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type {
+  ChangeEvent as ReactChangeEvent,
+  DragEvent as ReactDragEvent,
+  FormEvent as ReactFormEvent,
+  MouseEvent as ReactMouseEvent,
+  ReactNode,
+  JSX
+} from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -7,10 +14,12 @@ import Input from '../../components/ui/Input';
 import Textarea from '../../components/ui/Textarea';
 import Button from '../../components/ui/Button';
 import Select from '../../components/ui/Select';
-import { ChecklistItem, Task, TaskPayload, TaskStatus } from './types';
+import { Attachment, ChecklistItem, Task, TaskPayload, TaskStatus } from './types';
 import AttachmentUploader from './AttachmentUploader';
 import { getLabelColors, parseLabels, trelloPalette, type LabelColorId } from './labelColors';
 import { type LabelDefinition, useTasksStore } from './store';
+import { uploadAttachment } from './api';
+import { useToastStore } from '../../components/ui/ToastProvider';
 
 const futureDateMessage = 'Use uma data a partir de hoje';
 
@@ -55,11 +64,18 @@ type FormatCommand =
   | 'code'
   | 'codeblock'
   | 'link'
+  | 'image'
   | 'bullet'
   | 'number'
   | 'checklist'
   | 'quote'
   | 'divider';
+
+type LinkDialogState = {
+  url: string;
+  text: string;
+  selection: { start: number; end: number } | null;
+};
 
 const reminderLabels: Record<DueReminderOption, string> = {
   none: 'Nenhum',
@@ -95,6 +111,386 @@ const monthLabels = [
 ];
 
 const weekDayLabels = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
+
+type InlinePatternType = 'image' | 'link' | 'code' | 'bold' | 'italic' | 'strike' | 'underline';
+
+const inlinePatterns: ReadonlyArray<{ type: InlinePatternType; regex: RegExp }> = [
+  { type: 'image', regex: /!\[([^\]]*)\]\(([^)]+)\)/ },
+  { type: 'link', regex: /\[([^\]]+)\]\(([^)]+)\)/ },
+  { type: 'code', regex: /`([^`]+)`/ },
+  { type: 'bold', regex: /\*\*([^*]+)\*\*/ },
+  { type: 'italic', regex: /_([^_]+)_/ },
+  { type: 'strike', regex: /~~([^~]+)~~/ },
+  { type: 'underline', regex: /<u>(.*?)<\/u>/ }
+];
+
+function renderInlineTokens(text: string): ReactNode[] {
+  let tokenIndex = 0;
+  const createKey = () => {
+    tokenIndex += 1;
+    return `md-inline-${tokenIndex}`;
+  };
+
+  const collected: Array<string | ReactNode> = [];
+  let remaining = text;
+
+  while (remaining.length > 0) {
+    let earliestMatch: { pattern: (typeof inlinePatterns)[number]; match: RegExpExecArray } | null = null;
+
+    inlinePatterns.forEach((pattern) => {
+      const regex = new RegExp(pattern.regex.source, pattern.regex.flags);
+      const match = regex.exec(remaining);
+      if (match && (earliestMatch === null || match.index < earliestMatch.match.index)) {
+        earliestMatch = { pattern, match };
+      }
+    });
+
+    if (!earliestMatch) {
+      collected.push(remaining);
+      break;
+    }
+
+    const { pattern, match } = earliestMatch;
+    if (match.index > 0) {
+      collected.push(remaining.slice(0, match.index));
+    }
+
+    const [fullMatch, groupA = '', groupB = ''] = match;
+
+    switch (pattern.type) {
+      case 'image': {
+        collected.push(
+          <img
+            key={createKey()}
+            src={groupB}
+            alt={groupA || 'Imagem adicionada'}
+            loading="lazy"
+            className="my-3 max-h-80 w-full rounded-xl border border-slate-200 bg-white object-contain shadow-sm dark:border-white/10 dark:bg-slate-900/40"
+          />
+        );
+        break;
+      }
+      case 'link': {
+        collected.push(
+          <a
+            key={createKey()}
+            href={groupB}
+            target="_blank"
+            rel="noreferrer"
+            className="font-medium text-zenko-primary underline decoration-2 underline-offset-2 transition hover:text-zenko-primary/80"
+          >
+            {groupA}
+          </a>
+        );
+        break;
+      }
+      case 'code': {
+        collected.push(
+          <code
+            key={createKey()}
+            className="rounded-md bg-slate-900/80 px-1.5 py-0.5 font-mono text-[12px] text-slate-100 dark:bg-slate-800"
+          >
+            {groupA}
+          </code>
+        );
+        break;
+      }
+      case 'bold': {
+        collected.push(
+          <strong key={createKey()} className="font-semibold text-slate-900 dark:text-white">
+            {groupA}
+          </strong>
+        );
+        break;
+      }
+      case 'italic': {
+        collected.push(
+          <em key={createKey()} className="italic">
+            {groupA}
+          </em>
+        );
+        break;
+      }
+      case 'strike': {
+        collected.push(
+          <span key={createKey()} className="line-through text-slate-500 dark:text-slate-400">
+            {groupA}
+          </span>
+        );
+        break;
+      }
+      case 'underline': {
+        collected.push(
+          <span key={createKey()} className="underline decoration-2 underline-offset-2">
+            {groupA}
+          </span>
+        );
+        break;
+      }
+      default: {
+        collected.push(fullMatch);
+      }
+    }
+
+    remaining = remaining.slice(match.index + fullMatch.length);
+  }
+
+  const expanded: ReactNode[] = [];
+  collected.forEach((node) => {
+    if (typeof node === 'string') {
+      const segments = node.split('\n');
+      segments.forEach((segment, index) => {
+        if (index > 0) {
+          expanded.push(<br key={createKey()} />);
+        }
+        if (segment.length > 0) {
+          expanded.push(segment);
+        }
+      });
+      return;
+    }
+    expanded.push(node);
+  });
+
+  return expanded;
+}
+
+function parseDescriptionMarkdown(raw: string): ReactNode[] {
+  const normalized = raw.replace(/\r\n/g, '\n');
+  if (!normalized.trim()) {
+    return [];
+  }
+
+  const blocks: ReactNode[] = [];
+  const lines = normalized.split('\n');
+  let index = 0;
+  let blockIndex = 0;
+  const nextKey = () => {
+    blockIndex += 1;
+    return `md-block-${blockIndex}`;
+  };
+
+  const isChecklistLine = (line: string) => /^-\s\[[ xX]\]\s/.test(line);
+  const isOrderedLine = (line: string) => /^\d+\.\s+/.test(line);
+  const isBulletLine = (line: string) => /^-\s+/.test(line);
+  const isImageLine = (line: string) => /^!\[[^\]]*\]\([^)]+\)\s*$/.test(line.trim());
+
+  while (index < lines.length) {
+    const current = lines[index];
+    if (!current.trim()) {
+      index += 1;
+      continue;
+    }
+
+    if (current.trim() === '---') {
+      blocks.push(
+        <hr key={nextKey()} className="border-slate-200 dark:border-white/10" />
+      );
+      index += 1;
+      continue;
+    }
+
+    if (/^```/.test(current)) {
+      const codeLines: string[] = [];
+      index += 1;
+      while (index < lines.length && !/^```/.test(lines[index])) {
+        codeLines.push(lines[index]);
+        index += 1;
+      }
+      if (index < lines.length && /^```/.test(lines[index])) {
+        index += 1;
+      }
+      blocks.push(
+        <pre
+          key={nextKey()}
+          className="overflow-x-auto rounded-xl bg-slate-900/90 p-3 text-[13px] leading-relaxed text-slate-100 shadow-inner dark:bg-slate-900"
+        >
+          <code className="font-mono whitespace-pre">{codeLines.join('\n')}</code>
+        </pre>
+      );
+      continue;
+    }
+
+    if (/^>\s?/.test(current)) {
+      const quoteLines: string[] = [];
+      while (index < lines.length && /^>\s?/.test(lines[index])) {
+        quoteLines.push(lines[index].replace(/^>\s?/, ''));
+        index += 1;
+      }
+      blocks.push(
+        <blockquote
+          key={nextKey()}
+          className="rounded-xl border-l-4 border-zenko-primary/70 bg-zenko-primary/5 px-4 py-3 text-sm italic text-slate-700 dark:border-zenko-primary/50 dark:bg-zenko-primary/10 dark:text-slate-100"
+        >
+          {renderInlineTokens(quoteLines.join('\n'))}
+        </blockquote>
+      );
+      continue;
+    }
+
+    if (isChecklistLine(current)) {
+      const items: Array<{ done: boolean; text: string }> = [];
+      while (index < lines.length && isChecklistLine(lines[index])) {
+        const match = lines[index].match(/^-\s\[([ xX])\]\s(.*)$/);
+        if (match) {
+          items.push({ done: match[1].toLowerCase() === 'x', text: match[2] });
+        }
+        index += 1;
+      }
+      blocks.push(
+        <ul key={nextKey()} className="space-y-2">
+          {items.map((item, itemIndex) => (
+            <li
+              key={`md-check-${itemIndex}`}
+              className="flex items-start gap-3 rounded-xl border border-slate-200/60 bg-white px-3 py-2 text-sm shadow-sm dark:border-white/10 dark:bg-white/5"
+            >
+              <span
+                className={`mt-0.5 inline-flex h-5 w-5 items-center justify-center rounded-full border text-xs font-semibold ${
+                  item.done
+                    ? 'border-zenko-primary bg-zenko-primary text-white'
+                    : 'border-slate-300 text-transparent dark:border-white/30'
+                }`}
+                aria-hidden="true"
+              >
+                ✓
+              </span>
+              <span
+                className={
+                  item.done
+                    ? 'line-through text-slate-500 dark:text-slate-400'
+                    : 'text-slate-700 dark:text-slate-200'
+                }
+              >
+                {renderInlineTokens(item.text)}
+              </span>
+            </li>
+          ))}
+        </ul>
+      );
+      continue;
+    }
+
+    if (isOrderedLine(current)) {
+      const items: string[] = [];
+      while (index < lines.length && isOrderedLine(lines[index])) {
+        const match = lines[index].match(/^\d+\.\s+(.*)$/);
+        if (match) {
+          items.push(match[1]);
+        }
+        index += 1;
+      }
+      blocks.push(
+        <ol
+          key={nextKey()}
+          className="list-decimal space-y-1 pl-6 text-sm text-slate-700 marker:font-semibold marker:text-slate-400 dark:text-slate-200"
+        >
+          {items.map((item, itemIndex) => (
+            <li key={`md-ordered-${itemIndex}`} className="pl-1">
+              {renderInlineTokens(item)}
+            </li>
+          ))}
+        </ol>
+      );
+      continue;
+    }
+
+    if (isBulletLine(current)) {
+      const items: string[] = [];
+      while (index < lines.length && isBulletLine(lines[index]) && !isChecklistLine(lines[index])) {
+        const match = lines[index].match(/^-\s+(.*)$/);
+        if (match) {
+          items.push(match[1]);
+        }
+        index += 1;
+      }
+      blocks.push(
+        <ul
+          key={nextKey()}
+          className="list-disc space-y-1 pl-6 text-sm text-slate-700 marker:text-slate-400 dark:text-slate-200"
+        >
+          {items.map((item, itemIndex) => (
+            <li key={`md-bullet-${itemIndex}`} className="pl-1">
+              {renderInlineTokens(item)}
+            </li>
+          ))}
+        </ul>
+      );
+      continue;
+    }
+
+    if (/^#{1,6}\s/.test(current)) {
+      const headingMatch = current.match(/^(#{1,6})\s+(.*)$/);
+      if (headingMatch) {
+        const level = Math.min(headingMatch[1].length, 3);
+        const HeadingTag = (level === 1 ? 'h3' : level === 2 ? 'h4' : 'h5') as keyof JSX.IntrinsicElements;
+        const headingClasses =
+          level === 1
+            ? 'text-lg font-semibold text-slate-800 dark:text-slate-100'
+            : level === 2
+            ? 'text-base font-semibold text-slate-800 dark:text-slate-100'
+            : 'text-sm font-semibold text-slate-700 dark:text-slate-200';
+        blocks.push(
+          <HeadingTag key={nextKey()} className={headingClasses}>
+            {renderInlineTokens(headingMatch[2])}
+          </HeadingTag>
+        );
+        index += 1;
+        continue;
+      }
+    }
+
+    if (isImageLine(current)) {
+      const imageMatch = current.trim().match(/^!\[([^\]]*)\]\(([^)]+)\)/);
+      if (imageMatch) {
+        blocks.push(
+          <figure
+            key={nextKey()}
+            className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-white/10 dark:bg-white/5"
+          >
+            <img
+              src={imageMatch[2]}
+              alt={imageMatch[1] || 'Imagem adicionada'}
+              loading="lazy"
+              className="max-h-96 w-full object-contain"
+            />
+            {imageMatch[1] ? (
+              <figcaption className="px-3 py-2 text-center text-xs text-slate-500 dark:text-slate-400">
+                {imageMatch[1]}
+              </figcaption>
+            ) : null}
+          </figure>
+        );
+        index += 1;
+        continue;
+      }
+    }
+
+    const paragraphLines: string[] = [current];
+    index += 1;
+    while (
+      index < lines.length &&
+      lines[index].trim() &&
+      !/^```/.test(lines[index]) &&
+      !/^>\s?/.test(lines[index]) &&
+      !isChecklistLine(lines[index]) &&
+      !isOrderedLine(lines[index]) &&
+      !isBulletLine(lines[index]) &&
+      lines[index].trim() !== '---' &&
+      !isImageLine(lines[index])
+    ) {
+      paragraphLines.push(lines[index]);
+      index += 1;
+    }
+
+    blocks.push(
+      <p key={nextKey()} className="text-sm leading-relaxed text-slate-700 dark:text-slate-200">
+        {renderInlineTokens(paragraphLines.join('\n'))}
+      </p>
+    );
+  }
+
+  return blocks;
+}
 
 function formatDateInput(date: Date) {
   const year = date.getFullYear();
@@ -251,7 +647,7 @@ const schema = z
     }
   });
 
-type FormData = z.infer<typeof schema> & { attachments?: { name: string; url: string }[] };
+type FormData = z.infer<typeof schema> & { attachments?: Attachment[] };
 
 interface Props {
   task?: Task;
@@ -352,6 +748,13 @@ export default function TaskForm({
   const attachmentsSectionRef = useRef<HTMLDivElement | null>(null);
   const checklistSectionRef = useRef<HTMLDivElement | null>(null);
   const newChecklistInputRef = useRef<HTMLInputElement | null>(null);
+  const formattingMenuButtonRef = useRef<HTMLButtonElement | null>(null);
+  const formattingMenuRef = useRef<HTMLDivElement | null>(null);
+  const formattingMenuSearchRef = useRef<HTMLInputElement | null>(null);
+  const inlineImageInputRef = useRef<HTMLInputElement | null>(null);
+  const pendingInlineImageSelection = useRef<{ start: number; end: number } | null>(null);
+  const linkUrlInputRef = useRef<HTMLInputElement | null>(null);
+  const linkTextInputRef = useRef<HTMLInputElement | null>(null);
   const isEditingTask = Boolean(task);
   const [isAutoSaving, setAutoSaving] = useState(false);
   const [autoSaveError, setAutoSaveError] = useState<string | null>(null);
@@ -359,6 +762,12 @@ export default function TaskForm({
   const mountedRef = useRef(true);
   const checklistSaveTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastTaskIdRef = useRef<string | null>(task?.id ?? null);
+  const [isFormattingMenuOpen, setFormattingMenuOpen] = useState(false);
+  const [formattingMenuQuery, setFormattingMenuQuery] = useState('');
+  const [isInlineImageUploading, setInlineImageUploading] = useState(false);
+  const [linkDialog, setLinkDialog] = useState<LinkDialogState | null>(null);
+  const [linkDialogError, setLinkDialogError] = useState<string | null>(null);
+  const toast = useToastStore((state) => state.show);
   const {
     register,
     handleSubmit,
@@ -504,7 +913,10 @@ export default function TaskForm({
 
   const sanitizedChecklist = useMemo(() => sanitizeChecklistItems(checklistItems), [checklistItems]);
 
-  const attachments = watch('attachments') ?? [];
+  const attachments = (watch('attachments') ?? []) as Attachment[];
+  const descriptionPreviewBlocks = useMemo(() => parseDescriptionMarkdown(descriptionDraft), [
+    descriptionDraft
+  ]);
   const labelInput = watch('labels') ?? '';
   const startDateValue = watch('start_date') ?? '';
   const dueDateValue = watch('due_date') ?? '';
@@ -880,8 +1292,245 @@ export default function TaskForm({
     [updateDescriptionDraft]
   );
 
+  const triggerInlineImageUpload = useCallback(() => {
+    const textarea = descriptionTextareaRef.current;
+    if (!textarea || isInlineImageUploading) {
+      return;
+    }
+    pendingInlineImageSelection.current = {
+      start: textarea.selectionStart,
+      end: textarea.selectionEnd
+    };
+    inlineImageInputRef.current?.click();
+  }, [isInlineImageUploading]);
+
+  const handleInlineImageChange = useCallback(
+    async (event: ReactChangeEvent<HTMLInputElement>) => {
+      const files = event.target.files;
+      event.target.value = '';
+      if (!files?.length) {
+        pendingInlineImageSelection.current = null;
+        return;
+      }
+      const [file] = Array.from(files);
+      if (!file.type.startsWith('image/')) {
+        toast({
+          title: 'Arquivo incompatível',
+          description: 'Escolha um arquivo de imagem para inserir.',
+          type: 'error'
+        });
+        pendingInlineImageSelection.current = null;
+        return;
+      }
+
+      setInlineImageUploading(true);
+      try {
+        const uploaded = await uploadAttachment(file);
+        const currentAttachments = (getValues('attachments') ?? []) as Attachment[];
+        const nextAttachments = [...currentAttachments, uploaded] as Attachment[];
+        setValue('attachments', nextAttachments, { shouldDirty: true });
+        if (isEditingTask) {
+          await runAutoSave({ attachments: nextAttachments });
+        }
+
+        const altText = uploaded.name.replace(/\.[^./]+$/, '').replace(/[\[\]]/g, '').trim() || 'imagem';
+        const insertion = `![${altText}](${uploaded.url})`;
+        const textarea = descriptionTextareaRef.current;
+        const currentValue = textarea?.value ?? descriptionDraft;
+        const selection = pendingInlineImageSelection.current ?? {
+          start: textarea?.selectionStart ?? currentValue.length,
+          end: textarea?.selectionEnd ?? currentValue.length
+        };
+        const nextValue =
+          currentValue.slice(0, selection.start) +
+          insertion +
+          currentValue.slice(selection.end);
+        updateDescriptionDraft(nextValue);
+        requestAnimationFrame(() => {
+          const element = descriptionTextareaRef.current;
+          if (element) {
+            const caret = selection.start + insertion.length;
+            element.focus();
+            element.setSelectionRange(caret, caret);
+          }
+        });
+        toast({ title: 'Imagem adicionada', type: 'success' });
+      } catch (error: any) {
+        toast({
+          title: 'Erro ao enviar imagem',
+          description: error?.message ?? 'Não foi possível anexar a imagem.',
+          type: 'error'
+        });
+      } finally {
+        setInlineImageUploading(false);
+        pendingInlineImageSelection.current = null;
+      }
+    },
+    [
+      descriptionDraft,
+      getValues,
+      isEditingTask,
+      runAutoSave,
+      setValue,
+      toast,
+      updateDescriptionDraft
+    ]
+  );
+
+  const openLinkDialog = useCallback(() => {
+    const textarea = descriptionTextareaRef.current;
+    if (!textarea) {
+      return;
+    }
+    const { selectionStart, selectionEnd, value } = textarea;
+    const selected = value.slice(selectionStart, selectionEnd);
+    let url = '';
+    let text = '';
+    const markdownMatch = selected.match(/^\[([^\]]*)\]\(([^)]+)\)$/);
+    if (markdownMatch) {
+      text = markdownMatch[1];
+      url = markdownMatch[2];
+    } else if (/^https?:\/\//i.test(selected.trim())) {
+      url = selected.trim();
+    } else if (selected.trim()) {
+      text = selected.trim();
+    }
+    setLinkDialog({
+      url,
+      text,
+      selection: { start: selectionStart, end: selectionEnd }
+    });
+    setLinkDialogError(null);
+  }, []);
+
+  const closeLinkDialog = useCallback(() => {
+    setLinkDialog(null);
+    setLinkDialogError(null);
+    requestAnimationFrame(() => {
+      descriptionTextareaRef.current?.focus();
+    });
+  }, []);
+
+  const handleLinkSubmit = useCallback(
+    (event: ReactFormEvent<HTMLFormElement>) => {
+      event.preventDefault();
+      if (!linkDialog) {
+        return;
+      }
+      const url = linkDialog.url.trim();
+      if (!url) {
+        setLinkDialogError('Informe um link válido.');
+        return;
+      }
+      const text = linkDialog.text.trim() || url;
+      const textarea = descriptionTextareaRef.current;
+      const baseValue = textarea?.value ?? descriptionDraft;
+      const selection = linkDialog.selection ?? {
+        start: textarea?.selectionStart ?? baseValue.length,
+        end: textarea?.selectionEnd ?? baseValue.length
+      };
+      const insertion = `[${text}](${url})`;
+      const nextValue =
+        baseValue.slice(0, selection.start) +
+        insertion +
+        baseValue.slice(selection.end);
+      updateDescriptionDraft(nextValue);
+      requestAnimationFrame(() => {
+        const element = descriptionTextareaRef.current;
+        if (element) {
+          const caret = selection.start + insertion.length;
+          element.focus();
+          element.setSelectionRange(caret, caret);
+        }
+      });
+      closeLinkDialog();
+    },
+    [closeLinkDialog, descriptionDraft, linkDialog, updateDescriptionDraft]
+  );
+
+  useEffect(() => {
+    if (!isFormattingMenuOpen) {
+      return;
+    }
+    const handlePointer = (event: MouseEvent) => {
+      const target = event.target as Node;
+      if (
+        formattingMenuRef.current &&
+        !formattingMenuRef.current.contains(target) &&
+        !formattingMenuButtonRef.current?.contains(target)
+      ) {
+        setFormattingMenuOpen(false);
+        setFormattingMenuQuery('');
+      }
+    };
+    const handleKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        setFormattingMenuOpen(false);
+        setFormattingMenuQuery('');
+        formattingMenuButtonRef.current?.focus();
+      }
+    };
+    document.addEventListener('mousedown', handlePointer);
+    document.addEventListener('keydown', handleKey);
+    return () => {
+      document.removeEventListener('mousedown', handlePointer);
+      document.removeEventListener('keydown', handleKey);
+    };
+  }, [isFormattingMenuOpen]);
+
+  useEffect(() => {
+    if (!isFormattingMenuOpen) {
+      return;
+    }
+    const frame = requestAnimationFrame(() => {
+      formattingMenuSearchRef.current?.focus();
+      formattingMenuSearchRef.current?.select();
+    });
+    return () => {
+      cancelAnimationFrame(frame);
+    };
+  }, [isFormattingMenuOpen]);
+
+  useEffect(() => {
+    if (!linkDialog) {
+      return;
+    }
+    const frame = requestAnimationFrame(() => {
+      linkUrlInputRef.current?.focus();
+      if (linkDialog.url) {
+        linkUrlInputRef.current?.select();
+      }
+    });
+    const handleKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        closeLinkDialog();
+      }
+    };
+    document.addEventListener('keydown', handleKey);
+    return () => {
+      cancelAnimationFrame(frame);
+      document.removeEventListener('keydown', handleKey);
+    };
+  }, [closeLinkDialog, linkDialog]);
+
   const handleFormatting = useCallback(
     (command: FormatCommand) => {
+      if (command === 'link') {
+        setFormattingMenuOpen(false);
+        setFormattingMenuQuery('');
+        openLinkDialog();
+        return;
+      }
+
+      if (command === 'image') {
+        setFormattingMenuOpen(false);
+        setFormattingMenuQuery('');
+        triggerInlineImageUpload();
+        return;
+      }
+
       const textarea = descriptionTextareaRef.current;
       if (!textarea) return;
 
@@ -942,14 +1591,6 @@ export default function TaskForm({
           insert = "\n\n```\n" + content + "\n```\n";
           cursorStart = selectionStart + 5;
           cursorEnd = cursorStart + content.length;
-          break;
-        }
-        case 'link': {
-          const text = selected || 'texto';
-          const url = 'https://';
-          insert = `[${text}](${url})`;
-          cursorStart = selectionStart + text.length + 3;
-          cursorEnd = cursorStart + url.length;
           break;
         }
         case 'bullet': {
@@ -1025,162 +1666,299 @@ export default function TaskForm({
     [updateDescriptionDraft]
   );
 
-  const formattingToolbar = useMemo<
-    ReadonlyArray<
-      | { type: 'separator' }
-      | { type: 'command'; command: FormatCommand; label: string; icon: JSX.Element }
-    >
+  const handlePaletteSelection = useCallback(
+    (command: FormatCommand) => {
+      setFormattingMenuOpen(false);
+      setFormattingMenuQuery('');
+      handleFormatting(command);
+    },
+    [handleFormatting]
+  );
+
+  const quickFormattingCommands = useMemo<
+    ReadonlyArray<{ command: FormatCommand; label: string; icon: JSX.Element }>
   >(
-    () =>
-      [
-        {
-          type: 'command' as const,
-          command: 'heading' as const,
-          label: 'Cabeçalho',
-          icon: <span className="text-[13px] font-semibold tracking-wide">Aa</span>
-        },
-        {
-          type: 'command' as const,
-          command: 'bold' as const,
-          label: 'Negrito',
-          icon: <span className="text-[15px] font-semibold leading-none">B</span>
-        },
-        {
-          type: 'command' as const,
-          command: 'italic' as const,
-          label: 'Itálico',
-          icon: <span className="text-[15px] italic leading-none">I</span>
-        },
-        {
-          type: 'command' as const,
-          command: 'underline' as const,
-          label: 'Sublinhar',
-          icon: <span className="text-[15px] underline decoration-2 underline-offset-2">U</span>
-        },
-        {
-          type: 'command' as const,
-          command: 'strike' as const,
-          label: 'Tachado',
-          icon: <span className="text-[15px] leading-none line-through">S</span>
-        },
-        { type: 'separator' as const },
-        {
-          type: 'command' as const,
-          command: 'bullet' as const,
-          label: 'Lista com marcadores',
-          icon: (
-            <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-              <circle cx="6" cy="7" r="1.4" fill="currentColor" stroke="none" />
-              <circle cx="6" cy="12" r="1.4" fill="currentColor" stroke="none" />
-              <circle cx="6" cy="17" r="1.4" fill="currentColor" stroke="none" />
-              <line x1="10" y1="7" x2="19" y2="7" strokeLinecap="round" />
-              <line x1="10" y1="12" x2="19" y2="12" strokeLinecap="round" />
-              <line x1="10" y1="17" x2="19" y2="17" strokeLinecap="round" />
-            </svg>
-          )
-        },
-        {
-          type: 'command' as const,
-          command: 'number' as const,
-          label: 'Lista numerada',
-          icon: (
-            <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-              <text x="4" y="8" fontSize="6" fontWeight="600" fill="currentColor">
-                1
-              </text>
-              <text x="4" y="13" fontSize="6" fontWeight="600" fill="currentColor">
-                2
-              </text>
-              <text x="4" y="18" fontSize="6" fontWeight="600" fill="currentColor">
-                3
-              </text>
-              <line x1="10" y1="7" x2="19" y2="7" strokeLinecap="round" />
-              <line x1="10" y1="12" x2="19" y2="12" strokeLinecap="round" />
-              <line x1="10" y1="17" x2="19" y2="17" strokeLinecap="round" />
-            </svg>
-          )
-        },
-        {
-          type: 'command' as const,
-          command: 'checklist' as const,
-          label: 'Checklist',
-          icon: (
-            <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-              <rect x="4" y="5" width="5" height="5" rx="1" />
-              <polyline points="5.5 8 6.8 9.2 8.5 6.8" strokeLinecap="round" strokeLinejoin="round" />
-              <rect x="4" y="11" width="5" height="5" rx="1" />
-              <rect x="4" y="17" width="5" height="5" rx="1" />
-              <line x1="12" y1="7.5" x2="20" y2="7.5" strokeLinecap="round" />
-              <line x1="12" y1="13.5" x2="20" y2="13.5" strokeLinecap="round" />
-              <line x1="12" y1="19.5" x2="20" y2="19.5" strokeLinecap="round" />
-            </svg>
-          )
-        },
-        { type: 'separator' as const },
-        {
-          type: 'command' as const,
-          command: 'link' as const,
-          label: 'Link',
-          icon: (
-            <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-              <path
-                d="M9.5 14.5l-1.5 1.5a3 3 0 104.24 4.24l1.64-1.64"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-              <path
-                d="M14.5 9.5l1.5-1.5a3 3 0 10-4.24-4.24L10.12 5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-              <line x1="8.5" y1="15.5" x2="15.5" y2="8.5" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          )
-        },
-        {
-          type: 'command' as const,
-          command: 'code' as const,
-          label: 'Código inline',
-          icon: (
-            <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-              <polyline points="8 7 4 12 8 17" strokeLinecap="round" strokeLinejoin="round" />
-              <polyline points="16 7 20 12 16 17" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          )
-        },
-        {
-          type: 'command' as const,
-          command: 'codeblock' as const,
-          label: 'Bloco de código',
-          icon: (
-            <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-              <rect x="4" y="6" width="16" height="12" rx="2" />
-              <polyline points="9 10 7 12 9 14" strokeLinecap="round" strokeLinejoin="round" />
-              <polyline points="15 10 17 12 15 14" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          )
-        },
-        { type: 'separator' as const },
-        {
-          type: 'command' as const,
-          command: 'quote' as const,
-          label: 'Citação',
-          icon: (
-            <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-              <path d="M9 7H7a3 3 0 00-3 3v3h4v-2H6v-1a1 1 0 011-1h2V7z" fill="currentColor" stroke="none" />
-              <path d="M19 7h-2a3 3 0 00-3 3v3h4v-2h-2v-1a1 1 0 011-1h2V7z" fill="currentColor" stroke="none" />
-            </svg>
-          )
-        },
-        {
-          type: 'command' as const,
-          command: 'divider' as const,
-          label: 'Separador',
-          icon: <span className="block h-[2px] w-6 rounded-full bg-current" />
-        }
-      ],
+    () => [
+      {
+        command: 'bold' as const,
+        label: 'Negrito',
+        icon: <span className="text-[15px] font-semibold leading-none">B</span>
+      },
+      {
+        command: 'italic' as const,
+        label: 'Itálico',
+        icon: <span className="text-[15px] italic leading-none">I</span>
+      },
+      {
+        command: 'underline' as const,
+        label: 'Sublinhar',
+        icon: <span className="text-[15px] underline decoration-2 underline-offset-2">U</span>
+      },
+      {
+        command: 'strike' as const,
+        label: 'Tachado',
+        icon: <span className="text-[15px] leading-none line-through">S</span>
+      },
+      {
+        command: 'link' as const,
+        label: 'Adicionar link',
+        icon: (
+          <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+            <path
+              d="M9.5 14.5l-1.5 1.5a3 3 0 104.24 4.24l1.64-1.64"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+            <path
+              d="M14.5 9.5l1.5-1.5a3 3 0 10-4.24-4.24L10.12 5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+            <line x1="8.5" y1="15.5" x2="15.5" y2="8.5" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        )
+      },
+      {
+        command: 'image' as const,
+        label: 'Inserir imagem',
+        icon: (
+          <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+            <rect x="3" y="5" width="18" height="14" rx="2" />
+            <circle cx="9" cy="9" r="2" />
+            <path d="M21 16l-5-5-4 4-2-2-5 5" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        )
+      },
+      {
+        command: 'bullet' as const,
+        label: 'Lista com marcadores',
+        icon: (
+          <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+            <circle cx="6" cy="7" r="1.4" fill="currentColor" stroke="none" />
+            <circle cx="6" cy="12" r="1.4" fill="currentColor" stroke="none" />
+            <circle cx="6" cy="17" r="1.4" fill="currentColor" stroke="none" />
+            <line x1="10" y1="7" x2="19" y2="7" strokeLinecap="round" />
+            <line x1="10" y1="12" x2="19" y2="12" strokeLinecap="round" />
+            <line x1="10" y1="17" x2="19" y2="17" strokeLinecap="round" />
+          </svg>
+        )
+      },
+      {
+        command: 'number' as const,
+        label: 'Lista numerada',
+        icon: (
+          <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+            <text x="4" y="8" fontSize="6" fontWeight="600" fill="currentColor">
+              1
+            </text>
+            <text x="4" y="13" fontSize="6" fontWeight="600" fill="currentColor">
+              2
+            </text>
+            <text x="4" y="18" fontSize="6" fontWeight="600" fill="currentColor">
+              3
+            </text>
+            <line x1="10" y1="7" x2="19" y2="7" strokeLinecap="round" />
+            <line x1="10" y1="12" x2="19" y2="12" strokeLinecap="round" />
+            <line x1="10" y1="17" x2="19" y2="17" strokeLinecap="round" />
+          </svg>
+        )
+      },
+      {
+        command: 'checklist' as const,
+        label: 'Checklist',
+        icon: (
+          <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+            <rect x="4" y="5" width="5" height="5" rx="1" />
+            <polyline points="5.5 8 6.8 9.2 8.5 6.8" strokeLinecap="round" strokeLinejoin="round" />
+            <rect x="4" y="11" width="5" height="5" rx="1" />
+            <rect x="4" y="17" width="5" height="5" rx="1" />
+            <line x1="12" y1="7.5" x2="20" y2="7.5" strokeLinecap="round" />
+            <line x1="12" y1="13.5" x2="20" y2="13.5" strokeLinecap="round" />
+            <line x1="12" y1="19.5" x2="20" y2="19.5" strokeLinecap="round" />
+          </svg>
+        )
+      }
+    ],
     []
   );
+
+  type FormattingPaletteItem = {
+    command: FormatCommand;
+    label: string;
+    description: string;
+    icon: JSX.Element;
+  };
+
+  const formattingPaletteItems = useMemo<ReadonlyArray<FormattingPaletteItem>>(
+    () => [
+      {
+        command: 'heading' as const,
+        label: 'Cabeçalho',
+        description: 'Destaque títulos de seção',
+        icon: <span className="text-[13px] font-semibold tracking-wide">Aa</span>
+      },
+      {
+        command: 'bold' as const,
+        label: 'Negrito',
+        description: 'Enfatizar texto importante',
+        icon: <span className="text-[15px] font-semibold leading-none">B</span>
+      },
+      {
+        command: 'italic' as const,
+        label: 'Itálico',
+        description: 'Dar ênfase com itálico',
+        icon: <span className="text-[15px] italic leading-none">I</span>
+      },
+      {
+        command: 'underline' as const,
+        label: 'Sublinhar',
+        description: 'Ressaltar um trecho',
+        icon: <span className="text-[15px] underline decoration-2 underline-offset-2">U</span>
+      },
+      {
+        command: 'strike' as const,
+        label: 'Tachado',
+        description: 'Marcar itens concluídos ou removidos',
+        icon: <span className="text-[15px] leading-none line-through">S</span>
+      },
+      {
+        command: 'link' as const,
+        label: 'Link',
+        description: 'Adicionar um link com texto',
+        icon: (
+          <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+            <path
+              d="M9.5 14.5l-1.5 1.5a3 3 0 104.24 4.24l1.64-1.64"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+            <path
+              d="M14.5 9.5l1.5-1.5a3 3 0 10-4.24-4.24L10.12 5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+            <line x1="8.5" y1="15.5" x2="15.5" y2="8.5" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        )
+      },
+      {
+        command: 'image' as const,
+        label: 'Imagem',
+        description: 'Inserir imagem e salvar como anexo',
+        icon: (
+          <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+            <rect x="3" y="5" width="18" height="14" rx="2" />
+            <circle cx="9" cy="9" r="2" />
+            <path d="M21 16l-5-5-4 4-2-2-5 5" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        )
+      },
+      {
+        command: 'bullet' as const,
+        label: 'Lista com marcadores',
+        description: 'Organizar tópicos soltos',
+        icon: (
+          <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+            <circle cx="6" cy="7" r="1.4" fill="currentColor" stroke="none" />
+            <circle cx="6" cy="12" r="1.4" fill="currentColor" stroke="none" />
+            <circle cx="6" cy="17" r="1.4" fill="currentColor" stroke="none" />
+            <line x1="10" y1="7" x2="19" y2="7" strokeLinecap="round" />
+            <line x1="10" y1="12" x2="19" y2="12" strokeLinecap="round" />
+            <line x1="10" y1="17" x2="19" y2="17" strokeLinecap="round" />
+          </svg>
+        )
+      },
+      {
+        command: 'number' as const,
+        label: 'Lista numerada',
+        description: 'Sequenciar etapas ou prioridades',
+        icon: (
+          <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+            <text x="4" y="8" fontSize="6" fontWeight="600" fill="currentColor">
+              1
+            </text>
+            <text x="4" y="13" fontSize="6" fontWeight="600" fill="currentColor">
+              2
+            </text>
+            <text x="4" y="18" fontSize="6" fontWeight="600" fill="currentColor">
+              3
+            </text>
+            <line x1="10" y1="7" x2="19" y2="7" strokeLinecap="round" />
+            <line x1="10" y1="12" x2="19" y2="12" strokeLinecap="round" />
+            <line x1="10" y1="17" x2="19" y2="17" strokeLinecap="round" />
+          </svg>
+        )
+      },
+      {
+        command: 'checklist' as const,
+        label: 'Checklist',
+        description: 'Criar itens marcáveis',
+        icon: (
+          <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+            <rect x="4" y="5" width="5" height="5" rx="1" />
+            <polyline points="5.5 8 6.8 9.2 8.5 6.8" strokeLinecap="round" strokeLinejoin="round" />
+            <rect x="4" y="11" width="5" height="5" rx="1" />
+            <rect x="4" y="17" width="5" height="5" rx="1" />
+            <line x1="12" y1="7.5" x2="20" y2="7.5" strokeLinecap="round" />
+            <line x1="12" y1="13.5" x2="20" y2="13.5" strokeLinecap="round" />
+            <line x1="12" y1="19.5" x2="20" y2="19.5" strokeLinecap="round" />
+          </svg>
+        )
+      },
+      {
+        command: 'code' as const,
+        label: 'Código inline',
+        description: 'Destacar comandos em linha',
+        icon: (
+          <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+            <polyline points="8 7 4 12 8 17" strokeLinecap="round" strokeLinejoin="round" />
+            <polyline points="16 7 20 12 16 17" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        )
+      },
+      {
+        command: 'codeblock' as const,
+        label: 'Trecho de código',
+        description: 'Mostrar blocos com sintaxe destacada',
+        icon: (
+          <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+            <rect x="4" y="6" width="16" height="12" rx="2" />
+            <polyline points="9 10 7 12 9 14" strokeLinecap="round" strokeLinejoin="round" />
+            <polyline points="15 10 17 12 15 14" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        )
+      },
+      {
+        command: 'quote' as const,
+        label: 'Citar',
+        description: 'Dar destaque a uma fala ou referência',
+        icon: (
+          <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+            <path d="M9 7H7a3 3 0 00-3 3v3h4v-2H6v-1a1 1 0 011-1h2V7z" fill="currentColor" stroke="none" />
+            <path d="M19 7h-2a3 3 0 00-3 3v3h4v-2h-2v-1a1 1 0 011-1h2V7z" fill="currentColor" stroke="none" />
+          </svg>
+        )
+      },
+      {
+        command: 'divider' as const,
+        label: 'Separador',
+        description: 'Adicionar linha divisória',
+        icon: <span className="block h-[2px] w-6 rounded-full bg-current" />
+      }
+    ],
+    []
+  );
+
+  const filteredFormattingPalette = useMemo(() => {
+    const query = formattingMenuQuery.trim().toLocaleLowerCase();
+    if (!query) {
+      return formattingPaletteItems;
+    }
+    return formattingPaletteItems.filter((item) => {
+      const haystack = `${item.label} ${item.description}`.toLocaleLowerCase();
+      return haystack.includes(query);
+    });
+  }, [formattingMenuQuery, formattingPaletteItems]);
 
   const handleDescriptionSave = useCallback(async () => {
     if (!isEditingTask) {
@@ -1558,7 +2336,8 @@ export default function TaskForm({
   };
 
   return (
-    <form className="space-y-5" onSubmit={onSubmit}>
+    <>
+      <form className="space-y-5" onSubmit={onSubmit}>
       <div>
         <label
           htmlFor={fieldIds.title}
@@ -2151,7 +2930,7 @@ export default function TaskForm({
               <div>
                 <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">Descrição</p>
                 <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                  Use Markdown para destacar detalhes como no Trello.
+                  Use o menu de formatação para inserir links, imagens e Markdown como no Trello.
                 </p>
               </div>
               {isEditingTask && descriptionDirty ? (
@@ -2164,25 +2943,99 @@ export default function TaskForm({
               <div className="mt-3 space-y-4">
                 <div className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-slate-600 shadow-sm dark:border-white/10 dark:bg-slate-800/60 dark:text-slate-200">
                   <div className="flex flex-wrap items-center gap-1">
-                    {formattingToolbar.map((item, index) => {
-                      if (item.type === 'separator') {
-                        return <span key={`format-separator-${index}`} className="mx-1 h-6 w-px bg-slate-300 dark:bg-slate-700" />;
-                      }
-                      const { command, label, icon } = item;
+                    <div className="relative">
+                      <button
+                        ref={formattingMenuButtonRef}
+                        type="button"
+                        aria-haspopup="true"
+                        aria-expanded={isFormattingMenuOpen}
+                        onClick={() => {
+                          setFormattingMenuOpen((previous) => {
+                            const next = !previous;
+                            if (next) {
+                              setFormattingMenuQuery('');
+                            }
+                            return next;
+                          });
+                        }}
+                        className="inline-flex h-8 items-center gap-1 rounded px-3 text-sm font-medium transition hover:bg-white hover:text-zenko-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/40 dark:hover:bg-slate-700 dark:hover:text-zenko-primary"
+                        title="Mais opções de formatação"
+                      >
+                        <span className="text-[13px] font-semibold tracking-wide">Aa</span>
+                        <svg className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                          <path d="M5.25 7.5l4.5 4.5 4.5-4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      </button>
+                      {isFormattingMenuOpen ? (
+                        <div
+                          ref={formattingMenuRef}
+                          className="absolute left-0 z-40 mt-2 w-64 rounded-xl border border-slate-200/70 bg-white p-3 text-left shadow-lg dark:border-white/10 dark:bg-slate-800"
+                        >
+                          <label className="relative block">
+                            <span className="sr-only">Pesquisar formatação</span>
+                            <input
+                              ref={formattingMenuSearchRef}
+                              type="search"
+                              value={formattingMenuQuery}
+                              onChange={(event) => setFormattingMenuQuery(event.target.value)}
+                              placeholder="Pesquisar..."
+                              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 shadow-sm focus:border-zenko-primary focus:outline-none focus:ring-2 focus:ring-zenko-primary/40 dark:border-white/10 dark:bg-slate-900/70 dark:text-slate-200"
+                            />
+                          </label>
+                          <div className="mt-2 max-h-64 space-y-1 overflow-y-auto">
+                            {filteredFormattingPalette.length > 0 ? (
+                              filteredFormattingPalette.map((item) => (
+                                <button
+                                  key={item.command}
+                                  type="button"
+                                  onClick={() => handlePaletteSelection(item.command)}
+                                  className="flex w-full items-start gap-3 rounded-lg px-2 py-2 text-left text-sm text-slate-700 transition hover:bg-zenko-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/40 dark:text-slate-200 dark:hover:bg-white/10"
+                                >
+                                  <span className="mt-0.5 text-base text-slate-500 dark:text-slate-300">{item.icon}</span>
+                                  <span>
+                                    <span className="block font-medium">{item.label}</span>
+                                    <span className="block text-xs text-slate-500 dark:text-slate-400">{item.description}</span>
+                                  </span>
+                                </button>
+                              ))
+                            ) : (
+                              <p className="rounded-lg bg-slate-100 px-3 py-2 text-xs text-slate-500 dark:bg-white/10 dark:text-slate-400">
+                                Nenhum comando encontrado.
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      ) : null}
+                    </div>
+                    {quickFormattingCommands.map((item) => {
+                      const isImageCommand = item.command === 'image';
+                      const isDisabled = isImageCommand && isInlineImageUploading;
                       return (
                         <button
-                          key={command}
+                          key={item.command}
                           type="button"
-                          onClick={() => handleFormatting(command)}
-                          className="inline-flex h-8 min-w-[2.25rem] items-center justify-center rounded px-2 text-sm font-medium transition hover:bg-white hover:text-zenko-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/40 dark:hover:bg-slate-700 dark:hover:text-zenko-primary"
-                          aria-label={label}
-                          title={label}
+                          onClick={() => handleFormatting(item.command)}
+                          disabled={isDisabled}
+                          className="inline-flex h-8 min-w-[2.25rem] items-center justify-center rounded px-2 text-sm font-medium transition hover:bg-white hover:text-zenko-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/40 disabled:cursor-not-allowed disabled:opacity-60 dark:hover:bg-slate-700 dark:hover:text-zenko-primary"
+                          aria-label={item.label}
+                          title={item.label}
                         >
-                          {icon}
+                          {isImageCommand && isInlineImageUploading ? (
+                            <span className="h-4 w-4 animate-spin rounded-full border-[1.5px] border-slate-500 border-t-transparent dark:border-white/60" />
+                          ) : (
+                            item.icon
+                          )}
                         </button>
                       );
                     })}
                   </div>
+                  <input
+                    ref={inlineImageInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="sr-only"
+                    onChange={handleInlineImageChange}
+                  />
                 </div>
                 <Textarea
                   id={fieldIds.description}
@@ -2212,10 +3065,12 @@ export default function TaskForm({
               </div>
             ) : (
               <div className="mt-3 space-y-3">
-                {descriptionDraft ? (
+                {descriptionPreviewBlocks.length > 0 ? (
                   <>
-                    <div className="whitespace-pre-wrap rounded-2xl border border-slate-200 bg-white/70 p-4 text-sm text-slate-700 shadow-inner dark:border-white/10 dark:bg-white/5 dark:text-slate-200">
-                      {descriptionDraft}
+                    <div className="space-y-3 rounded-2xl border border-slate-200 bg-white/70 p-4 text-sm text-slate-700 shadow-inner dark:border-white/10 dark:bg-white/5 dark:text-slate-200">
+                      {descriptionPreviewBlocks.map((block, index) => (
+                        <Fragment key={`description-block-${index}`}>{block}</Fragment>
+                      ))}
                     </div>
                     <Button type="button" variant="secondary" onClick={() => setDescriptionEditing(true)}>
                       Editar descrição
@@ -2381,17 +3236,17 @@ export default function TaskForm({
             ref={attachmentsSectionRef}
             className="rounded-xl border border-slate-200/70 bg-white/80 p-4 shadow-sm dark:border-white/10 dark:bg-slate-900/40"
           >
-            <AttachmentUploader
-              attachments={attachments}
-              onChange={(next) => {
-                setValue('attachments', next, { shouldDirty: true });
-                if (isEditingTask) {
-                  runAutoSave({ attachments: next });
-                }
-              }}
-            />
-          </section>
-        </div>
+          <AttachmentUploader
+            attachments={attachments}
+            onChange={(next) => {
+              setValue('attachments', next, { shouldDirty: true });
+              if (isEditingTask) {
+                runAutoSave({ attachments: next });
+              }
+            }}
+          />
+        </section>
+      </div>
       {submitError && (
         <p className="text-sm text-rose-600 dark:text-rose-300" role="alert">
           {submitError}
@@ -2429,6 +3284,86 @@ export default function TaskForm({
           </>
         )}
       </div>
-    </form>
+      </form>
+      {linkDialog ? (
+        <div
+          className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/50 px-4"
+          onMouseDown={(event: ReactMouseEvent<HTMLDivElement>) => {
+            if (event.target === event.currentTarget) {
+              closeLinkDialog();
+            }
+          }}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="task-description-link-title"
+            className="w-full max-w-sm rounded-2xl border border-slate-200 bg-white p-5 shadow-xl dark:border-white/10 dark:bg-slate-900"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <h3
+              id="task-description-link-title"
+              className="text-sm font-semibold text-slate-800 dark:text-slate-100"
+            >
+              Inserir link
+            </h3>
+            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+              Adicione uma URL e personalize o texto mostrado na descrição.
+            </p>
+            <form className="mt-4 space-y-3" onSubmit={handleLinkSubmit}>
+              <div className="space-y-1.5">
+                <label
+                  htmlFor="task-description-link-url"
+                  className="text-xs font-medium text-slate-600 dark:text-slate-300"
+                >
+                  Link *
+                </label>
+                <Input
+                  id="task-description-link-url"
+                  ref={linkUrlInputRef}
+                  value={linkDialog.url}
+                  onChange={(event) => {
+                    const value = event.target.value;
+                    setLinkDialog((prev) => (prev ? { ...prev, url: value } : prev));
+                    setLinkDialogError(null);
+                  }}
+                  placeholder="https://exemplo.com"
+                  required
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label
+                  htmlFor="task-description-link-text"
+                  className="text-xs font-medium text-slate-600 dark:text-slate-300"
+                >
+                  Texto exibido
+                </label>
+                <Input
+                  id="task-description-link-text"
+                  ref={linkTextInputRef}
+                  value={linkDialog.text}
+                  onChange={(event) => {
+                    const value = event.target.value;
+                    setLinkDialog((prev) => (prev ? { ...prev, text: value } : prev));
+                  }}
+                  placeholder="Opcional"
+                />
+              </div>
+              {linkDialogError ? (
+                <p className="text-xs text-rose-500 dark:text-rose-300" role="alert">
+                  {linkDialogError}
+                </p>
+              ) : null}
+              <div className="flex justify-end gap-2 pt-1">
+                <Button type="button" variant="secondary" onClick={closeLinkDialog}>
+                  Cancelar
+                </Button>
+                <Button type="submit">Inserir</Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      ) : null}
+    </>
   );
 }
