@@ -716,13 +716,13 @@ export default function Kanban() {
                             >
                               <Card
                                 variant="board"
-                                className={`group cursor-grab overflow-hidden border-slate-200/80 bg-white/90 transition-all hover:-translate-y-0.5 hover:border-zenko-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/60 dark:border-white/5 dark:bg-slate-900/70 ${
+                                className={`group cursor-grab overflow-hidden border-slate-200/80 bg-white/90 transition-all hover:-translate-y-0.5 hover:border-zenko-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-zenko-primary/60 dark:border-white/5 dark:bg-slate-900/70 ${
                                   dragSnapshot.isDragging ? 'border-zenko-primary/60 shadow-lg' : ''
                                 } ${
                                   highlightedTaskId === task.id
-                                    ? 'ring-2 ring-zenko-primary/60'
+                                    ? 'ring-2 ring-inset ring-zenko-primary/60'
                                     : isRecentlyCreated
-                                      ? 'animate-taskHighlight ring-2 ring-zenko-primary/30'
+                                      ? 'animate-taskHighlight ring-2 ring-inset ring-zenko-primary/30'
                                       : ''
                                 }`}
                                 tabIndex={0}
