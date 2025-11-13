@@ -109,14 +109,6 @@ export default function Kanban() {
   const isCreateRoute = rawTaskParam === 'new' || location.pathname.endsWith('/task/new');
   const selectedTaskId = !rawTaskParam || isCreateRoute ? null : rawTaskParam;
   const isModalVisible = isCreateRoute || Boolean(rawTaskParam);
-  const defaultStatus = useMemo(() => todoStatus ?? statusOrder[0] ?? 'todo', [statusOrder, todoStatus]);
-  const [focusedColumn, setFocusedColumn] = useState<TaskStatus | null>(null);
-  const [highlightedTaskId, setHighlightedTaskId] = useState<string | null>(null);
-  const [draftStatus, setDraftStatus] = useState<TaskStatus>(defaultStatus);
-  const [recentlyCreatedMap, setRecentlyCreatedMap] = useState<Record<string, true>>({});
-  const [openMenuTaskId, setOpenMenuTaskId] = useState<string | null>(null);
-  const [isAddingList, setIsAddingList] = useState(false);
-  const [newListTitle, setNewListTitle] = useState('');
   const connectivityStatus = useConnectivityStore((state) => state.status);
   const showOffline = connectivityStatus === 'limited' || isOfflineMode(userId);
   const autoMoveToDone = profile?.auto_move_done ?? true;
@@ -141,6 +133,14 @@ export default function Kanban() {
     () => statusOrder.find((status) => status === 'done') ?? statusOrder[statusOrder.length - 1] ?? null,
     [statusOrder]
   );
+  const defaultStatus = useMemo(() => todoStatus ?? statusOrder[0] ?? 'todo', [statusOrder, todoStatus]);
+  const [focusedColumn, setFocusedColumn] = useState<TaskStatus | null>(null);
+  const [highlightedTaskId, setHighlightedTaskId] = useState<string | null>(null);
+  const [draftStatus, setDraftStatus] = useState<TaskStatus>(defaultStatus);
+  const [recentlyCreatedMap, setRecentlyCreatedMap] = useState<Record<string, true>>({});
+  const [openMenuTaskId, setOpenMenuTaskId] = useState<string | null>(null);
+  const [isAddingList, setIsAddingList] = useState(false);
+  const [newListTitle, setNewListTitle] = useState('');
   const tasksById = useMemo(() => {
     const map = new Map<string, Task>();
     tasks.forEach((task) => {
