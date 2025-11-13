@@ -435,10 +435,13 @@ export default function Kanban() {
         return;
       }
       if (type === 'COLUMN') {
+        const movedColumnId = draggableId as TaskStatus;
         if (source.index === destination.index) {
+          focusColumn(movedColumnId);
+          ensureHighlight(movedColumnId);
+          setDraftStatus(movedColumnId);
           return;
         }
-        const movedColumnId = statusOrder[source.index] ?? (draggableId.replace(/^column-/, '') as TaskStatus);
         reorderLists(source.index, destination.index);
         if (movedColumnId) {
           focusColumn(movedColumnId);
@@ -482,7 +485,7 @@ export default function Kanban() {
         setDraftStatus(destinationStatus);
       }
     },
-    [columnsMap, ensureHighlight, focusColumn, reorderLists, reorderTasks, statusOrder]
+    [columnsMap, ensureHighlight, focusColumn, reorderLists, reorderTasks]
   );
 
   const handleSubmitNewList = useCallback(() => {
@@ -751,7 +754,7 @@ export default function Kanban() {
                 className="flex h-full min-h-0 snap-x snap-mandatory gap-2.5 overflow-x-auto overflow-y-hidden pb-3 md:snap-none"
               >
                 {columnsData.map((column, columnIndex) => (
-                  <Draggable draggableId={`column-${column.key}`} index={columnIndex} key={column.key}>
+                  <Draggable draggableId={column.key} index={columnIndex} key={column.key}>
                     {(columnProvided, columnSnapshot) => {
                       const isFocused = focusedColumn === column.key;
                       const columnTabIndex = focusedColumn ? (isFocused ? 0 : -1) : 0;
@@ -763,6 +766,7 @@ export default function Kanban() {
                             columnRefs.current[column.key] = node;
                           }}
                           {...columnProvided.draggableProps}
+                          {...columnProvided.dragHandleProps}
                           className={`group relative flex h-full min-h-[20rem] w-[272px] flex-none snap-start flex-col rounded-[20px] bg-gradient-to-br p-[1px] transition-transform transition-shadow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/60 ${column.accent} ${columnSnapshot.isDragging ? 'scale-[1.01]' : ''}`}
                           role="region"
                           aria-labelledby={`column-${column.key}`}
@@ -790,7 +794,6 @@ export default function Kanban() {
                                 >
                                   <header
                                     className={`flex items-center justify-between ${columnSnapshot.isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
-                                    {...columnProvided.dragHandleProps}
                                     title="Arraste para reorganizar a lista"
                                   >
                                     <h3
