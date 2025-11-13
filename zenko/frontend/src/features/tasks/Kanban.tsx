@@ -133,7 +133,7 @@ export default function Kanban() {
   const navigate = useNavigate();
   const toast = useToastStore((state) => state.show);
   const rawTaskParam = params.taskId ?? null;
-  const isCreateRoute = rawTaskParam === 'new';
+  const isCreateRoute = rawTaskParam === 'new' || location.pathname.endsWith('/task/new');
   const selectedTaskId = !rawTaskParam || isCreateRoute ? null : rawTaskParam;
   const isModalVisible = isCreateRoute || Boolean(rawTaskParam);
   const [focusedColumn, setFocusedColumn] = useState<TaskStatus | null>(null);
