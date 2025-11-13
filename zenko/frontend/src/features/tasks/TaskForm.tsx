@@ -589,7 +589,7 @@ const schema = z
     due_reminder: z.enum(dueReminderOptions).optional(),
     due_recurrence: z.enum(dueRecurrenceOptions).optional(),
     labels: z.string().optional(),
-    status: z.enum(['todo', 'doing', 'done'])
+    status: z.string().min(1, 'Status obrigatório')
   })
   .superRefine((data, ctx) => {
     if (data.due_time) {

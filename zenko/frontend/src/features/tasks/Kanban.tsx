@@ -18,32 +18,10 @@ import createMousetrap from 'mousetrap';
 import type { TaskPositionChange } from './api';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useToastStore } from '../../components/ui/ToastProvider';
+import { useTaskListsStore, DEFAULT_LISTS } from './listsStore';
 
-const columns: { key: TaskStatus; title: string; accent: string }[] = [
-  {
-    key: 'todo',
-    title: 'A Fazer',
-    accent: 'from-slate-200/70 via-slate-200/40 to-slate-200/20 dark:from-white/15 dark:via-white/10 dark:to-white/5'
-  },
-  {
-    key: 'doing',
-    title: 'Fazendo',
-    accent: 'from-slate-200/70 via-slate-200/40 to-slate-200/20 dark:from-white/15 dark:via-white/10 dark:to-white/5'
-  },
-  {
-    key: 'done',
-    title: 'Concluídas',
-    accent: 'from-slate-200/70 via-slate-200/40 to-slate-200/20 dark:from-white/15 dark:via-white/10 dark:to-white/5'
-  }
-];
-
-const columnTitles: Record<TaskStatus, string> = {
-  todo: 'A Fazer',
-  doing: 'Fazendo',
-  done: 'Concluídas'
-};
-
-const statusOrder: TaskStatus[] = ['todo', 'doing', 'done'];
+const COLUMN_ACCENT =
+  'from-slate-200/70 via-slate-200/40 to-slate-200/20 dark:from-white/15 dark:via-white/10 dark:to-white/5';
 
 function useLabelDefinitionMap() {
   const labelsLibrary = useTasksStore((state) => state.labelsLibrary);
@@ -55,15 +33,6 @@ function useLabelDefinitionMap() {
     return map;
   }, [labelsLibrary]);
 }
-
-const getAdjacentStatus = (current: TaskStatus, direction: 'next' | 'previous'): TaskStatus | null => {
-  const index = statusOrder.indexOf(current);
-  if (index === -1) return null;
-  if (direction === 'next') {
-    return statusOrder[index + 1] ?? null;
-  }
-  return statusOrder[index - 1] ?? null;
-};
 
 function arrayMove<T>(items: T[], from: number, to: number) {
   const list = [...items];
@@ -92,9 +61,9 @@ function BoardSkeleton() {
         <div className="h-4 w-72 rounded-xl bg-slate-100/70 dark:bg-slate-800/50 animate-pulse" />
       </div>
       <div className="flex snap-x snap-mandatory gap-4 overflow-x-auto pb-4">
-        {columns.map((column) => (
+        {DEFAULT_LISTS.map((column) => (
           <div
-            key={`skeleton-${column.key}`}
+            key={`skeleton-${column.id}`}
             className="min-w-[260px] flex-1 rounded-3xl border border-slate-200/70 bg-white/70 p-4 backdrop-blur dark:border-white/10 dark:bg-slate-900/60"
           >
             <div className="mb-4 h-5 w-24 rounded-lg bg-slate-200/90 dark:bg-slate-800/80 animate-pulse" />
@@ -127,6 +96,10 @@ export default function Kanban() {
     createTaskIsPending,
     updateTaskIsPending
   } = useTasks();
+  const lists = useTaskListsStore((state) => state.lists);
+  const ensureTaskLists = useTaskListsStore((state) => state.ensureStatuses);
+  const addList = useTaskListsStore((state) => state.addList);
+  const getListTitle = useTaskListsStore((state) => state.getListTitle);
   const { profile } = useProfile();
   const params = useParams<{ taskId?: string }>();
   const location = useLocation();
@@ -138,15 +111,36 @@ export default function Kanban() {
   const isModalVisible = isCreateRoute || Boolean(rawTaskParam);
   const [focusedColumn, setFocusedColumn] = useState<TaskStatus | null>(null);
   const [highlightedTaskId, setHighlightedTaskId] = useState<string | null>(null);
-  const [draftStatus, setDraftStatus] = useState<TaskStatus>('todo');
+  const [draftStatus, setDraftStatus] = useState<TaskStatus>(defaultStatus);
   const [recentlyCreatedMap, setRecentlyCreatedMap] = useState<Record<string, true>>({});
   const [openMenuTaskId, setOpenMenuTaskId] = useState<string | null>(null);
+  const [isAddingList, setIsAddingList] = useState(false);
+  const [newListTitle, setNewListTitle] = useState('');
   const connectivityStatus = useConnectivityStore((state) => state.status);
   const showOffline = connectivityStatus === 'limited' || isOfflineMode(userId);
   const autoMoveToDone = profile?.auto_move_done ?? true;
   const labelDefinitionMap = useLabelDefinitionMap();
   const menuRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const creationTimeouts = useRef<Map<string, number>>(new Map());
+  const addListInputRef = useRef<HTMLInputElement | null>(null);
+
+  const statusOrder = useMemo(() => lists.map((list) => list.id), [lists]);
+  const columnTitleMap = useMemo(() => {
+    const map: Record<TaskStatus, string> = {};
+    lists.forEach((list) => {
+      map[list.id] = list.name;
+    });
+    return map;
+  }, [lists]);
+  const todoStatus = useMemo(
+    () => statusOrder.find((status) => status === 'todo') ?? statusOrder[0] ?? 'todo',
+    [statusOrder]
+  );
+  const doneStatus = useMemo(
+    () => statusOrder.find((status) => status === 'done') ?? statusOrder[statusOrder.length - 1] ?? null,
+    [statusOrder]
+  );
+  const defaultStatus = useMemo(() => todoStatus ?? statusOrder[0] ?? 'todo', [statusOrder, todoStatus]);
 
   const tasksById = useMemo(() => {
     const map = new Map<string, Task>();
@@ -161,43 +155,50 @@ export default function Kanban() {
   const draftStatusFromQuery = searchParams.get('status');
 
   const columnsMap = useMemo(() => {
-    const map: Record<TaskStatus, Task[]> = {
-      todo: [],
-      doing: [],
-      done: []
-    };
+    const map: Record<TaskStatus, Task[]> = {};
+
+    statusOrder.forEach((status) => {
+      map[status] = [];
+    });
+
     tasks.forEach((task) => {
+      if (!map[task.status]) {
+        map[task.status] = [];
+      }
       map[task.status].push(task);
     });
-    statusOrder.forEach((status) => {
-      map[status].sort((a, b) => {
+
+    Object.keys(map).forEach((status) => {
+      map[status]?.sort((a, b) => {
         if (a.sort_order !== b.sort_order) {
           return a.sort_order - b.sort_order;
         }
         return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
       });
     });
+
     return map;
-  }, [tasks]);
+  }, [statusOrder, tasks]);
 
   const columnsData = useMemo(() => {
-    return columns.map((column) => ({
-      ...column,
-      tasks: columnsMap[column.key]
+    return lists.map((column) => ({
+      key: column.id,
+      title: column.name,
+      accent: COLUMN_ACCENT,
+      tasks: columnsMap[column.id] ?? []
     }));
-  }, [columnsMap]);
+  }, [columnsMap, lists]);
 
   const isMutationPending = createTaskIsPending || updateTaskIsPending;
 
-  const columnRefs = useRef<Record<TaskStatus, HTMLElement | null>>({
-    todo: null,
-    doing: null,
-    done: null
-  });
+  const columnRefs = useRef<Record<string, HTMLElement | null>>({});
 
   const focusColumn = useCallback(
     (status: TaskStatus) => {
       setFocusedColumn(status);
+      if (!statusOrder.includes(status)) {
+        return;
+      }
       const node = columnRefs.current[status];
       if (node && typeof window !== 'undefined') {
         const target = node;
@@ -208,7 +209,19 @@ export default function Kanban() {
         });
       }
     },
-    []
+    [statusOrder]
+  );
+
+  const getAdjacentStatus = useCallback(
+    (current: TaskStatus, direction: 'next' | 'previous'): TaskStatus | null => {
+      const index = statusOrder.indexOf(current);
+      if (index === -1) return null;
+      if (direction === 'next') {
+        return statusOrder[index + 1] ?? null;
+      }
+      return statusOrder[index - 1] ?? null;
+    },
+    [statusOrder]
   );
 
   const ensureHighlight = useCallback(
@@ -233,8 +246,41 @@ export default function Kanban() {
   );
 
   useEffect(() => {
+    ensureTaskLists(tasks.map((task) => task.status));
+  }, [ensureTaskLists, tasks]);
+
+  useEffect(() => {
+    setDraftStatus((current) => (statusOrder.includes(current) ? current : defaultStatus));
+  }, [defaultStatus, statusOrder]);
+
+  useEffect(() => {
+    setFocusedColumn((current) => {
+      if (current && statusOrder.includes(current)) {
+        return current;
+      }
+      return statusOrder.includes(defaultStatus) ? defaultStatus : current;
+    });
+  }, [defaultStatus, statusOrder]);
+
+  useEffect(() => {
     ensureHighlight(focusedColumn);
   }, [columnsMap, focusedColumn, ensureHighlight]);
+
+  useEffect(() => {
+    if (!focusedColumn) return;
+    if (!statusOrder.includes(focusedColumn)) return;
+    const node = columnRefs.current[focusedColumn];
+    if (node && typeof document !== 'undefined' && document.activeElement !== node) {
+      node.focus();
+    }
+  }, [focusedColumn, statusOrder]);
+
+  useEffect(() => {
+    if (isAddingList && addListInputRef.current) {
+      addListInputRef.current.focus();
+      addListInputRef.current.select();
+    }
+  }, [isAddingList]);
 
   useEffect(() => {
     if (selectedTask) {
@@ -257,12 +303,20 @@ export default function Kanban() {
     if (!isCreateRoute) {
       return;
     }
-    if (draftStatusFromQuery && ['todo', 'doing', 'done'].includes(draftStatusFromQuery)) {
+    if (draftStatusFromQuery) {
       const status = draftStatusFromQuery as TaskStatus;
-      setDraftStatus(status);
-      setFocusedColumn(status);
+      if (statusOrder.includes(status)) {
+        setDraftStatus(status);
+        setFocusedColumn(status);
+      }
     }
-  }, [draftStatusFromQuery, isCreateRoute]);
+  }, [draftStatusFromQuery, isCreateRoute, statusOrder]);
+
+  useEffect(() => {
+    if (filters.status !== 'all' && !statusOrder.includes(filters.status as TaskStatus)) {
+      setFilter({ status: 'all' });
+    }
+  }, [filters.status, setFilter, statusOrder]);
 
   useEffect(() => {
     if (!highlightedTaskId) return;
@@ -307,20 +361,24 @@ export default function Kanban() {
   );
 
   const closeModal = useCallback(() => {
-    setDraftStatus('todo');
+    setDraftStatus(defaultStatus);
     setOpenMenuTaskId(null);
+    setFocusedColumn(defaultStatus);
     const state = location.state as { fromBoard?: boolean } | null;
     if (state?.fromBoard) {
       navigate(-1);
     } else {
       navigate('/', { replace: true });
     }
-  }, [location.state, navigate]);
+  }, [defaultStatus, location.state, navigate]);
 
   const placeTaskInStatus = useCallback(
     (task: Task, targetStatus: TaskStatus, position: 'start' | 'end' = 'end') => {
       if (task.status === targetStatus) {
         return;
+      }
+      if (!statusOrder.includes(targetStatus)) {
+        ensureTaskLists([targetStatus]);
       }
       const sourceTasks = columnsMap[task.status] ?? [];
       const destinationTasks = columnsMap[targetStatus] ?? [];
@@ -336,22 +394,24 @@ export default function Kanban() {
         ...destinationIds.map((id, index) => ({ id, status: targetStatus, sort_order: index }))
       ];
       reorderTasks(updates);
-      focusColumn(targetStatus);
+      if (statusOrder.includes(targetStatus)) {
+        focusColumn(targetStatus);
+      }
       setHighlightedTaskId(task.id);
       setDraftStatus(targetStatus);
     },
-    [columnsMap, focusColumn, reorderTasks]
+    [columnsMap, ensureTaskLists, focusColumn, reorderTasks, statusOrder]
   );
 
   const handleToggleComplete = useCallback(
     (task: Task, checked: boolean) => {
-      if (checked) {
-        placeTaskInStatus(task, 'done');
-      } else {
-        placeTaskInStatus(task, 'todo', 'start');
+      if (checked && doneStatus) {
+        placeTaskInStatus(task, doneStatus);
+      } else if (!checked && todoStatus) {
+        placeTaskInStatus(task, todoStatus, 'start');
       }
     },
-    [placeTaskInStatus]
+    [doneStatus, placeTaskInStatus, todoStatus]
   );
 
   const handleCardKeyDown = useCallback(
@@ -365,7 +425,7 @@ export default function Kanban() {
         placeTaskInStatus(task, nextStatus);
       }
     },
-    [placeTaskInStatus]
+    [getAdjacentStatus, placeTaskInStatus]
   );
 
   const handleDragEnd = useCallback(
@@ -411,6 +471,116 @@ export default function Kanban() {
     },
     [columnsMap, focusColumn, reorderTasks]
   );
+
+  const handleSubmitNewList = useCallback(() => {
+    const result = addList(newListTitle);
+    if (!result) {
+      toast({ title: 'Informe um nome para a lista', type: 'warning' });
+      return;
+    }
+    const { list, created } = result;
+    if (created) {
+      toast({ title: 'Lista criada', description: list.name, type: 'success' });
+      setNewListTitle('');
+      setIsAddingList(false);
+    } else {
+      toast({ title: 'Lista já existe', description: list.name, type: 'info' });
+    }
+    focusColumn(list.id);
+    ensureHighlight(list.id);
+    setDraftStatus(list.id);
+    if (!created && addListInputRef.current) {
+      addListInputRef.current.select();
+    }
+  }, [addList, addListInputRef, ensureHighlight, focusColumn, newListTitle, toast]);
+
+  const handleCancelNewList = useCallback(() => {
+    setIsAddingList(false);
+    setNewListTitle('');
+  }, []);
+
+  useEffect(() => {
+    if (!openMenuTaskId) return;
+    const handlePointer = (event: MouseEvent | TouchEvent) => {
+      const ref = menuRefs.current[openMenuTaskId];
+      if (!ref) return;
+      if (!ref.contains(event.target as Node)) {
+        setOpenMenuTaskId(null);
+      }
+    };
+    const handleKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setOpenMenuTaskId(null);
+      }
+    };
+    document.addEventListener('mousedown', handlePointer);
+    document.addEventListener('touchstart', handlePointer);
+    document.addEventListener('keydown', handleKey);
+    return () => {
+      document.removeEventListener('mousedown', handlePointer);
+      document.removeEventListener('touchstart', handlePointer);
+      document.removeEventListener('keydown', handleKey);
+    };
+  }, [openMenuTaskId]);
+
+  useEffect(() => {
+    if (!openMenuTaskId) return;
+    if (!tasksById.has(openMenuTaskId)) {
+      setOpenMenuTaskId(null);
+    }
+  }, [openMenuTaskId, tasksById]);
+
+  useEffect(() => {
+    setRecentlyCreatedMap((current) => {
+      const next = { ...current };
+      let changed = false;
+      Object.keys(next).forEach((id) => {
+        if (!tasksById.has(id)) {
+          delete next[id];
+          changed = true;
+        }
+      });
+      return changed ? next : current;
+    });
+  }, [tasksById]);
+
+  const handleCreateTask = useCallback(
+    async (payload: TaskPayload) => {
+      const created = (await createTask(payload)) as Task;
+      if (created?.id) {
+        setRecentlyCreatedMap((current) => ({ ...current, [created.id]: true }));
+        if (typeof window !== 'undefined') {
+          const timeoutId = window.setTimeout(() => {
+            setRecentlyCreatedMap((current) => {
+              if (!current[created.id]) {
+                return current;
+              }
+              const next = { ...current };
+              delete next[created.id];
+              return next;
+            });
+            creationTimeouts.current.delete(created.id);
+          }, 2000);
+          creationTimeouts.current.set(created.id, timeoutId);
+        }
+        setHighlightedTaskId(created.id);
+        focusColumn(created.status);
+      }
+      return created;
+    },
+    [createTask, focusColumn]
+  );
+
+  useEffect(() => {
+    return () => {
+      creationTimeouts.current.forEach((timeoutId) => {
+        if (typeof window !== 'undefined') {
+          window.clearTimeout(timeoutId);
+        }
+      });
+      creationTimeouts.current.clear();
+    };
+  }, []);
 
   useEffect(() => {
     if (!openMenuTaskId) return;
@@ -513,7 +683,7 @@ export default function Kanban() {
     const handleNew = (event: KeyboardEvent) => {
       if (shouldIgnore(event) || isModalVisible) return;
       event.preventDefault();
-      openCreate(focusedColumn ?? 'todo');
+      openCreate(focusedColumn ?? defaultStatus);
     };
 
     const handleEdit = (event: KeyboardEvent) => {
@@ -537,18 +707,24 @@ export default function Kanban() {
     trap.bind('esc', handleEscape);
     trap.bind('1', (event: KeyboardEvent) => {
       if (shouldIgnore(event)) return;
+      const status = statusOrder[0];
+      if (!status) return;
       event.preventDefault();
-      focusColumn('todo');
+      focusColumn(status);
     });
     trap.bind('2', (event: KeyboardEvent) => {
       if (shouldIgnore(event)) return;
+      const status = statusOrder[1];
+      if (!status) return;
       event.preventDefault();
-      focusColumn('doing');
+      focusColumn(status);
     });
     trap.bind('3', (event: KeyboardEvent) => {
       if (shouldIgnore(event)) return;
+      const status = statusOrder[2];
+      if (!status) return;
       event.preventDefault();
-      focusColumn('done');
+      focusColumn(status);
     });
 
     return () => {
@@ -562,6 +738,8 @@ export default function Kanban() {
     isModalVisible,
     openCreate,
     openTask,
+    defaultStatus,
+    statusOrder,
     tasksById
   ]);
 
@@ -609,9 +787,11 @@ export default function Kanban() {
             onChange={(e) => setFilter({ status: e.target.value as any })}
           >
             <option value="all">Todos</option>
-            <option value="todo">A fazer</option>
-            <option value="doing">Fazendo</option>
-            <option value="done">Concluídos</option>
+            {lists.map((list) => (
+              <option key={list.id} value={list.id}>
+                {list.name}
+              </option>
+            ))}
           </Select>
         </label>
         <label className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-white/80 px-3 py-2 backdrop-blur dark:border-white/10 dark:bg-white/5">
@@ -682,7 +862,7 @@ export default function Kanban() {
                           {column.tasks.map((task, index) => {
                       const previousStatus = getAdjacentStatus(task.status, 'previous');
                       const nextStatus = getAdjacentStatus(task.status, 'next');
-                      const nextStatusLabel = nextStatus ? columnTitles[nextStatus] : 'coluna final';
+                      const nextStatusLabel = nextStatus ? getListTitle(nextStatus) : 'coluna final';
                       const ariaInstruction = nextStatus
                         ? `Pressione Enter ou Espaço para mover para ${nextStatusLabel}.`
                         : 'Esta tarefa está na última coluna.';
@@ -718,7 +898,7 @@ export default function Kanban() {
                                       : ''
                                 }`}
                                 tabIndex={0}
-                                aria-label={`Tarefa ${task.title}. Status atual: ${columnTitles[task.status]}. ${ariaInstruction}`}
+                                aria-label={`Tarefa ${task.title}. Status atual: ${getListTitle(task.status)}. ${ariaInstruction}`}
                                 onFocus={() => {
                                   setHighlightedTaskId(task.id);
                                   setFocusedColumn(task.status);
@@ -736,11 +916,11 @@ export default function Kanban() {
                                     <input
                                       type="checkbox"
                                       aria-label={
-                                        task.status === 'done'
+                                        doneStatus && task.status === doneStatus
                                           ? 'Marcar tarefa como pendente'
                                           : 'Marcar tarefa como concluída'
                                       }
-                                      checked={task.status === 'done'}
+                                      checked={doneStatus ? task.status === doneStatus : false}
                                       disabled={!autoMoveToDone}
                                       onChange={(event) => {
                                         event.stopPropagation();
@@ -748,7 +928,7 @@ export default function Kanban() {
                                       }}
                                       className="sr-only"
                                     />
-                                    {task.status === 'done' ? (
+                                    {doneStatus && task.status === doneStatus ? (
                                       <svg
                                         className="h-4 w-4"
                                         viewBox="0 0 24 24"
@@ -893,7 +1073,7 @@ export default function Kanban() {
                                                 <path d="M5 12h14" />
                                                 <path d="M12 5l7 7-7 7" />
                                               </svg>
-                                              Mover para {columnTitles[nextStatus]}
+                                              Mover para {getListTitle(nextStatus)}
                                             </button>
                                           ) : null}
                                           {previousStatus ? (
@@ -920,7 +1100,7 @@ export default function Kanban() {
                                                 <path d="M19 12H5" />
                                                 <path d="M12 19l-7-7 7-7" />
                                               </svg>
-                                              Mover para {columnTitles[previousStatus]}
+                                              Mover para {getListTitle(previousStatus)}
                                             </button>
                                           ) : null}
                                           <button
@@ -1009,7 +1189,9 @@ export default function Kanban() {
                                           }
                                         }}
                                         disabled={!previousStatus}
-                                        aria-label={`Mover ${task.title} para ${previousStatus ? columnTitles[previousStatus] : 'coluna anterior'}`}
+                                        aria-label={`Mover ${task.title} para ${
+                                          previousStatus ? getListTitle(previousStatus) : 'coluna anterior'
+                                        }`}
                                       >
                                         Mover para coluna anterior
                                       </button>
@@ -1023,7 +1205,9 @@ export default function Kanban() {
                                           }
                                         }}
                                         disabled={!nextStatus}
-                                        aria-label={`Mover ${task.title} para ${nextStatus ? columnTitles[nextStatus] : 'coluna seguinte'}`}
+                                        aria-label={`Mover ${task.title} para ${
+                                          nextStatus ? getListTitle(nextStatus) : 'coluna seguinte'
+                                        }`}
                                       >
                                         Mover para próxima coluna
                                       </button>
@@ -1062,12 +1246,67 @@ export default function Kanban() {
                 }}
               </Droppable>
             ))}
+            <div className="min-w-[260px] flex-1 self-start">
+              {isAddingList ? (
+                <div className="rounded-3xl border border-slate-300/80 bg-white/80 p-4 shadow-sm backdrop-blur dark:border-white/15 dark:bg-white/10">
+                  <label htmlFor="board-new-list" className="sr-only">
+                    Nome da lista
+                  </label>
+                  <input
+                    id="board-new-list"
+                    ref={addListInputRef}
+                    value={newListTitle}
+                    onChange={(event) => setNewListTitle(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter') {
+                        event.preventDefault();
+                        handleSubmitNewList();
+                      }
+                      if (event.key === 'Escape') {
+                        event.preventDefault();
+                        handleCancelNewList();
+                      }
+                    }}
+                    placeholder="Nova lista"
+                    className="w-full rounded-2xl border border-slate-300/80 bg-white/95 px-4 py-2 text-sm font-medium text-slate-800 shadow-sm outline-none transition focus:border-zenko-primary/50 focus:ring-2 focus:ring-zenko-primary/40 dark:border-white/15 dark:bg-slate-900/70 dark:text-white"
+                  />
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <Button type="button" variant="primary" onClick={handleSubmitNewList}>
+                      Adicionar lista
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      className="text-sm"
+                      onClick={handleCancelNewList}
+                    >
+                      Cancelar
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  className="flex min-h-[44px] w-full items-center justify-center gap-2 rounded-3xl border border-dashed border-slate-300/80 bg-white/60 px-5 py-3 text-sm font-semibold text-slate-600 transition hover:border-slate-400 hover:bg-white/80 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/50 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:border-white/15 dark:bg-white/10 dark:text-slate-200 dark:hover:border-white/25 dark:hover:bg-white/15 dark:hover:text-white dark:focus-visible:ring-offset-slate-950"
+                  onClick={() => {
+                    setIsAddingList(true);
+                    setNewListTitle('');
+                  }}
+                  title="Adicionar outra lista"
+                  aria-expanded={isAddingList}
+                  aria-controls="board-new-list"
+                >
+                  <span className="text-base leading-none">+</span>
+                  <span>Adicionar outra lista</span>
+                </button>
+              )}
+            </div>
           </div>
         </DragDropContext>
       </div>
       <Button
         className="fixed bottom-6 right-6 z-30 shadow-lg shadow-zenko-primary/40 sm:hidden"
-        onClick={() => openCreate(focusedColumn ?? 'todo')}
+        onClick={() => openCreate(focusedColumn ?? defaultStatus)}
         title="Adicionar nova tarefa"
         aria-label="Adicionar nova tarefa"
       >
