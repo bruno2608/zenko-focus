@@ -664,8 +664,12 @@ export default function Kanban() {
   }
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-6" aria-live="polite">
-      {showOffline ? <OfflineNotice feature="Tarefas" /> : null}
+    <div className="flex h-full min-h-0 flex-col gap-6 overflow-hidden" aria-live="polite">
+      {showOffline ? (
+        <div className="flex-shrink-0">
+          <OfflineNotice feature="Tarefas" />
+        </div>
+      ) : null}
       {isMutationPending ? (
         <div
           className="pointer-events-none fixed bottom-6 left-1/2 z-40 flex -translate-x-1/2 items-center gap-2 rounded-full border border-white/20 bg-slate-900/85 px-4 py-2 text-xs font-medium text-white shadow-xl backdrop-blur dark:border-white/10 dark:bg-slate-800/85"
@@ -688,13 +692,13 @@ export default function Kanban() {
           Salvando alterações...
         </div>
       ) : null}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between flex-shrink-0">
         <div>
           <h2 className="text-2xl font-semibold text-slate-900 dark:text-white">Quadro de tarefas</h2>
           <p className="text-sm text-slate-600 dark:text-slate-300">Arraste e solte para mover prioridades rapidamente.</p>
         </div>
       </div>
-      <div className="flex flex-wrap gap-3 text-xs text-slate-600 dark:text-slate-200">
+      <div className="flex flex-wrap gap-3 text-xs text-slate-600 dark:text-slate-200 flex-shrink-0">
         <label className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-white/80 px-3 py-2 backdrop-blur dark:border-white/10 dark:bg-white/5">
           <span className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-300">Status</span>
           <Select
@@ -723,7 +727,7 @@ export default function Kanban() {
           </Select>
         </label>
       </div>
-      <div className="flex-1 min-h-0">
+      <div className="flex-1 min-h-0 overflow-hidden">
         <DragDropContext onDragEnd={handleDragEnd}>
           <div className="flex h-full min-h-0 snap-x snap-mandatory gap-4 overflow-x-auto overflow-y-hidden pb-4 md:snap-none">
             {columnsData.map((column) => (
