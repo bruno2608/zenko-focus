@@ -159,7 +159,7 @@ export default function TabsLayout() {
         <div className="absolute inset-x-0 top-0 h-56 bg-gradient-to-b from-white/60 via-white/40 to-transparent dark:hidden" />
       </div>
       <div className="relative mx-auto flex min-h-screen w-full max-w-screen-2xl flex-col gap-6 px-4 pb-[calc(4rem+env(safe-area-inset-bottom))] pt-[calc(2rem+env(safe-area-inset-top))] sm:px-6 xl:max-w-[90rem] xl:px-12 xl:pb-16 xl:pt-12">
-        <header className="flex flex-col gap-4 rounded-3xl border border-slate-200/80 bg-white/80 px-4 py-3 backdrop-blur shadow-[0_20px_45px_-20px_rgba(15,23,42,0.15)] transition-[grid-template-columns] dark:border-white/10 dark:bg-white/5 xl:grid xl:grid-cols-[auto,1fr,auto] xl:items-center xl:gap-6">
+        <header className="flex w-full flex-col gap-4 rounded-3xl border border-slate-200/80 bg-white/80 px-4 py-3 backdrop-blur shadow-[0_20px_45px_-20px_rgba(15,23,42,0.15)] transition-[grid-template-columns] dark:border-white/10 dark:bg-white/5 xl:grid xl:grid-cols-[auto,1fr,auto] xl:items-center xl:gap-6">
           <div className="flex flex-1 items-center gap-3 xl:flex-none">
             <button
               type="button"
@@ -187,21 +187,21 @@ export default function TabsLayout() {
               <p className="text-base font-semibold text-slate-900 dark:text-white">Produtividade unificada</p>
             </div>
           </div>
-          <nav className="order-last hidden w-full flex-wrap justify-center gap-2 xl:order-none xl:flex xl:w-full xl:flex-nowrap xl:items-center xl:justify-center xl:gap-3">
+          <nav className="order-last hidden w-full flex-wrap justify-center gap-2 xl:order-none xl:flex xl:w-full xl:flex-nowrap xl:items-center xl:justify-center xl:gap-3 xl:overflow-hidden">
             {tabs.map((tab) => (
               <NavLink
                 key={`top-${tab.to}`}
                 to={tab.to}
                 end={tab.to === '/'}
                 className={({ isActive }) =>
-                  `group inline-flex items-center gap-2 rounded-2xl border px-3 py-2 text-sm font-medium transition-all ${
+                  `group inline-flex items-center gap-2 rounded-2xl border px-3 py-2 text-sm font-medium transition-all whitespace-nowrap ${
                     isActive
                       ? 'border-zenko-primary/60 bg-gradient-to-r from-zenko-primary/15 via-zenko-secondary/20 to-zenko-primary/15 text-zenko-primary dark:border-zenko-primary/50 dark:text-white'
                       : 'border-transparent bg-white/60 text-slate-500 hover:border-zenko-primary/40 hover:bg-white/80 hover:text-slate-900 dark:bg-white/10 dark:text-slate-300 dark:hover:border-white/20 dark:hover:bg-white/15 dark:hover:text-white'
                   }`
                 }
               >
-                <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-zenko-primary/10 text-zenko-primary transition dark:bg-white/10 dark:text-white">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-zenko-primary/10 text-zenko-primary transition dark:bg-white/10 dark:text-white">
                   {tab.icon}
                 </span>
                 {tab.label}

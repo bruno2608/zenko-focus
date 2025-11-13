@@ -14,8 +14,9 @@ const variantClasses: Record<Variant, string> = {
   primary:
     'bg-gradient-to-r from-zenko-primary via-zenko-secondary to-zenko-primary text-white shadow-lg shadow-zenko-secondary/20 hover:shadow-zenko-secondary/30',
   secondary:
-    'border border-slate-200 bg-white/80 text-slate-900 shadow-sm backdrop-blur hover:bg-white dark:border-white/10 dark:bg-white/5 dark:text-white dark:hover:bg-white/10',
-  ghost: 'text-zenko-primary hover:text-zenko-secondary'
+    'border border-slate-200 bg-white/80 text-slate-900 shadow-sm backdrop-blur hover:bg-white/90 dark:border-white/10 dark:bg-white/5 dark:text-white dark:hover:bg-white/10',
+  ghost:
+    'text-zenko-primary hover:text-zenko-secondary hover:bg-zenko-primary/10 focus-visible:bg-zenko-primary/10 dark:text-zenko-secondary dark:hover:bg-white/10'
 };
 
 export default function Button({ className = '', variant = 'primary', isLoading = false, disabled, children, ...props }: Props) {

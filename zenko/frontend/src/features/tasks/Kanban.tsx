@@ -719,7 +719,7 @@ export default function Kanban() {
                                 onKeyDown={(event) => handleCardKeyDown(event, task)}
                                 onClick={() => openTask(task)}
                               >
-                                <div className="flex items-start gap-3">
+                                <div className="grid grid-cols-[auto,1fr] items-start gap-3">
                                   <label
                                     className={`mt-1 flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-slate-300 bg-white/80 text-zenko-primary shadow-sm transition focus-within:ring-2 focus-within:ring-zenko-primary/50 dark:border-white/20 dark:bg-white/10 ${
                                       autoMoveToDone ? 'cursor-pointer hover:scale-[1.02]' : 'cursor-not-allowed opacity-50'
@@ -757,7 +757,7 @@ export default function Kanban() {
                                     ) : null}
                                   </label>
                                   <div className="flex min-w-0 flex-1 flex-col gap-3">
-                                    <div className="flex items-start justify-between gap-2">
+                                    <div className="flex flex-wrap items-start justify-between gap-x-2 gap-y-2">
                                       <div
                                         className="flex min-w-0 flex-1 flex-wrap gap-1"
                                         aria-label={task.labels.length > 0 ? 'Etiquetas da tarefa' : undefined}
@@ -775,20 +775,20 @@ export default function Kanban() {
                                             return (
                                               <span
                                                 key={`${task.id}-label-${definition?.id ?? labelIndex}`}
-                                                className="inline-flex items-center rounded-md px-2 py-1 text-[10px] font-semibold uppercase tracking-wide shadow-sm"
+                                                className="inline-flex max-w-full items-center rounded-md px-2 py-1 text-[10px] font-semibold uppercase tracking-wide shadow-sm"
                                                 style={{
                                                   backgroundColor: colors.background,
                                                   color: colors.foreground
                                                 }}
                                               >
-                                                {definition?.value ?? label}
+                                                <span className="block max-w-full truncate">{definition?.value ?? label}</span>
                                               </span>
                                             );
                                           })
                                         )}
                                       </div>
                                       <div
-                                        className="relative flex-shrink-0"
+                                        className="relative flex-shrink-0 self-start"
                                         ref={(node) => {
                                           if (node) {
                                             menuRefs.current[task.id] = node;
@@ -948,11 +948,11 @@ export default function Kanban() {
                                       </div>
                                     </div>
                                     <div className="space-y-2">
-                                      <h4 className="break-words text-base font-semibold leading-tight text-slate-900 dark:text-white">
+                                      <h4 className="break-words text-base font-semibold leading-snug text-slate-900 dark:text-white">
                                         {task.title}
                                       </h4>
                                       {task.due_date ? (
-                                        <p className="inline-flex items-center gap-1 rounded-full bg-zenko-primary/10 px-3 py-1 text-[11px] font-medium text-zenko-primary dark:bg-zenko-primary/15">
+                                        <p className="inline-flex min-w-0 max-w-full items-center gap-1 rounded-full bg-zenko-primary/10 px-3 py-1 text-[11px] font-medium text-zenko-primary dark:bg-zenko-primary/15">
                                           <svg
                                             className="h-3.5 w-3.5"
                                             viewBox="0 0 24 24"
@@ -967,7 +967,7 @@ export default function Kanban() {
                                             <path d="M10 11h4" />
                                             <rect x="3" y="4" width="18" height="18" rx="2" />
                                           </svg>
-                                          Prazo: {new Date(task.due_date).toLocaleDateString('pt-BR')}
+                                          <span className="block max-w-full truncate">Prazo: {new Date(task.due_date).toLocaleDateString('pt-BR')}</span>
                                         </p>
                                       ) : null}
                                       {checklistTotal > 0 ? (
