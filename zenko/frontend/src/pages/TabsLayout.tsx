@@ -152,20 +152,29 @@ export default function TabsLayout() {
     : 'Organize tarefas, ciclos Pomodoro e lembretes em uma experiência única.';
   const showGreetingCard = location.pathname === '/dashboard';
   const isBoardRoute = location.pathname === '/';
+  const rootClassName = isBoardRoute
+    ? 'relative h-screen overflow-hidden bg-slate-100 text-slate-900 transition-colors dark:bg-zenko-background dark:text-slate-100'
+    : 'relative min-h-screen overflow-x-hidden bg-slate-100 text-slate-900 transition-colors dark:bg-zenko-background dark:text-slate-100';
+  const shellClassName = isBoardRoute
+    ? 'relative mx-auto flex h-full w-full max-w-screen-2xl flex-col gap-6 px-4 pb-[calc(2.5rem+env(safe-area-inset-bottom))] pt-[calc(1.75rem+env(safe-area-inset-top))] sm:px-6 xl:max-w-[90rem] xl:px-12 xl:pb-10 xl:pt-10'
+    : 'relative mx-auto flex min-h-screen w-full max-w-screen-2xl flex-col gap-6 px-4 pb-[calc(4rem+env(safe-area-inset-bottom))] pt-[calc(2rem+env(safe-area-inset-top))] sm:px-6 xl:max-w-[90rem] xl:px-12 xl:pb-16 xl:pt-12';
+  const headerClassName = isBoardRoute
+    ? 'flex w-full flex-col gap-4 rounded-3xl border border-slate-200/80 bg-white/80 px-4 py-3 backdrop-blur shadow-[0_20px_45px_-20px_rgba(15,23,42,0.15)] transition-[grid-template-columns] dark:border-white/10 dark:bg-white/5 sm:gap-5 lg:px-6 xl:grid xl:grid-cols-[auto,1fr,auto] xl:items-center xl:gap-6 xl:rounded-[26px] xl:px-8 xl:py-4 xl:shadow-[0_25px_60px_-30px_rgba(15,23,42,0.25)] xl:backdrop-blur-xl sticky top-[calc(1.75rem+env(safe-area-inset-top))] z-40'
+    : 'flex w-full flex-col gap-4 rounded-3xl border border-slate-200/80 bg-white/80 px-4 py-3 backdrop-blur shadow-[0_20px_45px_-20px_rgba(15,23,42,0.15)] transition-[grid-template-columns] dark:border-white/10 dark:bg-white/5 xl:sticky xl:top-10 xl:z-40 xl:grid xl:grid-cols-[auto,1fr,auto] xl:items-center xl:gap-6';
   const mainClassName = isBoardRoute ? 'flex-1 min-h-0 overflow-hidden' : 'flex-1 min-h-0';
   const outletWrapperClassName = isBoardRoute
-    ? 'flex h-full min-h-0 flex-col gap-6 overflow-hidden pb-6 xl:pb-8'
+    ? 'flex h-full min-h-0 flex-col gap-6 overflow-hidden'
     : 'flex h-full min-h-0 flex-col gap-6 overflow-visible pb-6 xl:pb-8';
 
   return (
-    <div className="relative min-h-screen overflow-x-hidden bg-slate-100 text-slate-900 transition-colors dark:bg-zenko-background dark:text-slate-100">
+    <div className={rootClassName}>
       <div className="pointer-events-none absolute inset-0">
         <div className="absolute -top-32 left-1/2 hidden h-72 w-72 -translate-x-1/2 rounded-full bg-zenko-secondary/25 blur-[140px] dark:block" />
         <div className="absolute bottom-[-4rem] right-[-2rem] hidden h-80 w-80 rounded-full bg-zenko-accent/20 blur-[160px] dark:block" />
         <div className="absolute inset-x-0 top-0 h-56 bg-gradient-to-b from-white/60 via-white/40 to-transparent dark:hidden" />
       </div>
-      <div className="relative mx-auto flex min-h-screen w-full max-w-screen-2xl flex-col gap-6 px-4 pb-[calc(4rem+env(safe-area-inset-bottom))] pt-[calc(2rem+env(safe-area-inset-top))] sm:px-6 xl:max-w-[90rem] xl:px-12 xl:pb-16 xl:pt-12">
-        <header className="flex w-full flex-col gap-4 rounded-3xl border border-slate-200/80 bg-white/80 px-4 py-3 backdrop-blur shadow-[0_20px_45px_-20px_rgba(15,23,42,0.15)] transition-[grid-template-columns] dark:border-white/10 dark:bg-white/5 xl:sticky xl:top-10 xl:z-40 xl:grid xl:grid-cols-[auto,1fr,auto] xl:items-center xl:gap-6">
+      <div className={shellClassName}>
+        <header className={headerClassName}>
           <div className="flex flex-1 items-center gap-3 xl:flex-none">
             <button
               type="button"
