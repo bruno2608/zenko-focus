@@ -599,14 +599,6 @@ export default function Kanban() {
           <h2 className="text-2xl font-semibold text-slate-900 dark:text-white">Quadro de tarefas</h2>
           <p className="text-sm text-slate-600 dark:text-slate-300">Arraste e solte para mover prioridades rapidamente.</p>
         </div>
-        <Button
-          title="Adicionar nova tarefa"
-          onClick={() => {
-            openCreate(focusedColumn ?? 'todo');
-          }}
-        >
-          Nova tarefa
-        </Button>
       </div>
       <div className="flex flex-wrap gap-3 text-xs text-slate-600 dark:text-slate-200">
         <label className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-white/80 px-3 py-2 backdrop-blur dark:border-white/10 dark:bg-white/5">
@@ -687,7 +679,7 @@ export default function Kanban() {
                           role="list"
                           aria-label={`Tarefas em ${column.title}`}
                         >
-                    {column.tasks.map((task, index) => {
+                          {column.tasks.map((task, index) => {
                       const previousStatus = getAdjacentStatus(task.status, 'previous');
                       const nextStatus = getAdjacentStatus(task.status, 'next');
                       const nextStatusLabel = nextStatus ? columnTitles[nextStatus] : 'coluna final';
@@ -1043,16 +1035,29 @@ export default function Kanban() {
                           )}
                         </Draggable>
                       );
-                    })}
-                    {column.tasks.length === 0 && (
-                      <p className="rounded-2xl border border-dashed border-slate-200 bg-white/70 px-4 py-6 text-center text-xs text-slate-500 dark:border-white/10 dark:bg-white/5 dark:text-slate-400">
-                        Arraste tarefas para esta coluna
-                      </p>
-                    )}
-                    {provided.placeholder}
-                  </div>
-                </div>
-              </section>
+                          })}
+                          {column.tasks.length === 0 ? (
+                            <p className="rounded-2xl border border-dashed border-slate-200 bg-white/70 px-4 py-6 text-center text-xs text-slate-500 dark:border-white/10 dark:bg-white/5 dark:text-slate-400">
+                              Arraste tarefas para esta coluna
+                            </p>
+                          ) : null}
+                          {provided.placeholder}
+                          <button
+                            type="button"
+                            className="mt-3 inline-flex w-full min-h-[44px] items-center justify-center gap-2 rounded-2xl border border-dashed border-slate-300/80 bg-white/70 px-4 py-3 text-xs font-semibold text-slate-600 transition hover:border-slate-400 hover:bg-white/90 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/60 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:border-white/15 dark:bg-white/10 dark:text-slate-200 dark:hover:border-white/25 dark:hover:bg-white/15 dark:hover:text-white dark:focus-visible:ring-offset-slate-950"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              openCreate(column.key);
+                            }}
+                            title="Adicionar nova tarefa"
+                            aria-label={`Adicionar tarefa na coluna ${column.title}`}
+                          >
+                            <span className="text-base leading-none">+</span>
+                            <span>Adicionar tarefa</span>
+                          </button>
+                        </div>
+                      </div>
+                    </section>
                   );
                 }}
               </Droppable>
