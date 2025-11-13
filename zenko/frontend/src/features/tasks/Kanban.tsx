@@ -544,90 +544,7 @@ export default function Kanban() {
     });
   }, [tasksById]);
 
-  const handleCreateTask = useCallback(
-    async (payload: TaskPayload) => {
-      const created = (await createTask(payload)) as Task;
-      if (created?.id) {
-        setRecentlyCreatedMap((current) => ({ ...current, [created.id]: true }));
-        if (typeof window !== 'undefined') {
-          const timeoutId = window.setTimeout(() => {
-            setRecentlyCreatedMap((current) => {
-              if (!current[created.id]) {
-                return current;
-              }
-              const next = { ...current };
-              delete next[created.id];
-              return next;
-            });
-            creationTimeouts.current.delete(created.id);
-          }, 2000);
-          creationTimeouts.current.set(created.id, timeoutId);
-        }
-        setHighlightedTaskId(created.id);
-        focusColumn(created.status);
-      }
-      return created;
-    },
-    [createTask, focusColumn]
-  );
-
-  useEffect(() => {
-    return () => {
-      creationTimeouts.current.forEach((timeoutId) => {
-        if (typeof window !== 'undefined') {
-          window.clearTimeout(timeoutId);
-        }
-      });
-      creationTimeouts.current.clear();
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!openMenuTaskId) return;
-    const handlePointer = (event: MouseEvent | TouchEvent) => {
-      const ref = menuRefs.current[openMenuTaskId];
-      if (!ref) return;
-      if (!ref.contains(event.target as Node)) {
-        setOpenMenuTaskId(null);
-      }
-    };
-    const handleKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        setOpenMenuTaskId(null);
-      }
-    };
-    document.addEventListener('mousedown', handlePointer);
-    document.addEventListener('touchstart', handlePointer);
-    document.addEventListener('keydown', handleKey);
-    return () => {
-      document.removeEventListener('mousedown', handlePointer);
-      document.removeEventListener('touchstart', handlePointer);
-      document.removeEventListener('keydown', handleKey);
-    };
-  }, [openMenuTaskId]);
-
-  useEffect(() => {
-    if (!openMenuTaskId) return;
-    if (!tasksById.has(openMenuTaskId)) {
-      setOpenMenuTaskId(null);
-    }
-  }, [openMenuTaskId, tasksById]);
-
-  useEffect(() => {
-    setRecentlyCreatedMap((current) => {
-      const next = { ...current };
-      let changed = false;
-      Object.keys(next).forEach((id) => {
-        if (!tasksById.has(id)) {
-          delete next[id];
-          changed = true;
-        }
-      });
-      return changed ? next : current;
-    });
-  }, [tasksById]);
-
-  const handleCreateTask = useCallback(
+  const handleCreateTaskAndHighlight = useCallback(
     async (payload: TaskPayload) => {
       const created = (await createTask(payload)) as Task;
       if (created?.id) {
@@ -1327,7 +1244,7 @@ export default function Kanban() {
         <TaskForm
           task={selectedTask ?? undefined}
           onClose={closeModal}
-          createTask={handleCreateTask}
+          createTask={handleCreateTaskAndHighlight}
           updateTask={updateTask}
           deleteTask={deleteTask}
           isCreatePending={createTaskIsPending}
