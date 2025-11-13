@@ -635,45 +635,52 @@ export default function Kanban() {
           <div className="flex h-full min-h-0 snap-x snap-mandatory gap-4 overflow-x-auto overflow-y-hidden pb-4 md:snap-none">
             {columnsData.map((column) => (
               <Droppable droppableId={column.key} key={column.key}>
-                {(provided, snapshot) => (
-                  <section
-                  ref={(node) => {
-                    provided.innerRef(node);
-                    columnRefs.current[column.key] = node;
-                  }}
-                  {...provided.droppableProps}
-                  className={`group flex h-full min-h-[22rem] min-w-[280px] snap-start flex-col overflow-hidden rounded-3xl border border-slate-200 bg-gradient-to-br p-4 backdrop-blur transition-shadow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/60 dark:border-white/5 md:min-w-0 md:flex-1 ${
-                    column.accent
-                  } ${snapshot.isDraggingOver ? 'ring-2 ring-zenko-primary/60 shadow-lg' : ''} ${
-                    focusedColumn === column.key ? 'border-zenko-primary/40 shadow-lg' : ''
-                  }`}
-                  role="region"
-                  aria-labelledby={`column-${column.key}`}
-                  aria-describedby={`column-${column.key}-meta`}
-                  tabIndex={focusedColumn === column.key ? 0 : -1}
-                  onFocus={() => {
-                    focusColumn(column.key);
-                  }}
-                >
-                  <header className="flex items-center justify-between">
-                    <h3
-                      id={`column-${column.key}`}
-                      className="text-sm font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-200"
+                {(provided, snapshot) => {
+                  const isFocused = focusedColumn === column.key;
+                  const highlightClasses = snapshot.isDraggingOver
+                    ? 'ring-2 ring-zenko-primary/60 shadow-xl'
+                    : isFocused
+                      ? 'border-zenko-primary/40 ring-1 ring-zenko-primary/25 shadow-lg'
+                      : 'shadow-[0_18px_40px_-22px_rgba(15,23,42,0.12)] dark:shadow-[0_18px_40px_-32px_rgba(15,23,42,0.8)]';
+
+                  return (
+                    <section
+                      ref={(node) => {
+                        provided.innerRef(node);
+                        columnRefs.current[column.key] = node;
+                      }}
+                      {...provided.droppableProps}
+                      className={`group relative flex h-full min-h-[22rem] min-w-[280px] snap-start flex-col rounded-[30px] bg-gradient-to-br p-[1px] transition-shadow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/60 md:min-w-0 md:flex-1 ${column.accent}`}
+                      role="region"
+                      aria-labelledby={`column-${column.key}`}
+                      aria-describedby={`column-${column.key}-meta`}
+                      tabIndex={isFocused ? 0 : -1}
+                      onFocus={() => {
+                        focusColumn(column.key);
+                      }}
                     >
-                      {column.title}
-                    </h3>
-                    <span
-                      id={`column-${column.key}-meta`}
-                      className="rounded-full bg-zenko-primary/10 px-2 py-1 text-xs text-zenko-primary dark:bg-white/10"
-                    >
-                      {column.tasks.length}
-                    </span>
-                  </header>
-                  <div
-                    className="mt-3 flex-1 min-h-0 space-y-3 overflow-y-auto pr-1"
-                    role="list"
-                    aria-label={`Tarefas em ${column.title}`}
-                  >
+                      <div
+                        className={`flex h-full min-h-0 flex-col overflow-hidden rounded-[26px] border border-slate-200/70 bg-white/95 p-4 backdrop-blur dark:border-white/10 dark:bg-slate-900/70 ${highlightClasses}`}
+                      >
+                        <header className="flex items-center justify-between">
+                          <h3
+                            id={`column-${column.key}`}
+                            className="text-sm font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-200"
+                          >
+                            {column.title}
+                          </h3>
+                          <span
+                            id={`column-${column.key}-meta`}
+                            className="rounded-full bg-zenko-primary/10 px-2 py-1 text-xs text-zenko-primary dark:bg-white/10"
+                          >
+                            {column.tasks.length}
+                          </span>
+                        </header>
+                        <div
+                          className="mt-3 flex-1 min-h-0 space-y-3 overflow-y-auto pr-1"
+                          role="list"
+                          aria-label={`Tarefas em ${column.title}`}
+                        >
                     {column.tasks.map((task, index) => {
                       const previousStatus = getAdjacentStatus(task.status, 'previous');
                       const nextStatus = getAdjacentStatus(task.status, 'next');
@@ -1037,8 +1044,10 @@ export default function Kanban() {
                     )}
                     {provided.placeholder}
                   </div>
-                </section>
-              )}
+                </div>
+              </section>
+                  );
+                }}
               </Droppable>
             ))}
           </div>
