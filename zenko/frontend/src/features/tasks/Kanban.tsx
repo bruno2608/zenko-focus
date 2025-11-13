@@ -882,13 +882,13 @@ export default function Kanban() {
                                             return (
                                               <span
                                                 key={`${task.id}-label-${definition?.id ?? labelIndex}`}
-                                                className="inline-flex max-w-full items-center rounded-[3px] px-1.5 py-0.5 text-[10px] font-semibold uppercase leading-[12px] tracking-[0.08em] shadow-sm"
+                                                className="inline-flex h-2 w-10 items-center rounded-sm border border-black/10 shadow-sm dark:border-white/20"
                                                 style={{
-                                                  backgroundColor: colors.background,
-                                                  color: colors.foreground
+                                                  backgroundColor: colors.background
                                                 }}
+                                                title={definition?.value ?? label}
                                               >
-                                                <span className="block max-w-full truncate">{definition?.value ?? label}</span>
+                                                <span className="sr-only">{definition?.value ?? label}</span>
                                               </span>
                                             );
                                           })
