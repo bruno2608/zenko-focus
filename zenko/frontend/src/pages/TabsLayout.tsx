@@ -152,14 +152,14 @@ export default function TabsLayout() {
     : 'Organize tarefas, ciclos Pomodoro e lembretes em uma experiência única.';
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-slate-100 text-slate-900 transition-colors dark:bg-zenko-background dark:text-slate-100">
+    <div className="relative min-h-screen overflow-x-hidden bg-slate-100 text-slate-900 transition-colors dark:bg-zenko-background dark:text-slate-100">
       <div className="pointer-events-none absolute inset-0">
         <div className="absolute -top-32 left-1/2 hidden h-72 w-72 -translate-x-1/2 rounded-full bg-zenko-secondary/25 blur-[140px] dark:block" />
         <div className="absolute bottom-[-4rem] right-[-2rem] hidden h-80 w-80 rounded-full bg-zenko-accent/20 blur-[160px] dark:block" />
         <div className="absolute inset-x-0 top-0 h-56 bg-gradient-to-b from-white/60 via-white/40 to-transparent dark:hidden" />
       </div>
       <div className="relative mx-auto flex min-h-screen w-full max-w-screen-2xl flex-col gap-6 px-4 pb-[calc(4rem+env(safe-area-inset-bottom))] pt-[calc(2rem+env(safe-area-inset-top))] sm:px-6 xl:max-w-[90rem] xl:px-12 xl:pb-16 xl:pt-12">
-        <header className="flex w-full flex-col gap-4 rounded-3xl border border-slate-200/80 bg-white/80 px-4 py-3 backdrop-blur shadow-[0_20px_45px_-20px_rgba(15,23,42,0.15)] transition-[grid-template-columns] dark:border-white/10 dark:bg-white/5 xl:grid xl:grid-cols-[auto,1fr,auto] xl:items-center xl:gap-6">
+        <header className="flex w-full flex-col gap-4 rounded-3xl border border-slate-200/80 bg-white/80 px-4 py-3 backdrop-blur shadow-[0_20px_45px_-20px_rgba(15,23,42,0.15)] transition-[grid-template-columns] dark:border-white/10 dark:bg-white/5 xl:sticky xl:top-10 xl:z-40 xl:grid xl:grid-cols-[auto,1fr,auto] xl:items-center xl:gap-6">
           <div className="flex flex-1 items-center gap-3 xl:flex-none">
             <button
               type="button"
