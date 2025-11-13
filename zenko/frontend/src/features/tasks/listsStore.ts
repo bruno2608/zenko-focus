@@ -60,6 +60,7 @@ interface TaskListsState {
   ) => { list: TaskList; created: boolean } | null;
   getListTitle: (status: TaskStatus) => string;
   getStatusOrder: () => TaskStatus[];
+  reorderLists: (sourceIndex: number, destinationIndex: number) => void;
 }
 
 const noopStorage: Storage = {
@@ -176,6 +177,37 @@ export const useTaskListsStore = create(
           return null;
         }
         return { list: target, created };
+      },
+      reorderLists: (sourceIndex, destinationIndex) => {
+        if (sourceIndex === destinationIndex) {
+          return;
+        }
+        set((state) => {
+          const withinBounds = (index: number) => index >= 0 && index < state.lists.length;
+          if (!withinBounds(sourceIndex) || !withinBounds(destinationIndex)) {
+            return state;
+          }
+          const reordered = [...state.lists];
+          const [moved] = reordered.splice(sourceIndex, 1);
+          if (!moved) {
+            return state;
+          }
+          reordered.splice(destinationIndex, 0, moved);
+          const normalized = reordered.map((list, index) => ({ ...list, order: index }));
+          const unchanged = normalized.every((list, index) => {
+            const current = state.lists[index];
+            return (
+              current &&
+              current.id === list.id &&
+              current.name === list.name &&
+              current.order === list.order
+            );
+          });
+          if (unchanged) {
+            return state;
+          }
+          return { ...state, lists: normalized };
+        });
       },
       getListTitle: (status) => {
         const target = get().lists.find((list) => list.id === status);
