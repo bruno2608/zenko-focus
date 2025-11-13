@@ -766,7 +766,6 @@ export default function Kanban() {
                             columnRefs.current[column.key] = node;
                           }}
                           {...columnProvided.draggableProps}
-                          {...columnProvided.dragHandleProps}
                           className={`group relative flex h-full min-h-[20rem] w-[272px] flex-none snap-start flex-col rounded-[20px] bg-gradient-to-br p-[1px] transition-transform transition-shadow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/60 ${column.accent} ${columnSnapshot.isDragging ? 'scale-[1.01]' : ''}`}
                           role="region"
                           aria-labelledby={`column-${column.key}`}
@@ -792,23 +791,26 @@ export default function Kanban() {
                                   {...taskProvided.droppableProps}
                                   className={`flex h-full min-h-0 flex-col overflow-hidden rounded-[14px] border border-slate-200/70 bg-white/95 p-2 backdrop-blur dark:border-white/10 dark:bg-slate-900/70 ${highlightClasses}`}
                                 >
-                                  <header
-                                    className={`flex items-center justify-between ${columnSnapshot.isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
-                                    title="Arraste para reorganizar a lista"
-                                  >
-                                    <h3
-                                      id={`column-${column.key}`}
-                                      className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-600 dark:text-slate-200"
+                                  <header>
+                                    <div
+                                      className={`flex items-center justify-between rounded-[10px] px-1 py-1 ${columnSnapshot.isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
+                                      title="Arraste para reorganizar a lista"
+                                      {...columnProvided.dragHandleProps}
                                     >
-                                      {column.title}
-                                    </h3>
-                                    <span className="sr-only">Arraste para reorganizar a lista</span>
-                                    <span
-                                      id={`column-${column.key}-meta`}
-                                      className="rounded-full bg-zenko-primary/10 px-1.5 py-0.5 text-[11px] text-zenko-primary dark:bg-white/10"
-                                    >
-                                      {column.tasks.length}
-                                    </span>
+                                      <h3
+                                        id={`column-${column.key}`}
+                                        className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-600 dark:text-slate-200"
+                                      >
+                                        {column.title}
+                                      </h3>
+                                      <span className="sr-only">Arraste para reorganizar a lista</span>
+                                      <span
+                                        id={`column-${column.key}-meta`}
+                                        className="rounded-full bg-zenko-primary/10 px-1.5 py-0.5 text-[11px] text-zenko-primary dark:bg-white/10"
+                                      >
+                                        {column.tasks.length}
+                                      </span>
+                                    </div>
                                   </header>
                                   <div
                                     className="mt-1.5 flex-1 min-h-0 space-y-1.5 overflow-y-auto pr-1"
