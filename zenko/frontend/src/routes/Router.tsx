@@ -13,6 +13,8 @@ const router = createBrowserRouter([
     element: <TabsLayout />,
     children: [
       { index: true, element: <Kanban /> },
+      { path: 'task/new', element: <Kanban /> },
+      { path: 'task/:taskId', element: <Kanban /> },
       { path: 'pomodoro', element: <PomodoroTimer /> },
       { path: 'reminders', element: <RemindersPage /> },
       { path: 'dashboard', element: <DashboardPage /> },
