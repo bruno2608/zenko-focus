@@ -150,6 +150,7 @@ export default function TabsLayout() {
   const greetingSubtitle = profile?.focus_area
     ? `Vamos conquistar resultados em ${profile.focus_area}.`
     : 'Organize tarefas, ciclos Pomodoro e lembretes em uma experiência única.';
+  const showGreetingCard = location.pathname === '/dashboard';
 
   return (
     <div className="relative min-h-screen overflow-x-hidden bg-slate-100 text-slate-900 transition-colors dark:bg-zenko-background dark:text-slate-100">
@@ -212,15 +213,17 @@ export default function TabsLayout() {
             <ThemeToggle />
           </div>
         </header>
-        <section className="rounded-3xl border border-slate-200/70 bg-white/80 p-5 shadow-[0_20px_45px_-20px_rgba(15,23,42,0.15)] backdrop-blur dark:border-white/10 dark:bg-white/5">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-            <div>
-              <p className="text-xs uppercase tracking-[0.35em] text-slate-500 dark:text-zenko-muted">Zenko · Produtividade</p>
-              <h1 className="mt-2 text-3xl font-semibold text-slate-900 dark:text-white">{greetingTitle}</h1>
-              <p className="text-sm text-slate-600 dark:text-slate-300">{greetingSubtitle}</p>
+        {showGreetingCard && (
+          <section className="rounded-3xl border border-slate-200/70 bg-white/80 p-5 shadow-[0_20px_45px_-20px_rgba(15,23,42,0.15)] backdrop-blur dark:border-white/10 dark:bg-white/5">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <p className="text-xs uppercase tracking-[0.35em] text-slate-500 dark:text-zenko-muted">Zenko · Produtividade</p>
+                <h1 className="mt-2 text-3xl font-semibold text-slate-900 dark:text-white">{greetingTitle}</h1>
+                <p className="text-sm text-slate-600 dark:text-slate-300">{greetingSubtitle}</p>
+              </div>
             </div>
-          </div>
-        </section>
+          </section>
+        )}
         <NotificationBanner />
         <main className="flex-1 space-y-6 overflow-visible pb-6 xl:pb-8">
           <Outlet />
