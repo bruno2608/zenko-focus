@@ -19,7 +19,7 @@ create table if not exists tasks (
   user_id uuid not null references auth.users(id) on delete cascade,
   title text not null,
   description text,
-  status text not null check (status in ('todo','doing','done')) default 'todo',
+  status text not null default 'todo',
   due_date date,
   start_date date,
   due_time time,
