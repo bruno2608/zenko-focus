@@ -60,7 +60,7 @@ function BoardSkeleton() {
         <div className="h-7 w-48 rounded-xl bg-slate-200/80 dark:bg-slate-700/60 animate-pulse" />
         <div className="h-4 w-72 rounded-xl bg-slate-100/70 dark:bg-slate-800/50 animate-pulse" />
       </div>
-      <div className="flex snap-x snap-mandatory gap-3 overflow-x-auto pb-3">
+      <div className="flex snap-x snap-mandatory gap-2.5 overflow-x-auto pb-3">
         {DEFAULT_LISTS.map((column) => (
           <div
             key={`skeleton-${column.id}`}
@@ -729,7 +729,7 @@ export default function Kanban() {
       </div>
       <div className="flex-1 min-h-0 overflow-hidden">
         <DragDropContext onDragEnd={handleDragEnd}>
-          <div className="flex h-full min-h-0 snap-x snap-mandatory gap-3 overflow-x-auto overflow-y-hidden pb-3 md:snap-none">
+          <div className="flex h-full min-h-0 snap-x snap-mandatory gap-2.5 overflow-x-auto overflow-y-hidden pb-3 md:snap-none">
             {columnsData.map((column) => (
               <Droppable droppableId={column.key} key={column.key}>
                 {(provided, snapshot) => {
@@ -748,7 +748,7 @@ export default function Kanban() {
                         columnRefs.current[column.key] = node;
                       }}
                       {...provided.droppableProps}
-                      className={`group relative flex h-full min-h-[20rem] w-[272px] flex-none snap-start flex-col rounded-[22px] bg-gradient-to-br p-[1px] transition-shadow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/60 ${column.accent}`}
+                    className={`group relative flex h-full min-h-[20rem] w-[272px] flex-none snap-start flex-col rounded-[20px] bg-gradient-to-br p-[1px] transition-shadow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/60 ${column.accent}`}
                       role="region"
                       aria-labelledby={`column-${column.key}`}
                       aria-describedby={`column-${column.key}-meta`}
@@ -758,24 +758,24 @@ export default function Kanban() {
                       }}
                     >
                       <div
-                        className={`flex h-full min-h-0 flex-col overflow-hidden rounded-xl border border-slate-200/70 bg-white/95 p-2.5 backdrop-blur dark:border-white/10 dark:bg-slate-900/70 ${highlightClasses}`}
+                        className={`flex h-full min-h-0 flex-col overflow-hidden rounded-[14px] border border-slate-200/70 bg-white/95 p-2 backdrop-blur dark:border-white/10 dark:bg-slate-900/70 ${highlightClasses}`}
                       >
                         <header className="flex items-center justify-between">
                           <h3
                             id={`column-${column.key}`}
-                            className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-600 dark:text-slate-200"
+                            className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-600 dark:text-slate-200"
                           >
                             {column.title}
                           </h3>
                           <span
                             id={`column-${column.key}-meta`}
-                            className="rounded-full bg-zenko-primary/10 px-2 py-1 text-xs text-zenko-primary dark:bg-white/10"
+                            className="rounded-full bg-zenko-primary/10 px-1.5 py-0.5 text-[11px] text-zenko-primary dark:bg-white/10"
                           >
                             {column.tasks.length}
                           </span>
                         </header>
                         <div
-                          className="mt-2 flex-1 min-h-0 space-y-2 overflow-y-auto pr-1"
+                          className="mt-1.5 flex-1 min-h-0 space-y-1.5 overflow-y-auto pr-1"
                           role="list"
                           aria-label={`Tarefas em ${column.title}`}
                         >
@@ -808,7 +808,7 @@ export default function Kanban() {
                             >
                               <Card
                                 variant="board"
-                                className={`group cursor-grab overflow-hidden border-slate-200/80 bg-white/90 transition-all hover:-translate-y-0.5 hover:border-zenko-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-zenko-primary/60 dark:border-white/5 dark:bg-slate-900/70 ${
+                                className={`group cursor-grab overflow-hidden border-slate-200/70 bg-white/90 transition-all hover:-translate-y-0.5 hover:border-zenko-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-zenko-primary/60 dark:border-white/5 dark:bg-slate-900/70 ${
                                   dragSnapshot.isDragging ? 'border-zenko-primary/60 shadow-lg' : ''
                                 } ${
                                   highlightedTaskId === task.id
@@ -826,9 +826,9 @@ export default function Kanban() {
                                 onKeyDown={(event) => handleCardKeyDown(event, task)}
                                 onClick={() => openTask(task)}
                               >
-                                <div className="grid grid-cols-[auto,1fr] items-start gap-2">
+                                <div className="grid grid-cols-[auto,1fr] items-start gap-1.5">
                                   <label
-                                    className={`mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white/80 text-zenko-primary shadow-sm transition focus-within:ring-2 focus-within:ring-zenko-primary/50 dark:border-white/20 dark:bg-white/10 ${
+                                    className={`mt-0 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white/80 text-zenko-primary shadow-sm transition focus-within:ring-2 focus-within:ring-zenko-primary/50 dark:border-white/20 dark:bg-white/10 ${
                                       autoMoveToDone ? 'cursor-pointer hover:scale-[1.02]' : 'cursor-not-allowed opacity-50'
                                     }`}
                                     onClick={(event) => event.stopPropagation()}
@@ -850,7 +850,7 @@ export default function Kanban() {
                                     />
                                     {doneStatus && task.status === doneStatus ? (
                                       <svg
-                                        className="h-4 w-4"
+                                        className="h-3.5 w-3.5"
                                         viewBox="0 0 24 24"
                                         fill="none"
                                         stroke="currentColor"
@@ -863,10 +863,10 @@ export default function Kanban() {
                                       </svg>
                                     ) : null}
                                   </label>
-                                  <div className="flex min-w-0 flex-1 flex-col gap-2">
-                                    <div className="flex flex-wrap items-start justify-between gap-x-1.5 gap-y-1.5">
+                                  <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+                                    <div className="flex flex-wrap items-start justify-between gap-x-1.5 gap-y-1">
                                       <div
-                                        className="flex min-w-0 flex-1 flex-wrap gap-1"
+                                        className="flex min-w-0 flex-1 flex-wrap gap-0.5"
                                         aria-label={task.labels.length > 0 ? 'Etiquetas da tarefa' : undefined}
                                       >
                                         {task.labels.length === 0 ? (
@@ -882,7 +882,7 @@ export default function Kanban() {
                                             return (
                                               <span
                                                 key={`${task.id}-label-${definition?.id ?? labelIndex}`}
-                                                className="inline-flex max-w-full items-center rounded-sm px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] shadow-sm"
+                                                className="inline-flex max-w-full items-center rounded-[3px] px-1.5 py-0.5 text-[10px] font-semibold uppercase leading-[12px] tracking-[0.08em] shadow-sm"
                                                 style={{
                                                   backgroundColor: colors.background,
                                                   color: colors.foreground
@@ -906,7 +906,7 @@ export default function Kanban() {
                                       >
                                         <button
                                           type="button"
-                                          className={`h-10 w-10 rounded-full border border-transparent bg-transparent text-slate-500 opacity-0 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/60 focus-visible:opacity-100 focus-visible:border-zenko-primary/40 focus-visible:bg-white/70 group-focus-within:opacity-100 group-hover:opacity-100 group-hover:border-slate-200/70 group-hover:bg-white/70 group-hover:text-slate-600 hover:border-zenko-primary/30 hover:bg-white/70 hover:text-zenko-primary dark:text-slate-300 dark:hover:border-white/20 dark:hover:bg-slate-900/60 dark:hover:text-white dark:group-hover:border-white/20 dark:group-hover:bg-slate-900/60 dark:group-hover:text-white ${
+                                          className={`h-8 w-8 rounded-full border border-transparent bg-transparent text-slate-500 opacity-0 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/60 focus-visible:opacity-100 focus-visible:border-zenko-primary/40 focus-visible:bg-white/70 group-focus-within:opacity-100 group-hover:opacity-100 group-hover:border-slate-200/60 group-hover:bg-white/70 group-hover:text-slate-600 hover:border-zenko-primary/30 hover:bg-white/70 hover:text-zenko-primary dark:text-slate-300 dark:hover:border-white/20 dark:hover:bg-slate-900/60 dark:hover:text-white dark:group-hover:border-white/20 dark:group-hover:bg-slate-900/60 dark:group-hover:text-white ${
                                             isMenuOpen ? 'opacity-100 border-zenko-primary/40 bg-white/70 text-zenko-primary dark:bg-slate-900/70' : ''
                                           }`}
                                           aria-haspopup="menu"
@@ -920,7 +920,7 @@ export default function Kanban() {
                                         >
                                           <span className="sr-only">Abrir ações rápidas para {task.title}</span>
                                           <svg
-                                            className="mx-auto h-4 w-4"
+                                            className="mx-auto h-3.5 w-3.5"
                                             viewBox="0 0 24 24"
                                             fill="none"
                                             stroke="currentColor"
@@ -937,7 +937,7 @@ export default function Kanban() {
                                         <div
                                           id={`task-menu-${task.id}`}
                                           role="menu"
-                                          className={`absolute right-0 top-11 z-30 w-48 rounded-xl border border-slate-200 bg-white/95 p-1.5 text-xs shadow-2xl transition focus:outline-none dark:border-white/10 dark:bg-slate-900/95 ${
+                                          className={`absolute right-0 top-9 z-30 w-48 rounded-xl border border-slate-200 bg-white/95 p-1.5 text-xs shadow-2xl transition focus:outline-none dark:border-white/10 dark:bg-slate-900/95 ${
                                             isMenuOpen
                                               ? 'visible translate-y-0 opacity-100'
                                               : 'invisible pointer-events-none -translate-y-1 opacity-0'
@@ -1054,8 +1054,8 @@ export default function Kanban() {
                                         </div>
                                       </div>
                                     </div>
-                                    <div className="space-y-2">
-                                      <h4 className="break-words text-[13px] font-semibold leading-[18px] text-slate-900 dark:text-white">
+                                    <div className="space-y-1">
+                                      <h4 className="break-words text-[12px] font-semibold leading-[16px] text-slate-900 dark:text-white">
                                         {task.title}
                                       </h4>
                                       {task.due_date ? (
@@ -1078,16 +1078,16 @@ export default function Kanban() {
                                         </p>
                                       ) : null}
                                       {checklistTotal > 0 ? (
-                                        <div className="space-y-1.5">
-                                          <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 text-[10px] font-medium text-slate-500 dark:text-slate-300">
+                                        <div className="space-y-1">
+                                          <div className="flex flex-wrap items-center justify-between gap-x-1.5 gap-y-0.5 text-[10px] font-medium text-slate-500 dark:text-slate-300">
                                             <span>Checklist</span>
                                             <span>
                                               {checklistDone}/{checklistTotal}
                                             </span>
                                           </div>
-                                          <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-white/10">
+                                          <div className="h-1 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-white/10">
                                             <div
-                                              className={`h-1.5 rounded-full transition-all ${
+                                              className={`h-1 rounded-full transition-all ${
                                                 checklistDone === checklistTotal && checklistTotal > 0
                                                   ? 'bg-emerald-500'
                                                   : 'bg-zenko-primary'
@@ -1141,14 +1141,14 @@ export default function Kanban() {
                       );
                           })}
                           {column.tasks.length === 0 ? (
-                            <p className="rounded-xl border border-dashed border-slate-200 bg-white/70 px-3.5 py-4 text-center text-[11px] text-slate-500 dark:border-white/10 dark:bg-white/5 dark:text-slate-400">
+                            <p className="rounded-lg border border-dashed border-slate-200 bg-white/70 px-3 py-3 text-center text-[11px] text-slate-500 dark:border-white/10 dark:bg-white/5 dark:text-slate-400">
                               Arraste tarefas para esta coluna
                             </p>
                           ) : null}
                           {provided.placeholder}
                           <button
                             type="button"
-                            className="mt-2.5 inline-flex w-full min-h-[44px] items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300/80 bg-white/70 px-3 py-2.5 text-xs font-semibold text-slate-600 transition hover:border-slate-400 hover:bg-white/90 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/60 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:border-white/15 dark:bg-white/10 dark:text-slate-200 dark:hover:border-white/25 dark:hover:bg-white/15 dark:hover:text-white dark:focus-visible:ring-offset-slate-950"
+                            className="mt-2 inline-flex w-full min-h-[40px] items-center justify-center gap-1.5 rounded-lg border border-dashed border-slate-300/80 bg-white/70 px-3 py-2 text-[12px] font-semibold text-slate-600 transition hover:border-slate-400 hover:bg-white/90 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/60 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:border-white/15 dark:bg-white/10 dark:text-slate-200 dark:hover:border-white/25 dark:hover:bg-white/15 dark:hover:text-white dark:focus-visible:ring-offset-slate-950"
                             onClick={(event) => {
                               event.stopPropagation();
                               openCreate(column.key);
@@ -1156,7 +1156,7 @@ export default function Kanban() {
                             title="Adicionar nova tarefa"
                             aria-label={`Adicionar tarefa na coluna ${column.title}`}
                           >
-                            <span className="text-base leading-none">+</span>
+                            <span className="text-sm leading-none">+</span>
                             <span>Adicionar tarefa</span>
                           </button>
                         </div>
@@ -1168,7 +1168,7 @@ export default function Kanban() {
             ))}
             <div className="w-[272px] flex-none self-start">
               {isAddingList ? (
-                <div className="rounded-2xl border border-slate-300/80 bg-white/80 p-3.5 shadow-sm backdrop-blur dark:border-white/15 dark:bg-white/10">
+                <div className="rounded-xl border border-slate-300/80 bg-white/80 p-3 shadow-sm backdrop-blur dark:border-white/15 dark:bg-white/10">
                   <label htmlFor="board-new-list" className="sr-only">
                     Nome da lista
                   </label>
@@ -1188,7 +1188,7 @@ export default function Kanban() {
                       }
                     }}
                     placeholder="Nova lista"
-                    className="w-full rounded-xl border border-slate-300/80 bg-white/95 px-3 py-2 text-sm font-medium text-slate-800 shadow-sm outline-none transition focus:border-zenko-primary/50 focus:ring-2 focus:ring-zenko-primary/40 dark:border-white/15 dark:bg-slate-900/70 dark:text-white"
+                    className="w-full rounded-lg border border-slate-300/80 bg-white/95 px-2.5 py-2 text-sm font-medium text-slate-800 shadow-sm outline-none transition focus:border-zenko-primary/50 focus:ring-2 focus:ring-zenko-primary/40 dark:border-white/15 dark:bg-slate-900/70 dark:text-white"
                   />
                   <div className="mt-3 flex flex-wrap gap-2">
                     <Button type="button" variant="primary" onClick={handleSubmitNewList}>
@@ -1207,7 +1207,7 @@ export default function Kanban() {
               ) : (
                 <button
                   type="button"
-                  className="flex min-h-[44px] w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-slate-300/80 bg-white/60 px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:border-slate-400 hover:bg-white/80 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/50 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:border-white/15 dark:bg-white/10 dark:text-slate-200 dark:hover:border-white/25 dark:hover:bg-white/15 dark:hover:text-white dark:focus-visible:ring-offset-slate-950"
+                  className="flex min-h-[40px] w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-slate-300/80 bg-white/60 px-3 py-2 text-sm font-semibold text-slate-600 transition hover:border-slate-400 hover:bg-white/80 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/50 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:border-white/15 dark:bg-white/10 dark:text-slate-200 dark:hover:border-white/25 dark:hover:bg-white/15 dark:hover:text-white dark:focus-visible:ring-offset-slate-950"
                   onClick={() => {
                     setIsAddingList(true);
                     setNewListTitle('');
@@ -1216,7 +1216,7 @@ export default function Kanban() {
                   aria-expanded={isAddingList}
                   aria-controls="board-new-list"
                 >
-                  <span className="text-base leading-none">+</span>
+                  <span className="text-sm leading-none">+</span>
                   <span>Adicionar outra lista</span>
                 </button>
               )}
