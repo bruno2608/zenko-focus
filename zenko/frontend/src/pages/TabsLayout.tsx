@@ -151,6 +151,11 @@ export default function TabsLayout() {
     ? `Vamos conquistar resultados em ${profile.focus_area}.`
     : 'Organize tarefas, ciclos Pomodoro e lembretes em uma experiência única.';
   const showGreetingCard = location.pathname === '/dashboard';
+  const isBoardRoute = location.pathname === '/';
+  const mainClassName = isBoardRoute ? 'flex-1 min-h-0 overflow-hidden' : 'flex-1 min-h-0';
+  const outletWrapperClassName = isBoardRoute
+    ? 'flex h-full min-h-0 flex-col gap-6 overflow-hidden pb-6 xl:pb-8'
+    : 'flex h-full min-h-0 flex-col gap-6 overflow-visible pb-6 xl:pb-8';
 
   return (
     <div className="relative min-h-screen overflow-x-hidden bg-slate-100 text-slate-900 transition-colors dark:bg-zenko-background dark:text-slate-100">
@@ -225,8 +230,8 @@ export default function TabsLayout() {
           </section>
         )}
         <NotificationBanner />
-        <main className="flex-1 min-h-0">
-          <div className="flex h-full min-h-0 flex-col gap-6 overflow-visible pb-6 xl:pb-8">
+        <main className={mainClassName}>
+          <div className={outletWrapperClassName}>
             <Outlet />
           </div>
         </main>

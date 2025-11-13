@@ -64,7 +64,7 @@ function BoardSkeleton() {
         {DEFAULT_LISTS.map((column) => (
           <div
             key={`skeleton-${column.id}`}
-            className="min-w-[260px] flex-1 rounded-3xl border border-slate-200/70 bg-white/70 p-4 backdrop-blur dark:border-white/10 dark:bg-slate-900/60"
+            className="w-[272px] flex-none rounded-3xl border border-slate-200/70 bg-white/70 p-4 backdrop-blur dark:border-white/10 dark:bg-slate-900/60"
           >
             <div className="mb-4 h-5 w-24 rounded-lg bg-slate-200/90 dark:bg-slate-800/80 animate-pulse" />
             <div className="space-y-3">
@@ -748,7 +748,7 @@ export default function Kanban() {
                         columnRefs.current[column.key] = node;
                       }}
                       {...provided.droppableProps}
-                      className={`group relative flex h-full min-h-[20rem] min-w-[272px] snap-start flex-col rounded-[26px] bg-gradient-to-br p-[1px] transition-shadow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/60 md:min-w-0 md:flex-1 ${column.accent}`}
+                      className={`group relative flex h-full min-h-[20rem] w-[272px] flex-none snap-start flex-col rounded-[26px] bg-gradient-to-br p-[1px] transition-shadow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/60 ${column.accent}`}
                       role="region"
                       aria-labelledby={`column-${column.key}`}
                       aria-describedby={`column-${column.key}-meta`}
@@ -1166,7 +1166,7 @@ export default function Kanban() {
                 }}
               </Droppable>
             ))}
-            <div className="min-w-[260px] flex-1 self-start">
+            <div className="w-[272px] flex-none self-start">
               {isAddingList ? (
                 <div className="rounded-3xl border border-slate-300/80 bg-white/80 p-4 shadow-sm backdrop-blur dark:border-white/15 dark:bg-white/10">
                   <label htmlFor="board-new-list" className="sr-only">
