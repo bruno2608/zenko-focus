@@ -632,7 +632,7 @@ export default function Kanban() {
       </div>
       <div className="flex-1 min-h-0">
         <DragDropContext onDragEnd={handleDragEnd}>
-          <div className="flex h-full min-h-0 snap-x snap-mandatory gap-4 overflow-x-auto pb-4 md:snap-none md:overflow-x-visible">
+          <div className="flex h-full min-h-0 snap-x snap-mandatory gap-4 overflow-x-auto overflow-y-hidden pb-4 md:snap-none">
             {columnsData.map((column) => (
               <Droppable droppableId={column.key} key={column.key}>
                 {(provided, snapshot) => (
