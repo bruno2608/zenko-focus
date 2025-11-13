@@ -565,7 +565,7 @@ export default function Kanban() {
   }
 
   return (
-    <div className="space-y-6" aria-live="polite">
+    <div className="flex h-full min-h-0 flex-col gap-6" aria-live="polite">
       {showOffline ? <OfflineNotice feature="Tarefas" /> : null}
       {isMutationPending ? (
         <div
@@ -630,18 +630,19 @@ export default function Kanban() {
           </Select>
         </label>
       </div>
-      <DragDropContext onDragEnd={handleDragEnd}>
-        <div className="flex snap-x snap-mandatory gap-4 overflow-x-auto pb-4 md:grid md:grid-cols-3 md:gap-6 md:overflow-visible">
-          {columnsData.map((column) => (
-            <Droppable droppableId={column.key} key={column.key}>
-              {(provided, snapshot) => (
-                <section
+      <div className="flex-1 min-h-0">
+        <DragDropContext onDragEnd={handleDragEnd}>
+          <div className="flex h-full min-h-0 snap-x snap-mandatory gap-4 overflow-x-auto pb-4 md:snap-none md:overflow-x-visible">
+            {columnsData.map((column) => (
+              <Droppable droppableId={column.key} key={column.key}>
+                {(provided, snapshot) => (
+                  <section
                   ref={(node) => {
                     provided.innerRef(node);
                     columnRefs.current[column.key] = node;
                   }}
                   {...provided.droppableProps}
-                  className={`group flex min-h-[22rem] min-w-[280px] snap-start flex-col rounded-3xl border border-slate-200 bg-gradient-to-br p-4 backdrop-blur transition-shadow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/60 dark:border-white/5 md:min-w-0 max-h-[calc(100vh-14rem)] md:max-h-[calc(100vh-11rem)] ${
+                  className={`group flex h-full min-h-[22rem] min-w-[280px] snap-start flex-col overflow-hidden rounded-3xl border border-slate-200 bg-gradient-to-br p-4 backdrop-blur transition-shadow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/60 dark:border-white/5 md:min-w-0 md:flex-1 ${
                     column.accent
                   } ${snapshot.isDraggingOver ? 'ring-2 ring-zenko-primary/60 shadow-lg' : ''} ${
                     focusedColumn === column.key ? 'border-zenko-primary/40 shadow-lg' : ''
@@ -669,7 +670,7 @@ export default function Kanban() {
                     </span>
                   </header>
                   <div
-                    className="mt-3 flex-1 space-y-3 overflow-y-auto pr-1"
+                    className="mt-3 flex-1 min-h-0 space-y-3 overflow-y-auto pr-1"
                     role="list"
                     aria-label={`Tarefas em ${column.title}`}
                   >
@@ -1038,10 +1039,11 @@ export default function Kanban() {
                   </div>
                 </section>
               )}
-            </Droppable>
-          ))}
-        </div>
-      </DragDropContext>
+              </Droppable>
+            ))}
+          </div>
+        </DragDropContext>
+      </div>
       <Button
         className="fixed bottom-6 right-6 z-30 shadow-lg shadow-zenko-primary/40 sm:hidden"
         onClick={() => openCreate(focusedColumn)}
