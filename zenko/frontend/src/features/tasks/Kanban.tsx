@@ -109,6 +109,7 @@ export default function Kanban() {
   const isCreateRoute = rawTaskParam === 'new' || location.pathname.endsWith('/task/new');
   const selectedTaskId = !rawTaskParam || isCreateRoute ? null : rawTaskParam;
   const isModalVisible = isCreateRoute || Boolean(rawTaskParam);
+  const defaultStatus = useMemo(() => todoStatus ?? statusOrder[0] ?? 'todo', [statusOrder, todoStatus]);
   const [focusedColumn, setFocusedColumn] = useState<TaskStatus | null>(null);
   const [highlightedTaskId, setHighlightedTaskId] = useState<string | null>(null);
   const [draftStatus, setDraftStatus] = useState<TaskStatus>(defaultStatus);
@@ -140,8 +141,6 @@ export default function Kanban() {
     () => statusOrder.find((status) => status === 'done') ?? statusOrder[statusOrder.length - 1] ?? null,
     [statusOrder]
   );
-  const defaultStatus = useMemo(() => todoStatus ?? statusOrder[0] ?? 'todo', [statusOrder, todoStatus]);
-
   const tasksById = useMemo(() => {
     const map = new Map<string, Task>();
     tasks.forEach((task) => {
