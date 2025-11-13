@@ -656,7 +656,7 @@ export default function Kanban() {
                         columnRefs.current[column.key] = node;
                       }}
                       {...provided.droppableProps}
-                      className={`group relative flex h-full min-h-[22rem] min-w-[280px] snap-start flex-col rounded-[30px] bg-gradient-to-br p-[1px] transition-shadow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/60 md:min-w-0 md:flex-1 ${column.accent}`}
+                      className={`group relative flex h-full min-h-[20rem] min-w-[272px] snap-start flex-col rounded-[26px] bg-gradient-to-br p-[1px] transition-shadow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/60 md:min-w-0 md:flex-1 ${column.accent}`}
                       role="region"
                       aria-labelledby={`column-${column.key}`}
                       aria-describedby={`column-${column.key}-meta`}
@@ -666,7 +666,7 @@ export default function Kanban() {
                       }}
                     >
                       <div
-                        className={`flex h-full min-h-0 flex-col overflow-hidden rounded-[26px] border border-slate-200/70 bg-white/95 p-4 backdrop-blur dark:border-white/10 dark:bg-slate-900/70 ${highlightClasses}`}
+                        className={`flex h-full min-h-0 flex-col overflow-hidden rounded-2xl border border-slate-200/70 bg-white/95 p-3 backdrop-blur dark:border-white/10 dark:bg-slate-900/70 ${highlightClasses}`}
                       >
                         <header className="flex items-center justify-between">
                           <h3
@@ -683,7 +683,7 @@ export default function Kanban() {
                           </span>
                         </header>
                         <div
-                          className="mt-3 flex-1 min-h-0 space-y-3 overflow-y-auto pr-1"
+                          className="mt-2.5 flex-1 min-h-0 space-y-2.5 overflow-y-auto pr-1"
                           role="list"
                           aria-label={`Tarefas em ${column.title}`}
                         >
@@ -715,6 +715,7 @@ export default function Kanban() {
                               aria-current={highlightedTaskId === task.id ? 'true' : undefined}
                             >
                               <Card
+                                variant="board"
                                 className={`group cursor-grab overflow-hidden border-slate-200/80 bg-white/90 transition-all hover:-translate-y-0.5 hover:border-zenko-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/60 dark:border-white/5 dark:bg-slate-900/70 ${
                                   dragSnapshot.isDragging ? 'border-zenko-primary/60 shadow-lg' : ''
                                 } ${
@@ -733,7 +734,7 @@ export default function Kanban() {
                                 onKeyDown={(event) => handleCardKeyDown(event, task)}
                                 onClick={() => openTask(task)}
                               >
-                                <div className="grid grid-cols-[auto,1fr] items-start gap-3">
+                                <div className="grid grid-cols-[auto,1fr] items-start gap-2.5">
                                   <label
                                     className={`mt-1 flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-slate-300 bg-white/80 text-zenko-primary shadow-sm transition focus-within:ring-2 focus-within:ring-zenko-primary/50 dark:border-white/20 dark:bg-white/10 ${
                                       autoMoveToDone ? 'cursor-pointer hover:scale-[1.02]' : 'cursor-not-allowed opacity-50'
@@ -770,7 +771,7 @@ export default function Kanban() {
                                       </svg>
                                     ) : null}
                                   </label>
-                                  <div className="flex min-w-0 flex-1 flex-col gap-3">
+                                  <div className="flex min-w-0 flex-1 flex-col gap-2.5">
                                     <div className="flex flex-wrap items-start justify-between gap-x-2 gap-y-2">
                                       <div
                                         className="flex min-w-0 flex-1 flex-wrap gap-1"
@@ -844,7 +845,7 @@ export default function Kanban() {
                                         <div
                                           id={`task-menu-${task.id}`}
                                           role="menu"
-                                          className={`absolute right-0 top-12 z-30 w-52 rounded-2xl border border-slate-200 bg-white/95 p-1.5 text-sm shadow-2xl transition focus:outline-none dark:border-white/10 dark:bg-slate-900/95 ${
+                                          className={`absolute right-0 top-12 z-30 w-48 rounded-xl border border-slate-200 bg-white/95 p-1.5 text-xs shadow-2xl transition focus:outline-none dark:border-white/10 dark:bg-slate-900/95 ${
                                             isMenuOpen
                                               ? 'visible translate-y-0 opacity-100'
                                               : 'invisible pointer-events-none -translate-y-1 opacity-0'
@@ -853,7 +854,7 @@ export default function Kanban() {
                                           <button
                                             type="button"
                                             role="menuitem"
-                                            className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-slate-700 transition hover:bg-zenko-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/60 dark:text-slate-200 dark:hover:bg-white/10"
+                                            className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-slate-700 transition hover:bg-zenko-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/60 dark:text-slate-200 dark:hover:bg-white/10"
                                             onClick={(event) => {
                                               event.stopPropagation();
                                               setOpenMenuTaskId(null);
@@ -880,7 +881,7 @@ export default function Kanban() {
                                             <button
                                               type="button"
                                               role="menuitem"
-                                              className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-slate-700 transition hover:bg-zenko-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/60 dark:text-slate-200 dark:hover:bg-white/10"
+                                            className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-slate-700 transition hover:bg-zenko-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/60 dark:text-slate-200 dark:hover:bg-white/10"
                                               onClick={(event) => {
                                                 event.stopPropagation();
                                                 setOpenMenuTaskId(null);
@@ -907,7 +908,7 @@ export default function Kanban() {
                                             <button
                                               type="button"
                                               role="menuitem"
-                                              className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-slate-700 transition hover:bg-zenko-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/60 dark:text-slate-200 dark:hover:bg-white/10"
+                                            className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-slate-700 transition hover:bg-zenko-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/60 dark:text-slate-200 dark:hover:bg-white/10"
                                               onClick={(event) => {
                                                 event.stopPropagation();
                                                 setOpenMenuTaskId(null);
@@ -933,7 +934,7 @@ export default function Kanban() {
                                           <button
                                             type="button"
                                             role="menuitem"
-                                            className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left font-semibold text-rose-600 transition hover:bg-rose-500/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500/60 dark:text-rose-300 dark:hover:bg-rose-400/10"
+                                            className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left font-semibold text-rose-600 transition hover:bg-rose-500/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500/60 dark:text-rose-300 dark:hover:bg-rose-400/10"
                                             onClick={(event) => {
                                               event.stopPropagation();
                                               setOpenMenuTaskId(null);
@@ -962,11 +963,11 @@ export default function Kanban() {
                                       </div>
                                     </div>
                                     <div className="space-y-2">
-                                      <h4 className="break-words text-base font-semibold leading-snug text-slate-900 dark:text-white">
+                                      <h4 className="break-words text-sm font-semibold leading-5 text-slate-900 dark:text-white">
                                         {task.title}
                                       </h4>
                                       {task.due_date ? (
-                                        <p className="inline-flex min-w-0 max-w-full items-center gap-1 rounded-full bg-zenko-primary/10 px-3 py-1 text-[11px] font-medium text-zenko-primary dark:bg-zenko-primary/15">
+                                        <p className="inline-flex min-w-0 max-w-full items-center gap-1 rounded-full bg-zenko-primary/10 px-2.5 py-1 text-[11px] font-medium text-zenko-primary dark:bg-zenko-primary/15">
                                           <svg
                                             className="h-3.5 w-3.5"
                                             viewBox="0 0 24 24"
