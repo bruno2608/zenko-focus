@@ -1,4 +1,6 @@
-export type TaskStatus = 'todo' | 'doing' | 'done';
+export type TaskStatus = string;
+
+export const DEFAULT_STATUS_IDS = ['todo', 'doing', 'done'] as const;
 
 export interface ChecklistItem {
   text: string;

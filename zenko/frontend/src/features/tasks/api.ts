@@ -8,14 +8,13 @@ import {
   type OfflineResource
 } from '../../lib/offline';
 import { Task, TaskPayload, TaskStatus } from './types';
+import { getOrderedStatusesSnapshot } from './listsStore';
 
 const TASKS_RESOURCE: OfflineResource = 'tasks';
 const OFFLINE_TASKS_KEY = 'all';
 const OFFLINE_ATTACHMENTS_INDEX_KEY = 'attachments-index';
 const OFFLINE_ATTACHMENT_PREFIX = 'attachment:';
 const MAX_OFFLINE_ATTACHMENTS = 50;
-
-const statusSequence: TaskStatus[] = ['todo', 'doing', 'done'];
 
 export interface TaskPositionChange {
   id: string;
@@ -24,21 +23,25 @@ export interface TaskPositionChange {
 }
 
 function ensureTaskSortOrder(tasks: Task[]): Task[] {
-  const grouped: Record<TaskStatus, Task[]> = {
-    todo: [],
-    doing: [],
-    done: []
-  };
+  const sequence = [...getOrderedStatusesSnapshot()];
+  const grouped: Record<TaskStatus, Task[]> = {};
+
+  sequence.forEach((status) => {
+    grouped[status] = [];
+  });
 
   tasks.forEach((task) => {
-    const list = grouped[task.status] ?? grouped.todo;
-    list.push(task);
+    if (!grouped[task.status]) {
+      sequence.push(task.status);
+      grouped[task.status] = [];
+    }
+    grouped[task.status].push(task);
   });
 
   const normalized = new Map<string, Task>();
 
-  statusSequence.forEach((status) => {
-    const list = grouped[status];
+  sequence.forEach((status) => {
+    const list = grouped[status] ?? [];
     const ordered = [...list].sort((a, b) => {
       const orderA = typeof a.sort_order === 'number' ? a.sort_order : Number.MAX_SAFE_INTEGER;
       const orderB = typeof b.sort_order === 'number' ? b.sort_order : Number.MAX_SAFE_INTEGER;
