@@ -6,7 +6,7 @@ import Card from '../../components/ui/Card';
 import Modal from '../../components/ui/Modal';
 import Select from '../../components/ui/Select';
 import { useTasks } from './hooks';
-import { Task, TaskStatus } from './types';
+import { Task, TaskPayload, TaskStatus } from './types';
 import TaskForm from './TaskForm';
 import OfflineNotice from '../../components/OfflineNotice';
 import { isOfflineMode } from '../../lib/supabase';
@@ -16,6 +16,8 @@ import { getLabelColors } from './labelColors';
 import { useTasksStore, type LabelDefinition } from './store';
 import createMousetrap from 'mousetrap';
 import type { TaskPositionChange } from './api';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
+import { useToastStore } from '../../components/ui/ToastProvider';
 
 const columns: { key: TaskStatus; title: string; accent: string }[] = [
   {
@@ -82,6 +84,35 @@ function arrayMove<T>(items: T[], from: number, to: number) {
   return list;
 }
 
+function BoardSkeleton() {
+  return (
+    <div className="space-y-6">
+      <div className="space-y-3">
+        <div className="h-7 w-48 rounded-xl bg-slate-200/80 dark:bg-slate-700/60 animate-pulse" />
+        <div className="h-4 w-72 rounded-xl bg-slate-100/70 dark:bg-slate-800/50 animate-pulse" />
+      </div>
+      <div className="flex snap-x snap-mandatory gap-4 overflow-x-auto pb-4">
+        {columns.map((column) => (
+          <div
+            key={`skeleton-${column.key}`}
+            className="min-w-[260px] flex-1 rounded-3xl border border-slate-200/70 bg-white/70 p-4 backdrop-blur dark:border-white/10 dark:bg-slate-900/60"
+          >
+            <div className="mb-4 h-5 w-24 rounded-lg bg-slate-200/90 dark:bg-slate-800/80 animate-pulse" />
+            <div className="space-y-3">
+              {[0, 1, 2].map((item) => (
+                <div
+                  key={`skeleton-card-${column.key}-${item}`}
+                  className="h-24 rounded-2xl bg-slate-100/90 shadow-inner animate-pulse dark:bg-slate-800/70"
+                />
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function Kanban() {
   const {
     tasks,
@@ -97,209 +128,25 @@ export default function Kanban() {
     updateTaskIsPending
   } = useTasks();
   const { profile } = useProfile();
-  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
-  const [modalOpen, setModalOpen] = useState(false);
+  const params = useParams<{ taskId?: string }>();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const toast = useToastStore((state) => state.show);
+  const rawTaskParam = params.taskId ?? null;
+  const isCreateRoute = rawTaskParam === 'new';
+  const selectedTaskId = !rawTaskParam || isCreateRoute ? null : rawTaskParam;
+  const isModalVisible = isCreateRoute || Boolean(rawTaskParam);
   const [focusedColumn, setFocusedColumn] = useState<TaskStatus>('todo');
   const [highlightedTaskId, setHighlightedTaskId] = useState<string | null>(null);
   const [draftStatus, setDraftStatus] = useState<TaskStatus>('todo');
+  const [recentlyCreatedMap, setRecentlyCreatedMap] = useState<Record<string, true>>({});
+  const [openMenuTaskId, setOpenMenuTaskId] = useState<string | null>(null);
   const connectivityStatus = useConnectivityStore((state) => state.status);
   const showOffline = connectivityStatus === 'limited' || isOfflineMode(userId);
   const autoMoveToDone = profile?.auto_move_done ?? true;
-  const labelDefinitions = useTasksStore((state) => state.labelsLibrary);
-  const labelDefinitionMap = useMemo(() => {
-    const map = new Map<string, LabelDefinition>();
-    labelDefinitions.forEach((definition) => {
-      map.set(definition.normalized, definition);
-    });
-    return map;
-  }, [labelDefinitions]);
-
-  const labelDefinitions = useTasksStore((state) => state.labelsLibrary);
-  const labelDefinitionMap = useMemo(() => {
-    const map = new Map<string, LabelDefinition>();
-    labelDefinitions.forEach((definition) => {
-      map.set(definition.normalized, definition);
-    });
-    return map;
-  }, [labelDefinitions]);
-
-  const tasksById = useMemo(() => {
-    const map = new Map<string, Task>();
-    tasks.forEach((task) => {
-      map.set(task.id, task);
-    });
-    return map;
-  }, [tasks]);
-
-  const columnsMap = useMemo(() => {
-    const map: Record<TaskStatus, Task[]> = {
-      todo: [],
-      doing: [],
-      done: []
-    };
-    tasks.forEach((task) => {
-      map[task.status].push(task);
-    });
-    statusOrder.forEach((status) => {
-      map[status].sort((a, b) => {
-        if (a.sort_order !== b.sort_order) {
-          return a.sort_order - b.sort_order;
-        }
-        return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
-      });
-    });
-    return map;
-  }, [tasks]);
-
-  const labelsLibrary = useTasksStore((state) => state.labelsLibrary);
-  const labelDefinitionMap = useMemo(() => {
-    const map = new Map<string, LabelDefinition>();
-    labelsLibrary.forEach((definition) => {
-      map.set(definition.normalized, definition);
-    });
-    return map;
-  }, [labelsLibrary]);
-
-  const tasksById = useMemo(() => {
-    const map = new Map<string, Task>();
-    tasks.forEach((task) => {
-      map.set(task.id, task);
-    });
-    return map;
-  }, [tasks]);
-
-  const columnsMap = useMemo(() => {
-    const map: Record<TaskStatus, Task[]> = {
-      todo: [],
-      doing: [],
-      done: []
-    };
-    tasks.forEach((task) => {
-      map[task.status].push(task);
-    });
-    statusOrder.forEach((status) => {
-      map[status].sort((a, b) => {
-        if (a.sort_order !== b.sort_order) {
-          return a.sort_order - b.sort_order;
-        }
-        return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
-      });
-    });
-    return map;
-  }, [tasks]);
-
-  const labelDefinitionsList = useTasksStore((state) => state.labelsLibrary);
-  const labelDefinitionMap = useMemo(() => {
-    const map = new Map<string, LabelDefinition>();
-    labelDefinitionsList.forEach((definition) => {
-      map.set(definition.normalized, definition);
-    });
-    return map;
-  }, [labelDefinitionsList]);
-
-  const tasksById = useMemo(() => {
-    const map = new Map<string, Task>();
-    tasks.forEach((task) => {
-      map.set(task.id, task);
-    });
-    return map;
-  }, [tasks]);
-
-  const columnsMap = useMemo(() => {
-    const map: Record<TaskStatus, Task[]> = {
-      todo: [],
-      doing: [],
-      done: []
-    };
-    tasks.forEach((task) => {
-      map[task.status].push(task);
-    });
-    statusOrder.forEach((status) => {
-      map[status].sort((a, b) => {
-        if (a.sort_order !== b.sort_order) {
-          return a.sort_order - b.sort_order;
-        }
-        return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
-      });
-    });
-    return map;
-  }, [tasks]);
-
-  const labelsLibrary = useTasksStore((state) => state.labelsLibrary);
-  const labelDefinitionMap = useMemo(() => {
-    const map = new Map<string, LabelDefinition>();
-    labelsLibrary.forEach((definition) => {
-      map.set(definition.normalized, definition);
-    });
-    return map;
-  }, [labelsLibrary]);
-
-  const tasksById = useMemo(() => {
-    const map = new Map<string, Task>();
-    tasks.forEach((task) => {
-      map.set(task.id, task);
-    });
-    return map;
-  }, [tasks]);
-
-  const columnsMap = useMemo(() => {
-    const map: Record<TaskStatus, Task[]> = {
-      todo: [],
-      doing: [],
-      done: []
-    };
-    tasks.forEach((task) => {
-      map[task.status].push(task);
-    });
-    statusOrder.forEach((status) => {
-      map[status].sort((a, b) => {
-        if (a.sort_order !== b.sort_order) {
-          return a.sort_order - b.sort_order;
-        }
-        return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
-      });
-    });
-    return map;
-  }, [tasks]);
-
-  const kanbanLabelsLibrary = useTasksStore((state) => state.labelsLibrary);
-  const labelDefinitionMap = useMemo(() => {
-    const map = new Map<string, LabelDefinition>();
-    kanbanLabelsLibrary.forEach((definition) => {
-      map.set(definition.normalized, definition);
-    });
-    return map;
-  }, [kanbanLabelsLibrary]);
-
-  const tasksById = useMemo(() => {
-    const map = new Map<string, Task>();
-    tasks.forEach((task) => {
-      map.set(task.id, task);
-    });
-    return map;
-  }, [tasks]);
-
-  const columnsMap = useMemo(() => {
-    const map: Record<TaskStatus, Task[]> = {
-      todo: [],
-      doing: [],
-      done: []
-    };
-    tasks.forEach((task) => {
-      map[task.status].push(task);
-    });
-    statusOrder.forEach((status) => {
-      map[status].sort((a, b) => {
-        if (a.sort_order !== b.sort_order) {
-          return a.sort_order - b.sort_order;
-        }
-        return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
-      });
-    });
-    return map;
-  }, [tasks]);
-
   const labelDefinitionMap = useLabelDefinitionMap();
+  const menuRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const creationTimeouts = useRef<Map<string, number>>(new Map());
 
   const tasksById = useMemo(() => {
     const map = new Map<string, Task>();
@@ -308,6 +155,10 @@ export default function Kanban() {
     });
     return map;
   }, [tasks]);
+
+  const selectedTask = selectedTaskId ? tasksById.get(selectedTaskId) ?? null : null;
+  const searchParams = useMemo(() => new URLSearchParams(location.search), [location.search]);
+  const draftStatusFromQuery = searchParams.get('status');
 
   const columnsMap = useMemo(() => {
     const map: Record<TaskStatus, Task[]> = {
@@ -335,6 +186,8 @@ export default function Kanban() {
       tasks: columnsMap[column.key]
     }));
   }, [columnsMap]);
+
+  const isMutationPending = createTaskIsPending || updateTaskIsPending;
 
   const columnRefs = useRef<Record<TaskStatus, HTMLElement | null>>({
     todo: null,
@@ -380,6 +233,34 @@ export default function Kanban() {
   }, [columnsMap, focusedColumn, ensureHighlight]);
 
   useEffect(() => {
+    if (selectedTask) {
+      setDraftStatus(selectedTask.status);
+      setFocusedColumn(selectedTask.status);
+    }
+  }, [selectedTask]);
+
+  useEffect(() => {
+    if (!selectedTaskId || isLoading) {
+      return;
+    }
+    if (!tasksById.has(selectedTaskId)) {
+      toast({ title: 'Tarefa não encontrada', type: 'warning' });
+      navigate('/', { replace: true });
+    }
+  }, [isLoading, navigate, selectedTaskId, tasksById, toast]);
+
+  useEffect(() => {
+    if (!isCreateRoute) {
+      return;
+    }
+    if (draftStatusFromQuery && ['todo', 'doing', 'done'].includes(draftStatusFromQuery)) {
+      const status = draftStatusFromQuery as TaskStatus;
+      setDraftStatus(status);
+      setFocusedColumn(status);
+    }
+  }, [draftStatusFromQuery, isCreateRoute]);
+
+  useEffect(() => {
     if (!highlightedTaskId) return;
     if (!tasksById.has(highlightedTaskId)) {
       setHighlightedTaskId(null);
@@ -398,29 +279,38 @@ export default function Kanban() {
     [columnsMap]
   );
 
-  const openTask = useCallback((task: Task) => {
-    setSelectedTask(task);
-    setDraftStatus(task.status);
-    setModalOpen(true);
-    setFocusedColumn(task.status);
-    setHighlightedTaskId(task.id);
-  }, []);
+  const openTask = useCallback(
+    (task: Task) => {
+      navigate(`/task/${task.id}`, { state: { fromBoard: true } });
+      setDraftStatus(task.status);
+      setFocusedColumn(task.status);
+      setHighlightedTaskId(task.id);
+    },
+    [navigate]
+  );
 
   const openCreate = useCallback(
     (status: TaskStatus) => {
-      setSelectedTask(null);
       setDraftStatus(status);
-      setModalOpen(true);
       setFocusedColumn(status);
       ensureHighlight(status);
+      const nextSearch = new URLSearchParams();
+      nextSearch.set('status', status);
+      navigate(`/task/new?${nextSearch.toString()}`, { state: { fromBoard: true } });
     },
-    [ensureHighlight]
+    [ensureHighlight, navigate]
   );
 
   const closeModal = useCallback(() => {
-    setModalOpen(false);
-    setSelectedTask(null);
-  }, []);
+    setDraftStatus('todo');
+    setOpenMenuTaskId(null);
+    const state = location.state as { fromBoard?: boolean } | null;
+    if (state?.fromBoard) {
+      navigate(-1);
+    } else {
+      navigate('/', { replace: true });
+    }
+  }, [location.state, navigate]);
 
   const placeTaskInStatus = useCallback(
     (task: Task, targetStatus: TaskStatus, position: 'start' | 'end' = 'end') => {
@@ -518,6 +408,89 @@ export default function Kanban() {
   );
 
   useEffect(() => {
+    if (!openMenuTaskId) return;
+    const handlePointer = (event: MouseEvent | TouchEvent) => {
+      const ref = menuRefs.current[openMenuTaskId];
+      if (!ref) return;
+      if (!ref.contains(event.target as Node)) {
+        setOpenMenuTaskId(null);
+      }
+    };
+    const handleKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setOpenMenuTaskId(null);
+      }
+    };
+    document.addEventListener('mousedown', handlePointer);
+    document.addEventListener('touchstart', handlePointer);
+    document.addEventListener('keydown', handleKey);
+    return () => {
+      document.removeEventListener('mousedown', handlePointer);
+      document.removeEventListener('touchstart', handlePointer);
+      document.removeEventListener('keydown', handleKey);
+    };
+  }, [openMenuTaskId]);
+
+  useEffect(() => {
+    if (!openMenuTaskId) return;
+    if (!tasksById.has(openMenuTaskId)) {
+      setOpenMenuTaskId(null);
+    }
+  }, [openMenuTaskId, tasksById]);
+
+  useEffect(() => {
+    setRecentlyCreatedMap((current) => {
+      const next = { ...current };
+      let changed = false;
+      Object.keys(next).forEach((id) => {
+        if (!tasksById.has(id)) {
+          delete next[id];
+          changed = true;
+        }
+      });
+      return changed ? next : current;
+    });
+  }, [tasksById]);
+
+  const handleCreateTask = useCallback(
+    async (payload: TaskPayload) => {
+      const created = (await createTask(payload)) as Task;
+      if (created?.id) {
+        setRecentlyCreatedMap((current) => ({ ...current, [created.id]: true }));
+        if (typeof window !== 'undefined') {
+          const timeoutId = window.setTimeout(() => {
+            setRecentlyCreatedMap((current) => {
+              if (!current[created.id]) {
+                return current;
+              }
+              const next = { ...current };
+              delete next[created.id];
+              return next;
+            });
+            creationTimeouts.current.delete(created.id);
+          }, 2000);
+          creationTimeouts.current.set(created.id, timeoutId);
+        }
+        setHighlightedTaskId(created.id);
+        focusColumn(created.status);
+      }
+      return created;
+    },
+    [createTask, focusColumn]
+  );
+
+  useEffect(() => {
+    return () => {
+      creationTimeouts.current.forEach((timeoutId) => {
+        if (typeof window !== 'undefined') {
+          window.clearTimeout(timeoutId);
+        }
+      });
+      creationTimeouts.current.clear();
+    };
+  }, []);
+
+  useEffect(() => {
     if (typeof document === 'undefined') return;
     const trap = createMousetrap();
     const shouldIgnore = (event: KeyboardEvent) => {
@@ -533,13 +506,13 @@ export default function Kanban() {
     };
 
     const handleNew = (event: KeyboardEvent) => {
-      if (shouldIgnore(event) || modalOpen) return;
+      if (shouldIgnore(event) || isModalVisible) return;
       event.preventDefault();
       openCreate(focusedColumn);
     };
 
     const handleEdit = (event: KeyboardEvent) => {
-      if (shouldIgnore(event) || modalOpen) return;
+      if (shouldIgnore(event) || isModalVisible) return;
       if (!highlightedTaskId) return;
       const task = tasksById.get(highlightedTaskId);
       if (!task) return;
@@ -549,9 +522,9 @@ export default function Kanban() {
 
     const handleEscape = (event: KeyboardEvent) => {
       if (shouldIgnore(event)) return;
-      if (!modalOpen) return;
+      if (!isModalVisible) return;
       event.preventDefault();
-      setModalOpen(false);
+      closeModal();
     };
 
     trap.bind('n', handleNew);
@@ -576,21 +549,53 @@ export default function Kanban() {
     return () => {
       trap.destroy();
     };
-  }, [focusColumn, focusedColumn, highlightedTaskId, modalOpen, openCreate, openTask, tasksById]);
+  }, [
+    closeModal,
+    focusColumn,
+    focusedColumn,
+    highlightedTaskId,
+    isModalVisible,
+    openCreate,
+    openTask,
+    tasksById
+  ]);
 
-  if (isLoading) {
-    return <p className="text-sm text-slate-300">Carregando...</p>;
+  if (isLoading && tasks.length === 0) {
+    return <BoardSkeleton />;
   }
 
   return (
-    <div className="space-y-6">
+    <div className="flex h-full min-h-0 flex-col gap-6" aria-live="polite">
       {showOffline ? <OfflineNotice feature="Tarefas" /> : null}
+      {isMutationPending ? (
+        <div
+          className="pointer-events-none fixed bottom-6 left-1/2 z-40 flex -translate-x-1/2 items-center gap-2 rounded-full border border-white/20 bg-slate-900/85 px-4 py-2 text-xs font-medium text-white shadow-xl backdrop-blur dark:border-white/10 dark:bg-slate-800/85"
+          role="status"
+          aria-live="polite"
+        >
+          <svg
+            className="h-4 w-4 animate-spin"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <circle cx="12" cy="12" r="10" className="opacity-40" />
+            <path d="M4 12a8 8 0 018-8" className="opacity-90" />
+          </svg>
+          Salvando alterações...
+        </div>
+      ) : null}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-2xl font-semibold text-slate-900 dark:text-white">Quadro de tarefas</h2>
           <p className="text-sm text-slate-600 dark:text-slate-300">Arraste e solte para mover prioridades rapidamente.</p>
         </div>
         <Button
+          title="Adicionar nova tarefa"
           onClick={() => {
             openCreate(focusedColumn);
           }}
@@ -625,21 +630,22 @@ export default function Kanban() {
           </Select>
         </label>
       </div>
-      <DragDropContext onDragEnd={handleDragEnd}>
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-          {columnsData.map((column) => (
-            <Droppable droppableId={column.key} key={column.key}>
-              {(provided, snapshot) => (
-                <section
+      <div className="flex-1 min-h-0">
+        <DragDropContext onDragEnd={handleDragEnd}>
+          <div className="flex h-full min-h-0 snap-x snap-mandatory gap-4 overflow-x-auto overflow-y-hidden pb-4 md:snap-none">
+            {columnsData.map((column) => (
+              <Droppable droppableId={column.key} key={column.key}>
+                {(provided, snapshot) => (
+                  <section
                   ref={(node) => {
                     provided.innerRef(node);
                     columnRefs.current[column.key] = node;
                   }}
                   {...provided.droppableProps}
-                  className={`space-y-3 rounded-3xl border border-slate-200 bg-gradient-to-br p-4 backdrop-blur dark:border-white/5 ${
+                  className={`group flex h-full min-h-[22rem] min-w-[280px] snap-start flex-col overflow-hidden rounded-3xl border border-slate-200 bg-gradient-to-br p-4 backdrop-blur transition-shadow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/60 dark:border-white/5 md:min-w-0 md:flex-1 ${
                     column.accent
-                  } ${snapshot.isDraggingOver ? 'ring-2 ring-zenko-primary/60' : ''} ${
-                    focusedColumn === column.key ? 'border-zenko-primary/40' : ''
+                  } ${snapshot.isDraggingOver ? 'ring-2 ring-zenko-primary/60 shadow-lg' : ''} ${
+                    focusedColumn === column.key ? 'border-zenko-primary/40 shadow-lg' : ''
                   }`}
                   role="region"
                   aria-labelledby={`column-${column.key}`}
@@ -663,7 +669,11 @@ export default function Kanban() {
                       {column.tasks.length}
                     </span>
                   </header>
-                  <div className="space-y-3" role="list" aria-label={`Tarefas em ${column.title}`}>
+                  <div
+                    className="mt-3 flex-1 min-h-0 space-y-3 overflow-y-auto pr-1"
+                    role="list"
+                    aria-label={`Tarefas em ${column.title}`}
+                  >
                     {column.tasks.map((task, index) => {
                       const previousStatus = getAdjacentStatus(task.status, 'previous');
                       const nextStatus = getAdjacentStatus(task.status, 'next');
@@ -677,6 +687,8 @@ export default function Kanban() {
                       const checklistPercentage = checklistTotal
                         ? Math.round((checklistDone / checklistTotal) * 100)
                         : 0;
+                      const isRecentlyCreated = Boolean(recentlyCreatedMap[task.id]);
+                      const isMenuOpen = openMenuTaskId === task.id;
 
                       return (
                         <Draggable draggableId={task.id} index={index} key={task.id}>
@@ -690,9 +702,15 @@ export default function Kanban() {
                               aria-current={highlightedTaskId === task.id ? 'true' : undefined}
                             >
                               <Card
-                                className={`cursor-grab overflow-hidden border-slate-200/80 bg-white/80 transition hover:-translate-y-0.5 hover:border-zenko-primary/40 dark:border-white/5 dark:bg-slate-900/70 ${
+                                className={`group cursor-grab overflow-hidden border-slate-200/80 bg-white/90 transition-all hover:-translate-y-0.5 hover:border-zenko-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/60 dark:border-white/5 dark:bg-slate-900/70 ${
                                   dragSnapshot.isDragging ? 'border-zenko-primary/60 shadow-lg' : ''
-                                } ${highlightedTaskId === task.id ? 'ring-2 ring-zenko-primary/60' : ''}`}
+                                } ${
+                                  highlightedTaskId === task.id
+                                    ? 'ring-2 ring-zenko-primary/60'
+                                    : isRecentlyCreated
+                                      ? 'animate-taskHighlight ring-2 ring-zenko-primary/30'
+                                      : ''
+                                }`}
                                 tabIndex={0}
                                 aria-label={`Tarefa ${task.title}. Status atual: ${columnTitles[task.status]}. ${ariaInstruction}`}
                                 onFocus={() => {
@@ -702,15 +720,20 @@ export default function Kanban() {
                                 onKeyDown={(event) => handleCardKeyDown(event, task)}
                                 onClick={() => openTask(task)}
                               >
-                                <div className="flex items-start gap-3">
+                                <div className="grid grid-cols-[auto,1fr] items-start gap-3">
                                   <label
-                                    className={`mt-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-slate-300 bg-white/80 text-zenko-primary shadow-sm transition dark:border-white/20 dark:bg-white/10 ${
+                                    className={`mt-1 flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-slate-300 bg-white/80 text-zenko-primary shadow-sm transition focus-within:ring-2 focus-within:ring-zenko-primary/50 dark:border-white/20 dark:bg-white/10 ${
                                       autoMoveToDone ? 'cursor-pointer hover:scale-[1.02]' : 'cursor-not-allowed opacity-50'
                                     }`}
                                     onClick={(event) => event.stopPropagation()}
                                   >
                                     <input
                                       type="checkbox"
+                                      aria-label={
+                                        task.status === 'done'
+                                          ? 'Marcar tarefa como pendente'
+                                          : 'Marcar tarefa como concluída'
+                                      }
                                       checked={task.status === 'done'}
                                       disabled={!autoMoveToDone}
                                       onChange={(event) => {
@@ -734,77 +757,245 @@ export default function Kanban() {
                                       </svg>
                                     ) : null}
                                   </label>
-                                  <div className="flex-1 min-w-0">
-                                    {task.labels.length > 0 ? (
-                                      <div className="mb-3 flex flex-wrap gap-1" aria-label="Etiquetas da tarefa">
-                                        {task.labels.map((label, labelIndex) => {
-                                          const normalized = label.toLocaleLowerCase();
-                                          const definition = labelDefinitionMap.get(normalized);
-                                          const colors = getLabelColors(label, {
-                                            colorId: definition?.colorId,
-                                            fallbackIndex: labelIndex
-                                          });
-                                          return (
-                                            <span
-                                              key={`${task.id}-label-${definition?.id ?? labelIndex}`}
-                                              className="inline-flex items-center rounded-md px-2 py-1 text-[10px] font-semibold uppercase tracking-wide shadow-sm"
-                                              style={{
-                                                backgroundColor: colors.background,
-                                                color: colors.foreground
+                                  <div className="flex min-w-0 flex-1 flex-col gap-3">
+                                    <div className="flex flex-wrap items-start justify-between gap-x-2 gap-y-2">
+                                      <div
+                                        className="flex min-w-0 flex-1 flex-wrap gap-1"
+                                        aria-label={task.labels.length > 0 ? 'Etiquetas da tarefa' : undefined}
+                                      >
+                                        {task.labels.length === 0 ? (
+                                          <span className="sr-only">Sem etiquetas</span>
+                                        ) : (
+                                          task.labels.map((label, labelIndex) => {
+                                            const normalized = label.toLocaleLowerCase();
+                                            const definition = labelDefinitionMap.get(normalized);
+                                            const colors = getLabelColors(label, {
+                                              colorId: definition?.colorId,
+                                              fallbackIndex: labelIndex
+                                            });
+                                            return (
+                                              <span
+                                                key={`${task.id}-label-${definition?.id ?? labelIndex}`}
+                                                className="inline-flex max-w-full items-center rounded-md px-2 py-1 text-[10px] font-semibold uppercase tracking-wide shadow-sm"
+                                                style={{
+                                                  backgroundColor: colors.background,
+                                                  color: colors.foreground
+                                                }}
+                                              >
+                                                <span className="block max-w-full truncate">{definition?.value ?? label}</span>
+                                              </span>
+                                            );
+                                          })
+                                        )}
+                                      </div>
+                                      <div
+                                        className="relative flex-shrink-0 self-start"
+                                        ref={(node) => {
+                                          if (node) {
+                                            menuRefs.current[task.id] = node;
+                                          } else {
+                                            delete menuRefs.current[task.id];
+                                          }
+                                        }}
+                                      >
+                                        <button
+                                          type="button"
+                                          className={`h-11 w-11 rounded-full border border-transparent bg-transparent text-slate-500 opacity-0 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/60 focus-visible:opacity-100 focus-visible:border-zenko-primary/40 focus-visible:bg-white/70 group-focus-within:opacity-100 group-hover:opacity-100 group-hover:border-slate-200/70 group-hover:bg-white/70 group-hover:text-slate-600 hover:border-zenko-primary/30 hover:bg-white/70 hover:text-zenko-primary dark:text-slate-300 dark:hover:border-white/20 dark:hover:bg-slate-900/60 dark:hover:text-white dark:group-hover:border-white/20 dark:group-hover:bg-slate-900/60 dark:group-hover:text-white ${
+                                            isMenuOpen ? 'opacity-100 border-zenko-primary/40 bg-white/70 text-zenko-primary dark:bg-slate-900/70' : ''
+                                          }`}
+                                          aria-haspopup="menu"
+                                          aria-expanded={isMenuOpen}
+                                          aria-controls={`task-menu-${task.id}`}
+                                          onClick={(event) => {
+                                            event.stopPropagation();
+                                            setOpenMenuTaskId((current) => (current === task.id ? null : task.id));
+                                          }}
+                                          title="Ações rápidas"
+                                        >
+                                          <span className="sr-only">Abrir ações rápidas para {task.title}</span>
+                                          <svg
+                                            className="mx-auto h-5 w-5"
+                                            viewBox="0 0 24 24"
+                                            fill="none"
+                                            stroke="currentColor"
+                                            strokeWidth="2"
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                            aria-hidden="true"
+                                          >
+                                            <circle cx="5" cy="12" r="1" />
+                                            <circle cx="12" cy="12" r="1" />
+                                            <circle cx="19" cy="12" r="1" />
+                                          </svg>
+                                        </button>
+                                        <div
+                                          id={`task-menu-${task.id}`}
+                                          role="menu"
+                                          className={`absolute right-0 top-12 z-30 w-52 rounded-2xl border border-slate-200 bg-white/95 p-1.5 text-sm shadow-2xl transition focus:outline-none dark:border-white/10 dark:bg-slate-900/95 ${
+                                            isMenuOpen
+                                              ? 'visible translate-y-0 opacity-100'
+                                              : 'invisible pointer-events-none -translate-y-1 opacity-0'
+                                          }`}
+                                        >
+                                          <button
+                                            type="button"
+                                            role="menuitem"
+                                            className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-slate-700 transition hover:bg-zenko-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/60 dark:text-slate-200 dark:hover:bg-white/10"
+                                            onClick={(event) => {
+                                              event.stopPropagation();
+                                              setOpenMenuTaskId(null);
+                                              openTask(task);
+                                            }}
+                                            autoFocus={isMenuOpen}
+                                          >
+                                            <svg
+                                              className="h-4 w-4"
+                                              viewBox="0 0 24 24"
+                                              fill="none"
+                                              stroke="currentColor"
+                                              strokeWidth="2"
+                                              strokeLinecap="round"
+                                              strokeLinejoin="round"
+                                              aria-hidden="true"
+                                            >
+                                              <path d="M12 20h9" />
+                                              <path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4 12.5-12.5z" />
+                                            </svg>
+                                            Editar tarefa
+                                          </button>
+                                          {nextStatus ? (
+                                            <button
+                                              type="button"
+                                              role="menuitem"
+                                              className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-slate-700 transition hover:bg-zenko-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/60 dark:text-slate-200 dark:hover:bg-white/10"
+                                              onClick={(event) => {
+                                                event.stopPropagation();
+                                                setOpenMenuTaskId(null);
+                                                placeTaskInStatus(task, nextStatus, 'end');
                                               }}
                                             >
-                                              {definition?.value ?? label}
+                                              <svg
+                                                className="h-4 w-4"
+                                                viewBox="0 0 24 24"
+                                                fill="none"
+                                                stroke="currentColor"
+                                                strokeWidth="2"
+                                                strokeLinecap="round"
+                                                strokeLinejoin="round"
+                                                aria-hidden="true"
+                                              >
+                                                <path d="M5 12h14" />
+                                                <path d="M12 5l7 7-7 7" />
+                                              </svg>
+                                              Mover para {columnTitles[nextStatus]}
+                                            </button>
+                                          ) : null}
+                                          {previousStatus ? (
+                                            <button
+                                              type="button"
+                                              role="menuitem"
+                                              className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-slate-700 transition hover:bg-zenko-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/60 dark:text-slate-200 dark:hover:bg-white/10"
+                                              onClick={(event) => {
+                                                event.stopPropagation();
+                                                setOpenMenuTaskId(null);
+                                                placeTaskInStatus(task, previousStatus, 'end');
+                                              }}
+                                            >
+                                              <svg
+                                                className="h-4 w-4"
+                                                viewBox="0 0 24 24"
+                                                fill="none"
+                                                stroke="currentColor"
+                                                strokeWidth="2"
+                                                strokeLinecap="round"
+                                                strokeLinejoin="round"
+                                                aria-hidden="true"
+                                              >
+                                                <path d="M19 12H5" />
+                                                <path d="M12 19l-7-7 7-7" />
+                                              </svg>
+                                              Mover para {columnTitles[previousStatus]}
+                                            </button>
+                                          ) : null}
+                                          <button
+                                            type="button"
+                                            role="menuitem"
+                                            className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left font-semibold text-rose-600 transition hover:bg-rose-500/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500/60 dark:text-rose-300 dark:hover:bg-rose-400/10"
+                                            onClick={(event) => {
+                                              event.stopPropagation();
+                                              setOpenMenuTaskId(null);
+                                              void deleteTask(task.id);
+                                            }}
+                                          >
+                                            <svg
+                                              className="h-4 w-4"
+                                              viewBox="0 0 24 24"
+                                              fill="none"
+                                              stroke="currentColor"
+                                              strokeWidth="2"
+                                              strokeLinecap="round"
+                                              strokeLinejoin="round"
+                                              aria-hidden="true"
+                                            >
+                                              <polyline points="3 6 5 6 21 6" />
+                                              <path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" />
+                                              <path d="M10 11v6" />
+                                              <path d="M14 11v6" />
+                                              <path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2" />
+                                            </svg>
+                                            Excluir tarefa
+                                          </button>
+                                        </div>
+                                      </div>
+                                    </div>
+                                    <div className="space-y-2">
+                                      <h4 className="break-words text-base font-semibold leading-snug text-slate-900 dark:text-white">
+                                        {task.title}
+                                      </h4>
+                                      {task.due_date ? (
+                                        <p className="inline-flex min-w-0 max-w-full items-center gap-1 rounded-full bg-zenko-primary/10 px-3 py-1 text-[11px] font-medium text-zenko-primary dark:bg-zenko-primary/15">
+                                          <svg
+                                            className="h-3.5 w-3.5"
+                                            viewBox="0 0 24 24"
+                                            fill="none"
+                                            stroke="currentColor"
+                                            strokeWidth="1.5"
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                            aria-hidden="true"
+                                          >
+                                            <path d="M4 7h16" />
+                                            <path d="M10 11h4" />
+                                            <rect x="3" y="4" width="18" height="18" rx="2" />
+                                          </svg>
+                                          <span className="block max-w-full truncate">Prazo: {new Date(task.due_date).toLocaleDateString('pt-BR')}</span>
+                                        </p>
+                                      ) : null}
+                                      {checklistTotal > 0 ? (
+                                        <div className="space-y-2">
+                                          <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 text-[11px] font-medium text-slate-500 dark:text-slate-300">
+                                            <span>Checklist</span>
+                                            <span>
+                                              {checklistDone}/{checklistTotal}
                                             </span>
-                                          );
-                                        })}
-                                      </div>
-                                    ) : null}
-                                    <h4 className="break-words text-base font-semibold leading-tight text-slate-900 dark:text-white">
-                                      {task.title}
-                                    </h4>
-                                    {task.due_date && (
-                                      <p className="mt-2 inline-flex items-center gap-1 rounded-full bg-zenko-primary/10 px-3 py-1 text-[11px] font-medium text-zenko-primary">
-                                        <svg
-                                          className="h-3.5 w-3.5"
-                                          viewBox="0 0 24 24"
-                                          fill="none"
-                                          stroke="currentColor"
-                                          strokeWidth="1.5"
-                                          strokeLinecap="round"
-                                          strokeLinejoin="round"
-                                          aria-hidden="true"
-                                        >
-                                          <path d="M4 7h16" />
-                                          <path d="M10 11h4" />
-                                          <rect x="3" y="4" width="18" height="18" rx="2" />
-                                        </svg>
-                                        Prazo: {new Date(task.due_date).toLocaleDateString('pt-BR')}
-                                      </p>
-                                    )}
-                                    {checklistTotal > 0 ? (
-                                      <div className="mt-3 space-y-2">
-                                        <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 text-[11px] font-medium text-slate-500 dark:text-slate-300">
-                                          <span>Checklist</span>
-                                          <span>
-                                            {checklistDone}/{checklistTotal}
-                                          </span>
+                                          </div>
+                                          <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-white/10">
+                                            <div
+                                              className={`h-1.5 rounded-full transition-all ${
+                                                checklistDone === checklistTotal && checklistTotal > 0
+                                                  ? 'bg-emerald-500'
+                                                  : 'bg-zenko-primary'
+                                              }`}
+                                              style={{ width: `${checklistPercentage}%` }}
+                                            />
+                                          </div>
                                         </div>
-                                        <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-white/10">
-                                          <div
-                                            className={`h-1.5 rounded-full transition-all ${
-                                              checklistDone === checklistTotal && checklistTotal > 0
-                                                ? 'bg-emerald-500'
-                                                : 'bg-zenko-primary'
-                                            }`}
-                                            style={{ width: `${checklistPercentage}%` }}
-                                          />
-                                        </div>
-                                      </div>
-                                    ) : null}
-                                    <div className="mt-3 flex flex-wrap gap-2 md:hidden motion-reduce:flex motion-reduce:md:flex">
+                                      ) : null}
+                                    </div>
+                                    <div className="flex flex-wrap gap-2 md:hidden motion-reduce:flex motion-reduce:md:flex">
                                       <button
                                         type="button"
-                                        className="flex-1 rounded-full border border-zenko-primary/40 bg-white/90 px-3 py-2 text-xs font-semibold text-zenko-primary shadow-sm transition hover:border-zenko-primary/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/60 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50 dark:bg-slate-900/70"
+                                        className="flex-1 rounded-full border border-zenko-primary/40 bg-white/90 px-4 py-2 text-xs font-semibold text-zenko-primary shadow-sm transition hover:border-zenko-primary/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/60 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50 dark:bg-slate-900/70 min-h-[44px]"
                                         onClick={(event) => {
                                           event.stopPropagation();
                                           if (previousStatus) {
@@ -818,7 +1009,7 @@ export default function Kanban() {
                                       </button>
                                       <button
                                         type="button"
-                                        className="flex-1 rounded-full border border-zenko-primary/40 bg-white/90 px-3 py-2 text-xs font-semibold text-zenko-primary shadow-sm transition hover:border-zenko-primary/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/60 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50 dark:bg-slate-900/70"
+                                        className="flex-1 rounded-full border border-zenko-primary/40 bg-white/90 px-4 py-2 text-xs font-semibold text-zenko-primary shadow-sm transition hover:border-zenko-primary/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/60 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50 dark:bg-slate-900/70 min-h-[44px]"
                                         onClick={(event) => {
                                           event.stopPropagation();
                                           if (nextStatus) {
@@ -844,23 +1035,39 @@ export default function Kanban() {
                         Arraste tarefas para esta coluna
                       </p>
                     )}
+                    {provided.placeholder}
                   </div>
                 </section>
               )}
-            </Droppable>
-          ))}
-        </div>
-      </DragDropContext>
+              </Droppable>
+            ))}
+          </div>
+        </DragDropContext>
+      </div>
+      <Button
+        className="fixed bottom-6 right-6 z-30 shadow-lg shadow-zenko-primary/40 sm:hidden"
+        onClick={() => openCreate(focusedColumn)}
+        title="Adicionar nova tarefa"
+        aria-label="Adicionar nova tarefa"
+      >
+        + Nova tarefa
+      </Button>
       <Modal
-        open={modalOpen}
+        open={isModalVisible}
         onClose={closeModal}
+        onBack={closeModal}
+        backLabel="Voltar para o quadro"
         title={selectedTask ? 'Editar tarefa' : 'Nova tarefa'}
-        description="Preencha os campos para atualizar sua produtividade."
+        description={
+          selectedTask
+            ? 'Atualize os detalhes da tarefa selecionada.'
+            : 'Preencha os campos para criar sua próxima tarefa.'
+        }
       >
         <TaskForm
           task={selectedTask ?? undefined}
           onClose={closeModal}
-          createTask={createTask}
+          createTask={handleCreateTask}
           updateTask={updateTask}
           deleteTask={deleteTask}
           isCreatePending={createTaskIsPending}
