@@ -23,17 +23,17 @@ const columns: { key: TaskStatus; title: string; accent: string }[] = [
   {
     key: 'todo',
     title: 'A Fazer',
-    accent: 'from-zenko-primary/10 to-zenko-secondary/10 dark:from-zenko-primary/20 dark:to-zenko-secondary/10'
+    accent: 'from-slate-200/70 via-slate-200/40 to-slate-200/20 dark:from-white/15 dark:via-white/10 dark:to-white/5'
   },
   {
     key: 'doing',
     title: 'Fazendo',
-    accent: 'from-zenko-secondary/10 to-zenko-primary/5 dark:from-zenko-secondary/20 dark:to-zenko-primary/10'
+    accent: 'from-slate-200/70 via-slate-200/40 to-slate-200/20 dark:from-white/15 dark:via-white/10 dark:to-white/5'
   },
   {
     key: 'done',
     title: 'Concluídas',
-    accent: 'from-zenko-accent/20 to-zenko-secondary/10 dark:from-zenko-accent/25 dark:to-zenko-secondary/15'
+    accent: 'from-slate-200/70 via-slate-200/40 to-slate-200/20 dark:from-white/15 dark:via-white/10 dark:to-white/5'
   }
 ];
 
@@ -136,7 +136,7 @@ export default function Kanban() {
   const isCreateRoute = rawTaskParam === 'new';
   const selectedTaskId = !rawTaskParam || isCreateRoute ? null : rawTaskParam;
   const isModalVisible = isCreateRoute || Boolean(rawTaskParam);
-  const [focusedColumn, setFocusedColumn] = useState<TaskStatus>('todo');
+  const [focusedColumn, setFocusedColumn] = useState<TaskStatus | null>(null);
   const [highlightedTaskId, setHighlightedTaskId] = useState<string | null>(null);
   const [draftStatus, setDraftStatus] = useState<TaskStatus>('todo');
   const [recentlyCreatedMap, setRecentlyCreatedMap] = useState<Record<string, true>>({});
@@ -212,7 +212,11 @@ export default function Kanban() {
   );
 
   const ensureHighlight = useCallback(
-    (nextColumn: TaskStatus) => {
+    (nextColumn: TaskStatus | null) => {
+      if (!nextColumn) {
+        setHighlightedTaskId(null);
+        return;
+      }
       const list = columnsMap[nextColumn];
       if (!list) {
         setHighlightedTaskId(null);
@@ -268,6 +272,7 @@ export default function Kanban() {
   }, [tasksById, highlightedTaskId]);
 
   useEffect(() => {
+    if (!focusedColumn) return;
     const ref = columnRefs.current[focusedColumn];
     if (ref) {
       ref.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
@@ -508,7 +513,7 @@ export default function Kanban() {
     const handleNew = (event: KeyboardEvent) => {
       if (shouldIgnore(event) || isModalVisible) return;
       event.preventDefault();
-      openCreate(focusedColumn);
+      openCreate(focusedColumn ?? 'todo');
     };
 
     const handleEdit = (event: KeyboardEvent) => {
@@ -597,7 +602,7 @@ export default function Kanban() {
         <Button
           title="Adicionar nova tarefa"
           onClick={() => {
-            openCreate(focusedColumn);
+            openCreate(focusedColumn ?? 'todo');
           }}
         >
           Nova tarefa
@@ -637,6 +642,7 @@ export default function Kanban() {
               <Droppable droppableId={column.key} key={column.key}>
                 {(provided, snapshot) => {
                   const isFocused = focusedColumn === column.key;
+                  const columnTabIndex = focusedColumn ? (isFocused ? 0 : -1) : 0;
                   const highlightClasses = snapshot.isDraggingOver
                     ? 'ring-2 ring-zenko-primary/60 shadow-xl'
                     : isFocused
@@ -654,7 +660,7 @@ export default function Kanban() {
                       role="region"
                       aria-labelledby={`column-${column.key}`}
                       aria-describedby={`column-${column.key}-meta`}
-                      tabIndex={isFocused ? 0 : -1}
+                      tabIndex={columnTabIndex}
                       onFocus={() => {
                         focusColumn(column.key);
                       }}
@@ -1055,7 +1061,7 @@ export default function Kanban() {
       </div>
       <Button
         className="fixed bottom-6 right-6 z-30 shadow-lg shadow-zenko-primary/40 sm:hidden"
-        onClick={() => openCreate(focusedColumn)}
+        onClick={() => openCreate(focusedColumn ?? 'todo')}
         title="Adicionar nova tarefa"
         aria-label="Adicionar nova tarefa"
       >
