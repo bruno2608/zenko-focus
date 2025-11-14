@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import ThemeToggle from '../components/ui/ThemeToggle';
 import OnboardingDialog from '../features/profile/OnboardingDialog';
 import { useProfile } from '../features/profile/hooks';
 import NotificationBanner from '../components/NotificationBanner';
@@ -223,9 +222,7 @@ export default function TabsLayout() {
               </NavLink>
             ))}
           </nav>
-          <div className="flex items-center justify-end">
-            <ThemeToggle />
-          </div>
+          <div className="flex items-center justify-end" />
         </header>
         {showGreetingCard && (
           <section className="rounded-3xl border border-slate-200/70 bg-white/80 p-5 shadow-[0_20px_45px_-20px_rgba(15,23,42,0.15)] backdrop-blur dark:border-white/10 dark:bg-white/5">
