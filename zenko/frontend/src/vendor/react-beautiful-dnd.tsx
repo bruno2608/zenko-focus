@@ -6,6 +6,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type CSSProperties,
   type DragEvent as ReactDragEvent,
   type ReactNode
 } from 'react';
@@ -19,6 +20,7 @@ export interface DropResult {
   draggableId: string;
   source: DraggableLocation;
   destination: DraggableLocation | null;
+  type: string;
 }
 
 interface DragDropContextProps {
@@ -26,9 +28,16 @@ interface DragDropContextProps {
   children: ReactNode;
 }
 
+interface DragDimensions {
+  width: number;
+  height: number;
+}
+
 interface ActiveDrag {
   draggableId: string;
   source: DraggableLocation;
+  type: string;
+  dimensions: DragDimensions | null;
 }
 
 interface InternalDndContext {
@@ -37,6 +46,9 @@ interface InternalDndContext {
   finishDrag: (destination: DraggableLocation | null) => void;
   clearDrag: () => void;
   activeId: string | null;
+  activeType: string | null;
+  activeSource: DraggableLocation | null;
+  activeDimensions: DragDimensions | null;
   over: DraggableLocation | null;
 }
 
@@ -47,9 +59,15 @@ interface DroppableRegistryItem {
 
 interface DroppableContextValue {
   droppableId: string;
+  type: string;
   registerItem: (id: string, index: number, element: HTMLElement | null) => void;
   unregisterItem: (id: string) => void;
   getCount: () => number;
+}
+
+interface DroppablePlaceholder {
+  index: number;
+  dimensions: DragDimensions;
 }
 
 interface DroppableProvided {
@@ -64,6 +82,7 @@ interface DroppableProvided {
 
 interface DroppableSnapshot {
   isDraggingOver: boolean;
+  placeholder: DroppablePlaceholder | null;
 }
 
 interface DraggableProvided {
@@ -74,6 +93,7 @@ interface DraggableProvided {
     onDragEnd: (event: ReactDragEvent) => void;
     onDragOver: (event: ReactDragEvent) => void;
     onDragEnter: (event: ReactDragEvent) => void;
+    style?: CSSProperties;
   };
   dragHandleProps: Record<string, never>;
 }
@@ -91,17 +111,26 @@ const DroppableContext = createContext<DroppableContextValue | null>(null);
 export function DragDropContext({ onDragEnd, children }: DragDropContextProps) {
   const activeRef = useRef<ActiveDrag | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [activeType, setActiveType] = useState<string | null>(null);
+  const [activeSource, setActiveSource] = useState<DraggableLocation | null>(null);
+  const [activeDimensions, setActiveDimensions] = useState<DragDimensions | null>(null);
   const [over, setOver] = useState<DraggableLocation | null>(null);
 
   const startDrag = useCallback((active: ActiveDrag) => {
     activeRef.current = active;
     setActiveId(active.draggableId);
+    setActiveType(active.type);
+    setActiveSource(active.source);
+    setActiveDimensions(active.dimensions);
     setOver(active.source);
   }, []);
 
   const clearDrag = useCallback(() => {
     activeRef.current = null;
     setActiveId(null);
+    setActiveType(null);
+    setActiveSource(null);
+    setActiveDimensions(null);
     setOver(null);
   }, []);
 
@@ -112,7 +141,12 @@ export function DragDropContext({ onDragEnd, children }: DragDropContextProps) {
         clearDrag();
         return;
       }
-      onDragEnd({ draggableId: active.draggableId, source: active.source, destination });
+      onDragEnd({
+        draggableId: active.draggableId,
+        source: active.source,
+        destination,
+        type: active.type
+      });
       clearDrag();
     },
     [clearDrag, onDragEnd]
@@ -125,15 +159,28 @@ export function DragDropContext({ onDragEnd, children }: DragDropContextProps) {
       finishDrag,
       clearDrag,
       activeId,
+      activeType,
+      activeSource,
+      activeDimensions,
       over
     }),
-    [activeId, finishDrag, over, startDrag]
+    [activeDimensions, activeId, activeSource, activeType, finishDrag, over, startDrag]
   );
 
   return <DndContext.Provider value={value}>{children}</DndContext.Provider>;
 }
 
-export function Droppable({ droppableId, children }: { droppableId: string; children: DroppableRender }) {
+export function Droppable({
+  droppableId,
+  type = 'DEFAULT',
+  direction = 'vertical',
+  children
+}: {
+  droppableId: string;
+  type?: string;
+  direction?: 'horizontal' | 'vertical';
+  children: DroppableRender;
+}) {
   const context = useContext(DndContext);
   if (!context) {
     throw new Error('Droppable must be used within a DragDropContext.');
@@ -152,35 +199,112 @@ export function Droppable({ droppableId, children }: { droppableId: string; chil
 
   const getCount = useCallback(() => itemsRef.current.size, []);
 
+  const resolvePlaceholderIndex = useCallback(() => {
+    if (!context.activeId || context.activeType !== type) {
+      return null;
+    }
+
+    if (context.over && context.over.droppableId === droppableId) {
+      return Math.min(context.over.index, getCount());
+    }
+
+    if (!context.over && context.activeSource?.droppableId === droppableId) {
+      return Math.min(context.activeSource.index, getCount());
+    }
+
+    return null;
+  }, [context.activeId, context.activeSource, context.activeType, context.over, droppableId, getCount, type]);
+
+  const placeholder = useMemo<DroppablePlaceholder | null>(() => {
+    const index = resolvePlaceholderIndex();
+    if (index === null || !context.activeDimensions) {
+      return null;
+    }
+
+    return {
+      index,
+      dimensions: context.activeDimensions
+    };
+  }, [context.activeDimensions, resolvePlaceholderIndex]);
+
+  const getSortedItems = useCallback(() => {
+    return Array.from(itemsRef.current.entries())
+      .map(([id, item]) => ({ id, element: item.element, order: item.index }))
+      .filter((entry) => entry.element)
+      .sort((a, b) => a.order - b.order);
+  }, []);
+
+  const computeDestinationIndex = useCallback(
+    (event: ReactDragEvent) => {
+      const sorted = getSortedItems().filter((entry) => entry.id !== context.activeId);
+      if (sorted.length === 0) {
+        return 0;
+      }
+
+      const pointer = direction === 'horizontal' ? event.clientX : event.clientY;
+      if (!Number.isFinite(pointer)) {
+        if (context.over?.droppableId === droppableId) {
+          return Math.min(context.over.index, sorted.length);
+        }
+        return sorted.length;
+      }
+
+      for (let index = 0; index < sorted.length; index += 1) {
+        const element = sorted[index].element!;
+        const rect = element.getBoundingClientRect();
+        const start = direction === 'horizontal' ? rect.left : rect.top;
+        const size = direction === 'horizontal' ? rect.width : rect.height;
+        const midpoint = start + size / 2;
+        if (pointer < midpoint) {
+          return index;
+        }
+      }
+
+      return sorted.length;
+    },
+    [context.activeId, context.over, direction, droppableId, getSortedItems]
+  );
+
   const handleDragOver = useCallback(
     (event: ReactDragEvent) => {
       event.preventDefault();
-      const current = context.over;
-      if (!current || current.droppableId !== droppableId) {
-        context.updateOver({ droppableId, index: itemsRef.current.size });
+      if (context.activeType && context.activeType !== type) {
+        return;
       }
+      if (event.dataTransfer) {
+        event.dataTransfer.dropEffect = 'move';
+      }
+      const nextIndex = computeDestinationIndex(event);
+      context.updateOver({ droppableId, index: nextIndex });
     },
-    [context, droppableId]
+    [computeDestinationIndex, context, droppableId, type]
   );
 
   const handleDragEnter = useCallback(
     (event: ReactDragEvent) => {
       event.preventDefault();
-      context.updateOver({ droppableId, index: itemsRef.current.size });
+      if (context.activeType && context.activeType !== type) {
+        return;
+      }
+      if (event.dataTransfer) {
+        event.dataTransfer.dropEffect = 'move';
+      }
+      const nextIndex = computeDestinationIndex(event);
+      context.updateOver({ droppableId, index: nextIndex });
     },
-    [context, droppableId]
+    [computeDestinationIndex, context, droppableId, type]
   );
 
   const handleDrop = useCallback(
     (event: ReactDragEvent) => {
       event.preventDefault();
-      const destination =
-        context.over && context.over.droppableId === droppableId
-          ? context.over
-          : { droppableId, index: itemsRef.current.size };
-      context.finishDrag(destination);
+      if (context.activeType && context.activeType !== type) {
+        return;
+      }
+      const nextIndex = computeDestinationIndex(event);
+      context.finishDrag({ droppableId, index: nextIndex });
     },
-    [context, droppableId]
+    [computeDestinationIndex, context, droppableId, type]
   );
 
   useEffect(() => {
@@ -198,16 +322,29 @@ export function Droppable({ droppableId, children }: { droppableId: string; chil
       onDragEnter: handleDragEnter,
       onDrop: handleDrop
     },
-    placeholder: null
+    placeholder:
+      placeholder && context.activeType === type
+        ? (
+            <div
+              aria-hidden="true"
+              style={{
+                width: direction === 'horizontal' ? `${placeholder.dimensions.width}px` : '100%',
+                height: direction === 'horizontal' ? '100%' : `${placeholder.dimensions.height}px`,
+                flex: direction === 'horizontal' ? '0 0 auto' : undefined
+              }}
+            />
+          )
+        : null
   };
 
   const snapshot: DroppableSnapshot = {
-    isDraggingOver: context.over?.droppableId === droppableId
+    isDraggingOver: context.over?.droppableId === droppableId,
+    placeholder: context.activeType === type ? placeholder : null
   };
 
   const droppableValue = useMemo<DroppableContextValue>(
-    () => ({ droppableId, registerItem, unregisterItem, getCount }),
-    [droppableId, getCount, registerItem, unregisterItem]
+    () => ({ droppableId, type, registerItem, unregisterItem, getCount }),
+    [droppableId, getCount, registerItem, unregisterItem, type]
   );
 
   return (
@@ -245,15 +382,31 @@ export function Draggable({
 
   const handleDragStart = useCallback(
     (event: ReactDragEvent) => {
+      event.stopPropagation();
       event.dataTransfer?.setData('text/plain', draggableId);
-      context.startDrag({ draggableId, source: { droppableId: droppable.droppableId, index } });
+      if (event.dataTransfer) {
+        event.dataTransfer.effectAllowed = 'move';
+      }
+      const rect = elementRef.current?.getBoundingClientRect() ?? null;
+      context.startDrag({
+        draggableId,
+        source: { droppableId: droppable.droppableId, index },
+        type: droppable.type,
+        dimensions: rect
+          ? {
+              width: rect.width,
+              height: rect.height
+            }
+          : null
+      });
     },
-    [context, draggableId, droppable.droppableId, index]
+    [context, draggableId, droppable.droppableId, droppable.type, index]
   );
 
   const handleDragEnd = useCallback(
     (event: ReactDragEvent) => {
       event.preventDefault();
+      event.stopPropagation();
       context.finishDrag(context.over ?? null);
     },
     [context]
@@ -262,18 +415,30 @@ export function Draggable({
   const handleDragOver = useCallback(
     (event: ReactDragEvent) => {
       event.preventDefault();
-      context.updateOver({ droppableId: droppable.droppableId, index });
+      if (context.activeType && context.activeType !== droppable.type) {
+        return;
+      }
+      if (event.dataTransfer) {
+        event.dataTransfer.dropEffect = 'move';
+      }
     },
-    [context, droppable.droppableId, index]
+    [context, droppable.type]
   );
 
   const handleDragEnter = useCallback(
     (event: ReactDragEvent) => {
       event.preventDefault();
-      context.updateOver({ droppableId: droppable.droppableId, index });
+      if (context.activeType && context.activeType !== droppable.type) {
+        return;
+      }
+      if (event.dataTransfer) {
+        event.dataTransfer.dropEffect = 'move';
+      }
     },
-    [context, droppable.droppableId, index]
+    [context, droppable.type]
   );
+
+  const isDragging = context.activeId === draggableId;
 
   const provided: DraggableProvided = {
     innerRef: (element) => {
@@ -287,13 +452,18 @@ export function Draggable({
       onDragStart: handleDragStart,
       onDragEnd: handleDragEnd,
       onDragOver: handleDragOver,
-      onDragEnter: handleDragEnter
+      onDragEnter: handleDragEnter,
+      style: isDragging
+        ? {
+            opacity: 0
+          }
+        : undefined
     },
     dragHandleProps: {}
   };
 
   const snapshot: DraggableSnapshot = {
-    isDragging: context.activeId === draggableId
+    isDragging
   };
 
   return children(provided, snapshot);

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { DragDropContext, Draggable, Droppable, type DropResult } from 'react-beautiful-dnd';
 import Button from '../../components/ui/Button';
@@ -22,6 +22,7 @@ import { useTaskListsStore, DEFAULT_LISTS } from './listsStore';
 
 const COLUMN_ACCENT =
   'from-slate-200/70 via-slate-200/40 to-slate-200/20 dark:from-white/15 dark:via-white/10 dark:to-white/5';
+const BOARD_COLUMNS_DROPPABLE_ID = 'board-columns';
 
 function useLabelDefinitionMap() {
   const labelsLibrary = useTasksStore((state) => state.labelsLibrary);
@@ -99,6 +100,7 @@ export default function Kanban() {
   const lists = useTaskListsStore((state) => state.lists);
   const ensureTaskLists = useTaskListsStore((state) => state.ensureStatuses);
   const addList = useTaskListsStore((state) => state.addList);
+  const reorderLists = useTaskListsStore((state) => state.reorderLists);
   const getListTitle = useTaskListsStore((state) => state.getListTitle);
   const { profile } = useProfile();
   const params = useParams<{ taskId?: string }>();
@@ -429,8 +431,26 @@ export default function Kanban() {
 
   const handleDragEnd = useCallback(
     (result: DropResult) => {
-      const { destination, source, draggableId } = result;
+      const { destination, source, draggableId, type } = result;
       if (!destination) {
+        return;
+      }
+      if (type === 'COLUMN') {
+        const movedColumnId = draggableId.startsWith('column:')
+          ? (draggableId.slice('column:'.length) as TaskStatus)
+          : (draggableId as TaskStatus);
+        if (source.index === destination.index) {
+          focusColumn(movedColumnId);
+          ensureHighlight(movedColumnId);
+          setDraftStatus(movedColumnId);
+          return;
+        }
+        reorderLists(source.index, destination.index);
+        if (movedColumnId) {
+          focusColumn(movedColumnId);
+          ensureHighlight(movedColumnId);
+          setDraftStatus(movedColumnId);
+        }
         return;
       }
       const sourceStatus = source.droppableId as TaskStatus;
@@ -451,9 +471,14 @@ export default function Kanban() {
           updates.push({ id, status: destinationStatus, sort_order: index });
         });
       } else {
-        const sourceIds = sourceTasks.map((task) => task.id).filter((id, index) => index !== source.index);
-        const destinationIds = destinationTasks.map((task) => task.id);
-        destinationIds.splice(destination.index, 0, draggableId);
+        const sourceIds = sourceTasks
+          .map((task) => task.id)
+          .filter((id) => id !== draggableId);
+        const destinationIds = destinationTasks
+          .map((task) => task.id)
+          .filter((id) => id !== draggableId);
+        const targetIndex = Math.min(destination.index, destinationIds.length);
+        destinationIds.splice(targetIndex, 0, draggableId);
         sourceIds.forEach((id, index) => {
           updates.push({ id, status: sourceStatus, sort_order: index });
         });
@@ -468,7 +493,7 @@ export default function Kanban() {
         setDraftStatus(destinationStatus);
       }
     },
-    [columnsMap, focusColumn, reorderTasks]
+    [columnsMap, ensureHighlight, focusColumn, reorderLists, reorderTasks]
   );
 
   const handleSubmitNewList = useCallback(() => {
@@ -729,142 +754,190 @@ export default function Kanban() {
       </div>
       <div className="flex-1 min-h-0 overflow-hidden">
         <DragDropContext onDragEnd={handleDragEnd}>
-          <div className="flex h-full min-h-0 snap-x snap-mandatory gap-2.5 overflow-x-auto overflow-y-hidden pb-3 md:snap-none">
-            {columnsData.map((column) => (
-              <Droppable droppableId={column.key} key={column.key}>
-                {(provided, snapshot) => {
-                  const isFocused = focusedColumn === column.key;
-                  const columnTabIndex = focusedColumn ? (isFocused ? 0 : -1) : 0;
-                  const highlightClasses = snapshot.isDraggingOver
-                    ? 'ring-2 ring-zenko-primary/60 shadow-xl'
-                    : isFocused
-                      ? 'border-zenko-primary/40 ring-1 ring-zenko-primary/25 shadow-lg'
-                      : 'shadow-[0_18px_40px_-22px_rgba(15,23,42,0.12)] dark:shadow-[0_18px_40px_-32px_rgba(15,23,42,0.8)]';
-
+          <Droppable droppableId={BOARD_COLUMNS_DROPPABLE_ID} direction="horizontal" type="COLUMN">
+            {(boardProvided, boardSnapshot) => (
+              <div
+                ref={boardProvided.innerRef}
+                {...boardProvided.droppableProps}
+                className="flex h-full min-h-0 snap-x snap-mandatory gap-2.5 overflow-x-auto overflow-y-hidden pb-3 md:snap-none"
+              >
+                {columnsData.map((column, columnIndex) => {
+                  const columnDraggableId = `column:${column.key}`;
+                  const shouldRenderPlaceholder = boardSnapshot.placeholder?.index === columnIndex;
                   return (
-                    <section
-                      ref={(node) => {
-                        provided.innerRef(node);
-                        columnRefs.current[column.key] = node;
-                      }}
-                      {...provided.droppableProps}
-                    className={`group relative flex h-full min-h-[20rem] w-[272px] flex-none snap-start flex-col rounded-[20px] bg-gradient-to-br p-[1px] transition-shadow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/60 ${column.accent}`}
-                      role="region"
-                      aria-labelledby={`column-${column.key}`}
-                      aria-describedby={`column-${column.key}-meta`}
-                      tabIndex={columnTabIndex}
-                      onFocus={() => {
-                        focusColumn(column.key);
-                      }}
-                    >
-                      <div
-                        className={`flex h-full min-h-0 flex-col overflow-hidden rounded-[14px] border border-slate-200/70 bg-white/95 p-2 backdrop-blur dark:border-white/10 dark:bg-slate-900/70 ${highlightClasses}`}
-                      >
-                        <header className="flex items-center justify-between">
-                          <h3
-                            id={`column-${column.key}`}
-                            className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-600 dark:text-slate-200"
-                          >
-                            {column.title}
-                          </h3>
-                          <span
-                            id={`column-${column.key}-meta`}
-                            className="rounded-full bg-zenko-primary/10 px-1.5 py-0.5 text-[11px] text-zenko-primary dark:bg-white/10"
-                          >
-                            {column.tasks.length}
-                          </span>
-                        </header>
+                    <Fragment key={column.key}>
+                      {shouldRenderPlaceholder ? (
                         <div
-                          className="mt-1.5 flex-1 min-h-0 space-y-1.5 overflow-y-auto pr-1"
-                          role="list"
-                          aria-label={`Tarefas em ${column.title}`}
-                        >
-                          {column.tasks.map((task, index) => {
-                      const previousStatus = getAdjacentStatus(task.status, 'previous');
-                      const nextStatus = getAdjacentStatus(task.status, 'next');
-                      const nextStatusLabel = nextStatus ? getListTitle(nextStatus) : 'coluna final';
-                      const ariaInstruction = nextStatus
-                        ? `Pressione Enter ou Espaço para mover para ${nextStatusLabel}.`
-                        : 'Esta tarefa está na última coluna.';
+                          aria-hidden="true"
+                          className="flex h-full min-h-[20rem] w-[272px] flex-none snap-start"
+                          style={{
+                            width: boardSnapshot.placeholder?.dimensions.width,
+                            height: boardSnapshot.placeholder?.dimensions.height
+                          }}
+                        />
+                      ) : null}
+                      <Draggable draggableId={columnDraggableId} index={columnIndex}>
+                        {(columnProvided, columnSnapshot) => {
+                          const isFocused = focusedColumn === column.key;
+                          const columnTabIndex = focusedColumn ? (isFocused ? 0 : -1) : 0;
 
-                      const checklistTotal = task.checklist.length;
-                      const checklistDone = task.checklist.filter((item) => item.done).length;
-                      const checklistPercentage = checklistTotal
-                        ? Math.round((checklistDone / checklistTotal) * 100)
-                        : 0;
-                      const isRecentlyCreated = Boolean(recentlyCreatedMap[task.id]);
-                      const isMenuOpen = openMenuTaskId === task.id;
-
-                      return (
-                        <Draggable draggableId={task.id} index={index} key={task.id}>
-                          {(dragProvided, dragSnapshot) => (
-                            <div
-                              ref={dragProvided.innerRef}
-                              {...dragProvided.draggableProps}
-                              {...dragProvided.dragHandleProps}
-                              className="space-y-1.5"
-                              role="listitem"
-                              aria-current={highlightedTaskId === task.id ? 'true' : undefined}
+                          return (
+                            <section
+                              ref={(node) => {
+                                columnProvided.innerRef(node);
+                                columnRefs.current[column.key] = node;
+                              }}
+                              {...columnProvided.draggableProps}
+                              style={columnProvided.draggableProps.style}
+                              className={`group relative flex h-full min-h-[20rem] w-[272px] flex-none snap-start flex-col rounded-[20px] bg-gradient-to-br p-[1px] transition-transform transition-shadow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/60 ${column.accent} ${columnSnapshot.isDragging ? 'scale-[1.01]' : ''}`}
+                              role="region"
+                              aria-labelledby={`column-${column.key}`}
+                              aria-describedby={`column-${column.key}-meta`}
+                              tabIndex={columnTabIndex}
+                              onFocus={() => {
+                                focusColumn(column.key);
+                              }}
                             >
-                              <Card
-                                variant="board"
-                                className={`group cursor-grab overflow-hidden border-slate-200/70 bg-white/90 transition-all hover:-translate-y-0.5 hover:border-zenko-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-zenko-primary/60 dark:border-white/5 dark:bg-slate-900/70 ${
-                                  dragSnapshot.isDragging ? 'border-zenko-primary/60 shadow-lg' : ''
-                                } ${
-                                  highlightedTaskId === task.id
-                                    ? 'ring-2 ring-inset ring-zenko-primary/60'
-                                    : isRecentlyCreated
-                                      ? 'animate-taskHighlight ring-2 ring-inset ring-zenko-primary/30'
-                                      : ''
-                                }`}
-                                tabIndex={0}
-                                aria-label={`Tarefa ${task.title}. Status atual: ${getListTitle(task.status)}. ${ariaInstruction}`}
-                                onFocus={() => {
-                                  setHighlightedTaskId(task.id);
-                                  setFocusedColumn(task.status);
-                                }}
-                                onKeyDown={(event) => handleCardKeyDown(event, task)}
-                                onClick={() => openTask(task)}
-                              >
-                                <div className="grid grid-cols-[auto,1fr] items-start gap-1.5">
-                                  <label
-                                    className={`mt-0 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white/80 text-zenko-primary shadow-sm transition focus-within:ring-2 focus-within:ring-zenko-primary/50 dark:border-white/20 dark:bg-white/10 ${
-                                      autoMoveToDone ? 'cursor-pointer hover:scale-[1.02]' : 'cursor-not-allowed opacity-50'
-                                    }`}
-                                    onClick={(event) => event.stopPropagation()}
-                                  >
-                                    <input
-                                      type="checkbox"
-                                      aria-label={
-                                        doneStatus && task.status === doneStatus
-                                          ? 'Marcar tarefa como pendente'
-                                          : 'Marcar tarefa como concluída'
-                                      }
-                                      checked={doneStatus ? task.status === doneStatus : false}
-                                      disabled={!autoMoveToDone}
-                                      onChange={(event) => {
-                                        event.stopPropagation();
-                                        handleToggleComplete(task, event.target.checked);
+                              <Droppable droppableId={column.key} type="TASK">
+                                {(taskProvided, taskSnapshot) => {
+                                  const highlightClasses = taskSnapshot.isDraggingOver
+                                    ? 'ring-2 ring-zenko-primary/60 shadow-xl'
+                                    : isFocused
+                                      ? 'border-zenko-primary/40 ring-1 ring-zenko-primary/25 shadow-lg'
+                                      : 'shadow-[0_18px_40px_-22px_rgba(15,23,42,0.12)] dark:shadow-[0_18px_40px_-32px_rgba(15,23,42,0.8)]';
+                                  const placeholderIndex = taskSnapshot.placeholder?.index ?? null;
+                                  const placeholderHeight = taskSnapshot.placeholder?.dimensions.height ?? null;
+
+                                  return (
+                                    <div
+                                      ref={(node) => {
+                                        taskProvided.innerRef(node);
                                       }}
-                                      className="sr-only"
-                                    />
-                                    {doneStatus && task.status === doneStatus ? (
-                                      <svg
-                                        className="h-3.5 w-3.5"
-                                        viewBox="0 0 24 24"
-                                        fill="none"
-                                        stroke="currentColor"
-                                        strokeWidth="2"
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        aria-hidden="true"
+                                      {...taskProvided.droppableProps}
+                                      className={`flex h-full min-h-0 flex-col overflow-hidden rounded-[14px] border border-slate-200/70 bg-white/95 p-2 backdrop-blur dark:border-white/10 dark:bg-slate-900/70 ${highlightClasses}`}
+                                    >
+                                      <header>
+                                        <div
+                                          className={`flex items-center justify-between rounded-[10px] px-1 py-1 ${columnSnapshot.isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
+                                          title="Arraste para reorganizar a lista"
+                                          {...columnProvided.dragHandleProps}
+                                        >
+                                          <h3
+                                            id={`column-${column.key}`}
+                                            className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-600 dark:text-slate-200"
+                                          >
+                                            {column.title}
+                                          </h3>
+                                          <span className="sr-only">Arraste para reorganizar a lista</span>
+                                          <span
+                                            id={`column-${column.key}-meta`}
+                                            className="rounded-full bg-zenko-primary/10 px-1.5 py-0.5 text-[11px] text-zenko-primary dark:bg-white/10"
+                                          >
+                                            {column.tasks.length}
+                                          </span>
+                                        </div>
+                                      </header>
+                                      <div
+                                        className="mt-1.5 flex-1 min-h-0 space-y-1.5 overflow-y-auto pr-1"
+                                        role="list"
+                                        aria-label={`Tarefas em ${column.title}`}
                                       >
-                                        <path d="M5 13l4 4L19 7" />
-                                      </svg>
-                                    ) : null}
-                                  </label>
-                                  <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-                                    <div className="flex flex-wrap items-start justify-between gap-x-1.5 gap-y-1">
+                                        {column.tasks.map((task, index) => {
+                                      const renderPlaceholderBefore = placeholderIndex === index && placeholderHeight;
+                                      const previousStatus = getAdjacentStatus(task.status, 'previous');
+                                      const nextStatus = getAdjacentStatus(task.status, 'next');
+                                      const nextStatusLabel = nextStatus ? getListTitle(nextStatus) : 'coluna final';
+                                      const ariaInstruction = nextStatus
+                                        ? `Pressione Enter ou Espaço para mover para ${nextStatusLabel}.`
+                                        : 'Esta tarefa está na última coluna.';
+
+                                      const checklistTotal = task.checklist.length;
+                                      const checklistDone = task.checklist.filter((item) => item.done).length;
+                                      const checklistPercentage = checklistTotal
+                                        ? Math.round((checklistDone / checklistTotal) * 100)
+                                        : 0;
+                                      const isRecentlyCreated = Boolean(recentlyCreatedMap[task.id]);
+                                      const isMenuOpen = openMenuTaskId === task.id;
+
+                                      return (
+                                        <Fragment key={task.id}>
+                                          {renderPlaceholderBefore ? (
+                                            <div
+                                              aria-hidden="true"
+                                              className="rounded-2xl border border-dashed border-transparent"
+                                              style={{ height: placeholderHeight ?? undefined }}
+                                            />
+                                          ) : null}
+                                          <Draggable draggableId={task.id} index={index}>
+                                            {(dragProvided, dragSnapshot) => (
+                                              <div
+                                                ref={dragProvided.innerRef}
+                                                {...dragProvided.draggableProps}
+                                                style={dragProvided.draggableProps.style}
+                                                className="space-y-1.5"
+                                                role="listitem"
+                                                aria-current={highlightedTaskId === task.id ? 'true' : undefined}
+                                              >
+                                                <Card
+                                                  {...dragProvided.dragHandleProps}
+                                                  variant="board"
+                                                  className={`group cursor-grab overflow-hidden border-slate-200/70 bg-white/90 transition-all hover:-translate-y-0.5 hover:border-zenko-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-zenko-primary/60 dark:border-white/5 dark:bg-slate-900/70 ${
+                                                    dragSnapshot.isDragging ? 'border-zenko-primary/60 shadow-lg' : ''
+                                                  } ${
+                                                    highlightedTaskId === task.id
+                                                      ? 'ring-2 ring-inset ring-zenko-primary/60'
+                                                      : isRecentlyCreated
+                                                        ? 'animate-taskHighlight ring-2 ring-inset ring-zenko-primary/30'
+                                                        : ''
+                                                  }`}
+                                                  tabIndex={0}
+                                                  aria-label={`Tarefa ${task.title}. Status atual: ${getListTitle(task.status)}. ${ariaInstruction}`}
+                                                  onFocus={() => {
+                                                    setHighlightedTaskId(task.id);
+                                                    setFocusedColumn(task.status);
+                                                  }}
+                                                  onKeyDown={(event) => handleCardKeyDown(event, task)}
+                                                  onClick={() => openTask(task)}
+                                                >
+                                                  <div className="grid grid-cols-[auto,1fr] items-start gap-1.5">
+                                                    <label
+                                                      className={`mt-0 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white/80 text-zenko-primary shadow-sm transition focus-within:ring-2 focus-within:ring-zenko-primary/50 dark:border-white/20 dark:bg-white/10 ${
+                                                        autoMoveToDone ? 'cursor-pointer hover:scale-[1.02]' : 'cursor-not-allowed opacity-50'
+                                                      }`}
+                                                      onClick={(event) => event.stopPropagation()}
+                                                    >
+                                                      <input
+                                                        type="checkbox"
+                                                        aria-label={
+                                                          doneStatus && task.status === doneStatus
+                                                            ? 'Marcar tarefa como pendente'
+                                                            : 'Marcar tarefa como concluída'
+                                                        }
+                                                        checked={doneStatus ? task.status === doneStatus : false}
+                                                        disabled={!autoMoveToDone}
+                                                        onChange={(event) => {
+                                                          event.stopPropagation();
+                                                          handleToggleComplete(task, event.target.checked);
+                                                        }}
+                                                        className="sr-only"
+                                                      />
+                                                      {doneStatus && task.status === doneStatus ? (
+                                                        <svg
+                                                          className="h-3.5 w-3.5"
+                                                          viewBox="0 0 24 24"
+                                                          fill="none"
+                                                          stroke="currentColor"
+                                                          strokeWidth="2"
+                                                          strokeLinecap="round"
+                                                          strokeLinejoin="round"
+                                                          aria-hidden="true"
+                                                        >
+                                                          <path d="M5 13l4 4L19 7" />
+                                                        </svg>
+                                                      ) : null}
+                                                    </label>
+                                                    <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+                                                      <div className="flex flex-wrap items-start justify-between gap-x-1.5 gap-y-1">
                                       <div
                                         className="flex min-w-0 flex-1 flex-wrap gap-0.5"
                                         aria-label={task.labels.length > 0 ? 'Etiquetas da tarefa' : undefined}
@@ -882,13 +955,13 @@ export default function Kanban() {
                                             return (
                                               <span
                                                 key={`${task.id}-label-${definition?.id ?? labelIndex}`}
-                                                className="inline-flex max-w-full items-center rounded-[3px] px-1.5 py-0.5 text-[10px] font-semibold uppercase leading-[12px] tracking-[0.08em] shadow-sm"
+                                                className="inline-flex h-2 w-10 items-center rounded-sm border border-black/10 shadow-sm dark:border-white/20"
                                                 style={{
-                                                  backgroundColor: colors.background,
-                                                  color: colors.foreground
+                                                  backgroundColor: colors.background
                                                 }}
+                                                title={definition?.value ?? label}
                                               >
-                                                <span className="block max-w-full truncate">{definition?.value ?? label}</span>
+                                                <span className="sr-only">{definition?.value ?? label}</span>
                                               </span>
                                             );
                                           })
@@ -1134,94 +1207,117 @@ export default function Kanban() {
                                     </div>
                                   </div>
                                 </div>
-                              </Card>
-                            </div>
-                          )}
-                        </Draggable>
-                      );
-                          })}
+                                                </Card>
+                                              </div>
+                                            )}
+                                          </Draggable>
+                                        </Fragment>
+                                      );
+                                    })}
                           {column.tasks.length === 0 ? (
                             <p className="rounded-lg border border-dashed border-slate-200 bg-white/70 px-3 py-3 text-center text-[11px] text-slate-500 dark:border-white/10 dark:bg-white/5 dark:text-slate-400">
                               Arraste tarefas para esta coluna
                             </p>
                           ) : null}
-                          {provided.placeholder}
-                          <button
-                            type="button"
-                            className="mt-2 inline-flex w-full min-h-[40px] items-center justify-center gap-1.5 rounded-lg border border-dashed border-slate-300/80 bg-white/70 px-3 py-2 text-[12px] font-semibold text-slate-600 transition hover:border-slate-400 hover:bg-white/90 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/60 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:border-white/15 dark:bg-white/10 dark:text-slate-200 dark:hover:border-white/25 dark:hover:bg-white/15 dark:hover:text-white dark:focus-visible:ring-offset-slate-950"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              openCreate(column.key);
+                                    {placeholderIndex === column.tasks.length && placeholderHeight ? (
+                                      <div
+                                        aria-hidden="true"
+                                        className="rounded-2xl border border-dashed border-transparent"
+                                        style={{ height: placeholderHeight }}
+                                      />
+                                    ) : null}
+                                  </div>
+                                  <button
+                                    type="button"
+                                    className="mt-2 inline-flex w-full min-h-[40px] items-center justify-center gap-1.5 rounded-lg border border-dashed border-slate-300/80 bg-white/70 px-3 py-2 text-[12px] font-semibold text-slate-600 transition hover:border-slate-400 hover:bg-white/90 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/60 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:border-white/15 dark:bg-white/10 dark:text-slate-200 dark:hover:border-white/25 dark:hover:bg-white/15 dark:hover:text-white dark:focus-visible:ring-offset-slate-950"
+                                    onClick={(event) => {
+                                      event.stopPropagation();
+                                      openCreate(column.key);
+                                    }}
+                                    title="Adicionar nova tarefa"
+                                    aria-label={`Adicionar tarefa na coluna ${column.title}`}
+                                  >
+                                    <span className="text-sm leading-none">+</span>
+                                    <span>Adicionar tarefa</span>
+                                  </button>
+                                </div>
+                              );
                             }}
-                            title="Adicionar nova tarefa"
-                            aria-label={`Adicionar tarefa na coluna ${column.title}`}
-                          >
-                            <span className="text-sm leading-none">+</span>
-                            <span>Adicionar tarefa</span>
-                          </button>
-                        </div>
-                      </div>
-                    </section>
+                          </Droppable>
+                        </section>
+                      );
+                      </Draggable>
+                    </Fragment>
                   );
-                }}
-              </Droppable>
-            ))}
-            <div className="w-[272px] flex-none self-start">
-              {isAddingList ? (
-                <div className="rounded-xl border border-slate-300/80 bg-white/80 p-3 shadow-sm backdrop-blur dark:border-white/15 dark:bg-white/10">
-                  <label htmlFor="board-new-list" className="sr-only">
-                    Nome da lista
-                  </label>
-                  <input
-                    id="board-new-list"
-                    ref={addListInputRef}
-                    value={newListTitle}
-                    onChange={(event) => setNewListTitle(event.target.value)}
-                    onKeyDown={(event) => {
-                      if (event.key === 'Enter') {
-                        event.preventDefault();
-                        handleSubmitNewList();
-                      }
-                      if (event.key === 'Escape') {
-                        event.preventDefault();
-                        handleCancelNewList();
-                      }
+                })}
+                {boardSnapshot.placeholder?.index === columnsData.length ? (
+                  <div
+                    aria-hidden="true"
+                    className="flex h-full min-h-[20rem] w-[272px] flex-none snap-start"
+                    style={{
+                      width: boardSnapshot.placeholder?.dimensions.width,
+                      height: boardSnapshot.placeholder?.dimensions.height
                     }}
-                    placeholder="Nova lista"
-                    className="w-full rounded-lg border border-slate-300/80 bg-white/95 px-2.5 py-2 text-sm font-medium text-slate-800 shadow-sm outline-none transition focus:border-zenko-primary/50 focus:ring-2 focus:ring-zenko-primary/40 dark:border-white/15 dark:bg-slate-900/70 dark:text-white"
                   />
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    <Button type="button" variant="primary" onClick={handleSubmitNewList}>
-                      Adicionar lista
-                    </Button>
-                    <Button
+                ) : null}
+                <div className="w-[272px] flex-none self-start">
+                  {isAddingList ? (
+                    <div className="rounded-xl border border-slate-300/80 bg-white/80 p-3 shadow-sm backdrop-blur dark:border-white/15 dark:bg-white/10">
+                      <label htmlFor="board-new-list" className="sr-only">
+                        Nome da lista
+                      </label>
+                      <input
+                        id="board-new-list"
+                        ref={addListInputRef}
+                        value={newListTitle}
+                        onChange={(event) => setNewListTitle(event.target.value)}
+                        onKeyDown={(event) => {
+                          if (event.key === 'Enter') {
+                            event.preventDefault();
+                            handleSubmitNewList();
+                          }
+                          if (event.key === 'Escape') {
+                            event.preventDefault();
+                            handleCancelNewList();
+                          }
+                        }}
+                        placeholder="Nova lista"
+                        className="w-full rounded-lg border border-slate-300/80 bg-white/95 px-2.5 py-2 text-sm font-medium text-slate-800 shadow-sm outline-none transition focus:border-zenko-primary/50 focus:ring-2 focus:ring-zenko-primary/40 dark:border-white/15 dark:bg-slate-900/70 dark:text-white"
+                      />
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <Button type="button" variant="primary" onClick={handleSubmitNewList}>
+                          Adicionar lista
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          className="text-sm"
+                          onClick={handleCancelNewList}
+                        >
+                          Cancelar
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button
                       type="button"
-                      variant="ghost"
-                      className="text-sm"
-                      onClick={handleCancelNewList}
+                      className="flex min-h-[40px] w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-slate-300/80 bg-white/60 px-3 py-2 text-sm font-semibold text-slate-600 transition hover:border-slate-400 hover:bg-white/80 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/50 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:border-white/15 dark:bg-white/10 dark:text-slate-200 dark:hover:border-white/25 dark:hover:bg-white/15 dark:hover:text-white dark:focus-visible:ring-offset-slate-950"
+                      onClick={() => {
+                        setIsAddingList(true);
+                        setNewListTitle('');
+                      }}
+                      title="Adicionar outra lista"
+                      aria-expanded={isAddingList}
+                      aria-controls="board-new-list"
                     >
-                      Cancelar
-                    </Button>
-                  </div>
+                      <span className="text-sm leading-none">+</span>
+                      <span>Adicionar outra lista</span>
+                    </button>
+                  )}
                 </div>
-              ) : (
-                <button
-                  type="button"
-                  className="flex min-h-[40px] w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-slate-300/80 bg-white/60 px-3 py-2 text-sm font-semibold text-slate-600 transition hover:border-slate-400 hover:bg-white/80 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/50 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:border-white/15 dark:bg-white/10 dark:text-slate-200 dark:hover:border-white/25 dark:hover:bg-white/15 dark:hover:text-white dark:focus-visible:ring-offset-slate-950"
-                  onClick={() => {
-                    setIsAddingList(true);
-                    setNewListTitle('');
-                  }}
-                  title="Adicionar outra lista"
-                  aria-expanded={isAddingList}
-                  aria-controls="board-new-list"
-                >
-                  <span className="text-sm leading-none">+</span>
-                  <span>Adicionar outra lista</span>
-                </button>
-              )}
-            </div>
-          </div>
+              </div>
+            )}
+          </Droppable>
         </DragDropContext>
       </div>
       <Button
