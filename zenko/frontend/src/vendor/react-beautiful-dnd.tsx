@@ -6,6 +6,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type CSSProperties,
   type DragEvent as ReactDragEvent,
   type ReactNode
 } from 'react';
@@ -19,6 +20,7 @@ export interface DropResult {
   draggableId: string;
   source: DraggableLocation;
   destination: DraggableLocation | null;
+  type: string;
 }
 
 interface DragDropContextProps {
@@ -29,6 +31,7 @@ interface DragDropContextProps {
 interface ActiveDrag {
   draggableId: string;
   source: DraggableLocation;
+  type: string;
 }
 
 interface InternalDndContext {
@@ -37,6 +40,7 @@ interface InternalDndContext {
   finishDrag: (destination: DraggableLocation | null) => void;
   clearDrag: () => void;
   activeId: string | null;
+  activeType: string | null;
   over: DraggableLocation | null;
 }
 
@@ -47,6 +51,7 @@ interface DroppableRegistryItem {
 
 interface DroppableContextValue {
   droppableId: string;
+  type: string;
   registerItem: (id: string, index: number, element: HTMLElement | null) => void;
   unregisterItem: (id: string) => void;
   getCount: () => number;
@@ -74,6 +79,7 @@ interface DraggableProvided {
     onDragEnd: (event: ReactDragEvent) => void;
     onDragOver: (event: ReactDragEvent) => void;
     onDragEnter: (event: ReactDragEvent) => void;
+    style?: CSSProperties;
   };
   dragHandleProps: Record<string, never>;
 }
@@ -91,17 +97,20 @@ const DroppableContext = createContext<DroppableContextValue | null>(null);
 export function DragDropContext({ onDragEnd, children }: DragDropContextProps) {
   const activeRef = useRef<ActiveDrag | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [activeType, setActiveType] = useState<string | null>(null);
   const [over, setOver] = useState<DraggableLocation | null>(null);
 
   const startDrag = useCallback((active: ActiveDrag) => {
     activeRef.current = active;
     setActiveId(active.draggableId);
+    setActiveType(active.type);
     setOver(active.source);
   }, []);
 
   const clearDrag = useCallback(() => {
     activeRef.current = null;
     setActiveId(null);
+    setActiveType(null);
     setOver(null);
   }, []);
 
@@ -112,7 +121,12 @@ export function DragDropContext({ onDragEnd, children }: DragDropContextProps) {
         clearDrag();
         return;
       }
-      onDragEnd({ draggableId: active.draggableId, source: active.source, destination });
+      onDragEnd({
+        draggableId: active.draggableId,
+        source: active.source,
+        destination,
+        type: active.type
+      });
       clearDrag();
     },
     [clearDrag, onDragEnd]
@@ -125,15 +139,26 @@ export function DragDropContext({ onDragEnd, children }: DragDropContextProps) {
       finishDrag,
       clearDrag,
       activeId,
+      activeType,
       over
     }),
-    [activeId, finishDrag, over, startDrag]
+    [activeId, activeType, finishDrag, over, startDrag]
   );
 
   return <DndContext.Provider value={value}>{children}</DndContext.Provider>;
 }
 
-export function Droppable({ droppableId, children }: { droppableId: string; children: DroppableRender }) {
+export function Droppable({
+  droppableId,
+  type = 'DEFAULT',
+  direction: _direction = 'vertical',
+  children
+}: {
+  droppableId: string;
+  type?: string;
+  direction?: 'horizontal' | 'vertical';
+  children: DroppableRender;
+}) {
   const context = useContext(DndContext);
   if (!context) {
     throw new Error('Droppable must be used within a DragDropContext.');
@@ -155,32 +180,47 @@ export function Droppable({ droppableId, children }: { droppableId: string; chil
   const handleDragOver = useCallback(
     (event: ReactDragEvent) => {
       event.preventDefault();
+      if (context.activeType && context.activeType !== type) {
+        return;
+      }
+      if (event.dataTransfer) {
+        event.dataTransfer.dropEffect = 'move';
+      }
       const current = context.over;
       if (!current || current.droppableId !== droppableId) {
         context.updateOver({ droppableId, index: itemsRef.current.size });
       }
     },
-    [context, droppableId]
+    [context, droppableId, type]
   );
 
   const handleDragEnter = useCallback(
     (event: ReactDragEvent) => {
       event.preventDefault();
+      if (context.activeType && context.activeType !== type) {
+        return;
+      }
+      if (event.dataTransfer) {
+        event.dataTransfer.dropEffect = 'move';
+      }
       context.updateOver({ droppableId, index: itemsRef.current.size });
     },
-    [context, droppableId]
+    [context, droppableId, type]
   );
 
   const handleDrop = useCallback(
     (event: ReactDragEvent) => {
       event.preventDefault();
+      if (context.activeType && context.activeType !== type) {
+        return;
+      }
       const destination =
         context.over && context.over.droppableId === droppableId
           ? context.over
           : { droppableId, index: itemsRef.current.size };
       context.finishDrag(destination);
     },
-    [context, droppableId]
+    [context, droppableId, type]
   );
 
   useEffect(() => {
@@ -206,8 +246,8 @@ export function Droppable({ droppableId, children }: { droppableId: string; chil
   };
 
   const droppableValue = useMemo<DroppableContextValue>(
-    () => ({ droppableId, registerItem, unregisterItem, getCount }),
-    [droppableId, getCount, registerItem, unregisterItem]
+    () => ({ droppableId, type, registerItem, unregisterItem, getCount }),
+    [droppableId, getCount, registerItem, unregisterItem, type]
   );
 
   return (
@@ -246,9 +286,16 @@ export function Draggable({
   const handleDragStart = useCallback(
     (event: ReactDragEvent) => {
       event.dataTransfer?.setData('text/plain', draggableId);
-      context.startDrag({ draggableId, source: { droppableId: droppable.droppableId, index } });
+      if (event.dataTransfer) {
+        event.dataTransfer.effectAllowed = 'move';
+      }
+      context.startDrag({
+        draggableId,
+        source: { droppableId: droppable.droppableId, index },
+        type: droppable.type
+      });
     },
-    [context, draggableId, droppable.droppableId, index]
+    [context, draggableId, droppable.droppableId, droppable.type, index]
   );
 
   const handleDragEnd = useCallback(
@@ -262,17 +309,29 @@ export function Draggable({
   const handleDragOver = useCallback(
     (event: ReactDragEvent) => {
       event.preventDefault();
+      if (context.activeType && context.activeType !== droppable.type) {
+        return;
+      }
+      if (event.dataTransfer) {
+        event.dataTransfer.dropEffect = 'move';
+      }
       context.updateOver({ droppableId: droppable.droppableId, index });
     },
-    [context, droppable.droppableId, index]
+    [context, droppable.droppableId, droppable.type, index]
   );
 
   const handleDragEnter = useCallback(
     (event: ReactDragEvent) => {
       event.preventDefault();
+      if (context.activeType && context.activeType !== droppable.type) {
+        return;
+      }
+      if (event.dataTransfer) {
+        event.dataTransfer.dropEffect = 'move';
+      }
       context.updateOver({ droppableId: droppable.droppableId, index });
     },
-    [context, droppable.droppableId, index]
+    [context, droppable.droppableId, droppable.type, index]
   );
 
   const provided: DraggableProvided = {
