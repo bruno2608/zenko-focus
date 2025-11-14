@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { KeyboardEvent as ReactKeyboardEvent, TouchEvent as ReactTouchEvent } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { DragDropContext, Draggable, Droppable, type DropResult } from 'react-beautiful-dnd';
 import Button from '../../components/ui/Button';
 import Card from '../../components/ui/Card';
@@ -19,67 +19,9 @@ import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useToastStore } from '../../components/ui/ToastProvider';
 import { useTaskListsStore, DEFAULT_LISTS } from './listsStore';
 
-const columnTitles: Record<TaskStatus, string> = {
-  todo: 'A Fazer',
-  doing: 'Fazendo',
-  done: 'Concluídas'
-};
-
-const statusOrder: TaskStatus[] = ['todo', 'doing', 'done'];
-
-const columnVisuals: Record<
-  TaskStatus,
-  { accent: string; badge: string; statusChip: string }
-> = {
-  todo: {
-    accent:
-      'from-sky-100/80 via-sky-50/80 to-white/60 dark:from-sky-500/25 dark:via-sky-500/10 dark:to-transparent',
-    badge: 'border border-sky-200/70 bg-sky-100/70 text-sky-700 dark:border-sky-400/40 dark:bg-sky-400/15 dark:text-sky-200',
-    statusChip:
-      'border border-sky-200/80 bg-sky-100/80 text-sky-700 dark:border-sky-400/40 dark:bg-sky-400/15 dark:text-sky-100'
-  },
-  doing: {
-    accent:
-      'from-violet-100/80 via-violet-50/80 to-white/60 dark:from-violet-500/25 dark:via-violet-500/10 dark:to-transparent',
-    badge:
-      'border border-violet-200/70 bg-violet-100/80 text-violet-700 dark:border-violet-400/30 dark:bg-violet-500/15 dark:text-violet-100',
-    statusChip:
-      'border border-violet-200/70 bg-violet-100/80 text-violet-700 dark:border-violet-400/30 dark:bg-violet-500/15 dark:text-violet-100'
-  },
-  done: {
-    accent:
-      'from-emerald-100/80 via-emerald-50/80 to-white/60 dark:from-emerald-500/25 dark:via-emerald-500/10 dark:to-transparent',
-    badge:
-      'border border-emerald-200/70 bg-emerald-100/70 text-emerald-700 dark:border-emerald-400/30 dark:bg-emerald-500/15 dark:text-emerald-100',
-    statusChip:
-      'border border-emerald-200/70 bg-emerald-100/80 text-emerald-700 dark:border-emerald-400/30 dark:bg-emerald-500/20 dark:text-emerald-100'
-  }
-};
-
-const columns = statusOrder.map((status) => ({
-  key: status,
-  title: columnTitles[status],
-  accent: columnVisuals[status].accent,
-  badge: columnVisuals[status].badge,
-  statusChip: columnVisuals[status].statusChip
-}));
-
-const dueDateFormatter =
-  typeof Intl !== 'undefined'
-    ? new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: 'short' })
-    : null;
-
-const formatDueDate = (value: string) => {
-  try {
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) {
-      return null;
-    }
-    return dueDateFormatter ? dueDateFormatter.format(date) : date.toLocaleDateString('pt-BR');
-  } catch (error) {
-    return null;
-  }
-};
+const COLUMN_ACCENT =
+  'from-slate-200/70 via-slate-200/40 to-slate-200/20 dark:from-white/15 dark:via-white/10 dark:to-white/5';
+const BOARD_COLUMNS_DROPPABLE_ID = 'board-columns';
 
 function useLabelDefinitionMap() {
   const labelsLibrary = useTasksStore((state) => state.labelsLibrary);
@@ -118,22 +60,20 @@ function BoardSkeleton() {
         <div className="h-7 w-48 rounded-xl bg-slate-200/80 dark:bg-slate-700/60 animate-pulse" />
         <div className="h-4 w-72 rounded-xl bg-slate-100/70 dark:bg-slate-800/50 animate-pulse" />
       </div>
-      <div className="kanban-scroll flex snap-x snap-mandatory gap-4 overflow-x-auto pb-4">
-        {columns.map((column) => (
+      <div className="flex snap-x snap-mandatory gap-2.5 overflow-x-auto pb-3">
+        {DEFAULT_LISTS.map((column) => (
           <div
-            key={`skeleton-${column.key}`}
-            className={`kanban-column min-h-[20rem] rounded-[26px] bg-gradient-to-br p-[1px] ${column.accent}`}
+            key={`skeleton-${column.id}`}
+            className="w-[272px] flex-none rounded-[22px] border border-slate-200/70 bg-white/70 p-3 backdrop-blur dark:border-white/10 dark:bg-slate-900/60"
           >
-            <div className="flex h-full min-h-0 flex-col rounded-2xl border border-slate-200/70 bg-white/80 p-4 backdrop-blur dark:border-white/10 dark:bg-slate-900/70">
-              <div className="mb-4 h-5 w-24 rounded-lg bg-slate-200/90 dark:bg-slate-800/80 animate-pulse" />
-              <div className="space-y-3">
-                {[0, 1, 2].map((item) => (
-                  <div
-                    key={`skeleton-card-${column.key}-${item}`}
-                    className="h-24 rounded-2xl bg-slate-100/90 shadow-inner animate-pulse dark:bg-slate-800/70"
-                  />
-                ))}
-              </div>
+            <div className="mb-3 h-5 w-24 rounded-lg bg-slate-200/90 dark:bg-slate-800/80 animate-pulse" />
+            <div className="space-y-2.5">
+              {[0, 1, 2].map((item) => (
+                <div
+                  key={`skeleton-card-${column.key}-${item}`}
+                  className="h-20 rounded-xl bg-slate-100/90 shadow-inner animate-pulse dark:bg-slate-800/70"
+                />
+              ))}
             </div>
           </div>
         ))}
@@ -152,10 +92,7 @@ export default function Kanban() {
     updateTask,
     deleteTask,
     createTaskIsPending,
-    updateTaskIsPending,
-    reorderTasksIsPending,
-    updateStatusIsPending,
-    pendingTaskIds
+    updateTaskIsPending
   } = useTasks();
   const lists = useTaskListsStore((state) => state.lists);
   const ensureTaskLists = useTaskListsStore((state) => state.ensureStatuses);
@@ -177,7 +114,7 @@ export default function Kanban() {
   const labelDefinitionMap = useLabelDefinitionMap();
   const menuRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const creationTimeouts = useRef<Map<string, number>>(new Map());
-  const touchSwipeRef = useRef<{ id: string; x: number; y: number; time: number } | null>(null);
+  const addListInputRef = useRef<HTMLInputElement | null>(null);
 
   const statusOrder = useMemo(() => lists.map((list) => list.id), [lists]);
   const columnTitleMap = useMemo(() => {
@@ -250,15 +187,9 @@ export default function Kanban() {
     }));
   }, [columnsMap, lists]);
 
-  const isBoardMutating =
-    createTaskIsPending || updateTaskIsPending || reorderTasksIsPending || updateStatusIsPending;
+  const isMutationPending = createTaskIsPending || updateTaskIsPending;
 
-  const columnRefs = useRef<Record<TaskStatus, HTMLElement | null>>({
-    todo: null,
-    doing: null,
-    done: null
-  });
-  const boardScrollRef = useRef<HTMLDivElement | null>(null);
+  const columnRefs = useRef<Record<string, HTMLElement | null>>({});
 
   const focusColumn = useCallback(
     (status: TaskStatus) => {
@@ -267,32 +198,13 @@ export default function Kanban() {
         return;
       }
       const node = columnRefs.current[status];
-      if (!node || typeof window === 'undefined') {
-        return;
-      }
-
-      const target = node;
-      const prefersReducedMotion =
-        typeof window !== 'undefined'
-          ? window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches ?? false
-          : false;
-      const behavior: ScrollBehavior = prefersReducedMotion ? 'auto' : 'smooth';
-
-      window.requestAnimationFrame(() => {
-        if (typeof document !== 'undefined' && target) {
-          if (document.activeElement !== target) {
+      if (node && typeof window !== 'undefined') {
+        const target = node;
+        window.requestAnimationFrame(() => {
+          if (typeof document !== 'undefined' && target && document.activeElement !== target) {
             target.focus();
           }
-          target.scrollIntoView({ behavior, block: 'nearest', inline: 'center' });
-        }
-      });
-
-      const scroller = boardScrollRef.current;
-      if (scroller) {
-        const { left: columnLeft, width: columnWidth } = target.getBoundingClientRect();
-        const { left: scrollerLeft, width: scrollerWidth } = scroller.getBoundingClientRect();
-        const offset = columnLeft - scrollerLeft - (scrollerWidth - columnWidth) / 2;
-        scroller.scrollTo({ left: scroller.scrollLeft + offset, behavior });
+        });
       }
     },
     [statusOrder]
@@ -405,6 +317,14 @@ export default function Kanban() {
     }
   }, [tasksById, highlightedTaskId]);
 
+  useEffect(() => {
+    if (!focusedColumn) return;
+    const ref = columnRefs.current[focusedColumn];
+    if (ref) {
+      ref.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
+    }
+  }, [focusedColumn]);
+
   const getNextSortOrder = useCallback(
     (status: TaskStatus) => columnsMap[status]?.length ?? 0,
     [columnsMap]
@@ -498,72 +418,6 @@ export default function Kanban() {
       }
     },
     [getAdjacentStatus, placeTaskInStatus]
-  );
-
-  const handleTouchStart = useCallback(
-    (event: ReactTouchEvent<HTMLDivElement>, task: Task) => {
-      if (event.touches.length !== 1) {
-        return;
-      }
-      const touch = event.touches[0];
-      touchSwipeRef.current = {
-        id: task.id,
-        x: touch.clientX,
-        y: touch.clientY,
-        time: Date.now()
-      };
-    },
-    []
-  );
-
-  const handleTouchMove = useCallback((event: ReactTouchEvent<HTMLDivElement>) => {
-    if (!touchSwipeRef.current) return;
-    if (event.touches.length !== 1) {
-      touchSwipeRef.current = null;
-      return;
-    }
-    const touch = event.touches[0];
-    const deltaX = Math.abs(touch.clientX - touchSwipeRef.current.x);
-    const deltaY = Math.abs(touch.clientY - touchSwipeRef.current.y);
-    if (deltaY > deltaX * 1.2) {
-      touchSwipeRef.current = null;
-    }
-  }, []);
-
-  const handleTouchEnd = useCallback(
-    (event: ReactTouchEvent<HTMLDivElement>, task: Task) => {
-      const start = touchSwipeRef.current;
-      touchSwipeRef.current = null;
-      if (!start || start.id !== task.id) {
-        return;
-      }
-      const touch = event.changedTouches[0];
-      if (!touch) {
-        return;
-      }
-      const deltaX = touch.clientX - start.x;
-      const deltaY = Math.abs(touch.clientY - start.y);
-      const duration = Date.now() - start.time;
-      if (deltaY > 80 || duration > 600 || Math.abs(deltaX) < 60) {
-        return;
-      }
-      if (deltaX < 0) {
-        const nextStatus = getAdjacentStatus(task.status, 'next');
-        if (nextStatus) {
-          placeTaskInStatus(task, nextStatus);
-        } else {
-          toast({ title: 'Já está na última coluna', type: 'warning' });
-        }
-      } else {
-        const previousStatus = getAdjacentStatus(task.status, 'previous');
-        if (previousStatus) {
-          placeTaskInStatus(task, previousStatus, 'end');
-        } else {
-          toast({ title: 'Esta é a primeira coluna', type: 'warning' });
-        }
-      }
-    },
-    [placeTaskInStatus, toast]
   );
 
   const handleDragEnd = useCallback(
@@ -825,17 +679,14 @@ export default function Kanban() {
     return <BoardSkeleton />;
   }
 
-  const hasAnyTask = columnsData.some((column) => column.tasks.length > 0);
-
   return (
-    <div
-      className="flex h-full min-h-0 flex-col gap-6"
-      aria-live="polite"
-      aria-busy={isBoardMutating}
-      aria-label="Quadro Kanban"
-    >
-      {showOffline ? <OfflineNotice feature="Tarefas" /> : null}
-      {isBoardMutating ? (
+    <div className="flex h-full min-h-0 flex-col gap-6 overflow-hidden" aria-live="polite">
+      {showOffline ? (
+        <div className="flex-shrink-0">
+          <OfflineNotice feature="Tarefas" />
+        </div>
+      ) : null}
+      {isMutationPending ? (
         <div
           className="pointer-events-none fixed bottom-6 left-1/2 z-40 flex -translate-x-1/2 items-center gap-2 rounded-full border border-white/20 bg-slate-900/85 px-4 py-2 text-xs font-medium text-white shadow-xl backdrop-blur dark:border-white/10 dark:bg-slate-800/85"
           role="status"
@@ -863,273 +714,62 @@ export default function Kanban() {
           <p className="text-sm text-slate-600 dark:text-slate-300">Arraste e solte para mover prioridades rapidamente.</p>
         </div>
       </div>
-      <div className="flex flex-wrap gap-3 text-xs text-slate-600 dark:text-slate-200">
-        <label className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-white/80 px-3 py-2 backdrop-blur dark:border-white/10 dark:bg-white/5">
-          <span className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-300">Status</span>
-          <Select
-            className="w-28 min-w-[7rem] text-xs"
-            value={filters.status}
-            onChange={(e) => setFilter({ status: e.target.value as any })}
-          >
-            <option value="all">Todos</option>
-            <option value="todo">A fazer</option>
-            <option value="doing">Fazendo</option>
-            <option value="done">Concluídos</option>
-          </Select>
-        </label>
-        <label className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-white/80 px-3 py-2 backdrop-blur dark:border-white/10 dark:bg-white/5">
-          <span className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-300">Prazo</span>
-          <Select
-            className="w-28 min-w-[7rem] text-xs"
-            value={filters.due}
-            onChange={(e) => setFilter({ due: e.target.value as any })}
-          >
-            <option value="all">Todos</option>
-            <option value="today">Hoje</option>
-            <option value="week">Esta semana</option>
-          </Select>
-        </label>
-      </div>
-      {!hasAnyTask ? (
-        <div className="rounded-3xl border border-dashed border-slate-300/70 bg-white/70 px-6 py-8 text-center text-sm text-slate-500 shadow-inner backdrop-blur dark:border-white/15 dark:bg-slate-900/40 dark:text-slate-300">
-          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full border border-slate-300/70 bg-white/80 text-zenko-primary shadow-sm dark:border-white/10 dark:bg-white/10">
-            <svg
-              className="h-5 w-5"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.6"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden="true"
-            >
-              <path d="M12 5v14" />
-              <path d="M5 12h14" />
-            </svg>
-          </div>
-          <p className="mb-4 font-medium text-slate-600 dark:text-slate-200">Organize suas próximas tarefas</p>
-          <p className="mx-auto mb-5 max-w-xs text-xs text-slate-500 dark:text-slate-300">
-            Crie sua primeira tarefa e arraste para as colunas conforme o progresso. Tudo fica sincronizado automaticamente.
-          </p>
-          <Button
-            type="button"
-            onClick={() => openCreate('todo')}
-            className="mx-auto w-full max-w-xs"
-            aria-label="Criar primeira tarefa"
-          >
-            Adicionar tarefa
-          </Button>
-        </div>
-      ) : null}
-      <div className="flex-1 min-h-0">
+      <div className="flex-1 min-h-0 overflow-hidden">
         <DragDropContext onDragEnd={handleDragEnd}>
-          <div
-            ref={boardScrollRef}
-            className="kanban-scroll flex h-full min-h-0 snap-x snap-mandatory gap-4 overflow-x-auto overflow-y-hidden pb-4 md:snap-none"
-            role="list"
-            aria-label="Colunas do quadro"
-          >
-            {columnsData.map((column) => (
-              <Droppable droppableId={column.key} key={column.key}>
-                {(provided, snapshot) => {
-                  const isFocused = focusedColumn === column.key;
-                  const columnTabIndex = focusedColumn ? (isFocused ? 0 : -1) : 0;
-                  const columnTitleId = `column-${column.key}`;
-                  const highlightClasses = snapshot.isDraggingOver
-                    ? 'ring-2 ring-zenko-primary/60 shadow-xl'
-                    : isFocused
-                      ? 'border-zenko-primary/40 ring-1 ring-zenko-primary/25 shadow-lg'
-                      : 'shadow-[0_18px_40px_-22px_rgba(15,23,42,0.12)] dark:shadow-[0_18px_40px_-32px_rgba(15,23,42,0.8)]';
-                  const columnIsPending = column.tasks.some((task) => pendingTaskIds.has(task.id));
+          <Droppable droppableId={BOARD_COLUMNS_DROPPABLE_ID} direction="horizontal" type="COLUMN">
+            {(boardProvided) => (
+              <div
+                ref={boardProvided.innerRef}
+                {...boardProvided.droppableProps}
+                className="flex h-full min-h-0 snap-x snap-mandatory gap-2.5 overflow-x-auto overflow-y-hidden pb-3 md:snap-none"
+              >
 
                 {columnsData.map((column, columnIndex) => {
                   const columnDraggableId = `column:${column.key}`;
                   return (
-                    <section
-                      ref={(node) => {
-                        provided.innerRef(node);
-                        columnRefs.current[column.key] = node;
-                      }}
-                      {...provided.droppableProps}
-                      className={`kanban-column group relative flex h-full min-h-[20rem] snap-start flex-col rounded-[26px] bg-gradient-to-br p-[1px] transition-shadow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/60 ${column.accent}`}
-                      role="group"
-                      aria-labelledby={columnTitleId}
-                      aria-describedby={`${columnTitleId}-meta`}
-                      tabIndex={columnTabIndex}
-                      onFocus={() => {
-                        focusColumn(column.key);
-                      }}
-                    >
-                      <div
-                        className={`flex h-full min-h-0 flex-col overflow-hidden rounded-2xl border border-slate-200/70 bg-white/95 p-3 backdrop-blur dark:border-white/10 dark:bg-slate-900/70 ${highlightClasses}`}
-                        aria-busy={columnIsPending || undefined}
-                      >
-                        <header className="flex items-center justify-between">
-                          <h3
-                            id={columnTitleId}
-                            className="text-sm font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-200"
-                          >
-                            {column.title}
-                          </h3>
-                          <span
-                            id={`${columnTitleId}-meta`}
-                            className={`rounded-full px-2 py-1 text-xs font-semibold ${column.badge}`}
-                          >
-                            {column.tasks.length}
-                          </span>
-                        </header>
-                        <div
-                          className="mt-2.5 flex-1 min-h-0 space-y-2.5 overflow-y-auto pr-1"
-                          role="list"
-                          aria-label={`Tarefas em ${column.title}`}
-                        >
-                          {column.tasks.map((task, index) => {
-                      const previousStatus = getAdjacentStatus(task.status, 'previous');
-                      const nextStatus = getAdjacentStatus(task.status, 'next');
-                      const nextStatusLabel = nextStatus ? columnTitles[nextStatus] : 'coluna final';
-                      const ariaInstruction = nextStatus
-                        ? `Pressione Enter ou Espaço para mover para ${nextStatusLabel}.`
-                        : 'Esta tarefa está na última coluna.';
+                    <Draggable key={column.key} draggableId={columnDraggableId} index={columnIndex}>
+                      {(columnProvided, columnSnapshot) => {
+                        const isFocused = focusedColumn === column.key;
+                        const columnTabIndex = focusedColumn ? (isFocused ? 0 : -1) : 0;
 
-                      const checklistTotal = task.checklist.length;
-                      const checklistDone = task.checklist.filter((item) => item.done).length;
-                      const checklistPercentage = checklistTotal
-                        ? Math.round((checklistDone / checklistTotal) * 100)
-                        : 0;
-                      const isRecentlyCreated = Boolean(recentlyCreatedMap[task.id]);
-                      const isMenuOpen = openMenuTaskId === task.id;
-                      const columnVisual = columnVisuals[task.status];
-                      const statusChipClass = columnVisual.statusChip;
-                      const isCardPending = pendingTaskIds.has(task.id);
-                      const dueLabel = task.due_date ? formatDueDate(task.due_date) : null;
-                      const statusLabel = columnTitles[task.status];
+                        return (
+                          <section
+                            ref={(node) => {
+                              columnProvided.innerRef(node);
+                              columnRefs.current[column.key] = node;
+                            }}
+                            {...columnProvided.draggableProps}
+                            style={columnProvided.draggableProps.style}
+                            className={`group relative flex h-full min-h-[20rem] w-[272px] flex-none snap-start flex-col rounded-[20px] bg-gradient-to-br p-[1px] transition-transform transition-shadow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/60 ${column.accent} ${columnSnapshot.isDragging ? 'scale-[1.01]' : ''}`}
+                            role="region"
+                            aria-labelledby={`column-${column.key}`}
+                            aria-describedby={`column-${column.key}-meta`}
+                            tabIndex={columnTabIndex}
+                            onFocus={() => {
+                              focusColumn(column.key);
+                            }}
+                          >
+                            <Droppable droppableId={column.key} type="TASK">
+                              {(taskProvided, taskSnapshot) => {
+                                const highlightClasses = taskSnapshot.isDraggingOver
+                                  ? 'ring-2 ring-zenko-primary/60 shadow-xl'
+                                  : isFocused
+                                    ? 'border-zenko-primary/40 ring-1 ring-zenko-primary/25 shadow-lg'
+                                    : 'shadow-[0_18px_40px_-22px_rgba(15,23,42,0.12)] dark:shadow-[0_18px_40px_-32px_rgba(15,23,42,0.8)]';
 
-                      return (
-                        <Draggable draggableId={task.id} index={index} key={task.id}>
-                          {(dragProvided, dragSnapshot) => (
-                            <div
-                              ref={dragProvided.innerRef}
-                              {...dragProvided.draggableProps}
-                              {...dragProvided.dragHandleProps}
-                              className="space-y-2"
-                              role="listitem"
-                              aria-current={highlightedTaskId === task.id ? 'true' : undefined}
-                            >
-                              <Card
-                                variant="board"
-                                className={`group relative cursor-grab overflow-hidden border-slate-200/80 bg-white/90 transition-all hover:-translate-y-1 hover:border-zenko-primary/40 hover:shadow-[0_20px_45px_-24px_rgba(14,165,233,0.45)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-zenko-primary/60 dark:border-white/5 dark:bg-slate-900/70 ${
-                                  dragSnapshot.isDragging ? 'border-zenko-primary/60 shadow-lg' : ''
-                                } ${
-                                  highlightedTaskId === task.id
-                                    ? 'ring-2 ring-inset ring-zenko-primary/60'
-                                    : isRecentlyCreated
-                                      ? 'animate-taskHighlight ring-2 ring-inset ring-zenko-primary/30'
-                                      : ''
-                                } ${isCardPending ? 'pointer-events-none' : ''}`}
-                                tabIndex={0}
-                                aria-label={`Tarefa ${task.title}. Status atual: ${columnTitles[task.status]}. ${ariaInstruction}`}
-                                onFocus={() => {
-                                  setHighlightedTaskId(task.id);
-                                  setFocusedColumn(task.status);
-                                }}
-                                onKeyDown={(event) => handleCardKeyDown(event, task)}
-                                onClick={() => openTask(task)}
-                                aria-busy={isCardPending || undefined}
-                                onTouchStart={(event) => handleTouchStart(event, task)}
-                                onTouchMove={handleTouchMove}
-                                onTouchEnd={(event) => handleTouchEnd(event, task)}
-                                onTouchCancel={() => {
-                                  touchSwipeRef.current = null;
-                                }}
-                              >
-                                {isCardPending ? (
-                                  <div className="absolute inset-0 z-20 flex items-center justify-center rounded-xl bg-white/70 backdrop-blur-sm dark:bg-slate-950/70">
-                                    <svg
-                                      className="h-5 w-5 animate-spin text-zenko-primary"
-                                      viewBox="0 0 24 24"
-                                      fill="none"
-                                      stroke="currentColor"
-                                      strokeWidth="2"
-                                      strokeLinecap="round"
-                                      strokeLinejoin="round"
-                                      aria-hidden="true"
-                                    >
-                                      <circle cx="12" cy="12" r="10" className="opacity-30" />
-                                      <path d="M4 12a8 8 0 018-8" className="opacity-80" />
-                                    </svg>
-                                    <span className="sr-only">Atualizando tarefa...</span>
-                                  </div>
-                                ) : null}
-                                <div className={`grid grid-cols-[auto,1fr] items-start gap-2.5 ${isCardPending ? 'opacity-60' : ''}`}>
-                                  <label
-                                    className={`mt-1 flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-slate-300 bg-white/80 text-zenko-primary shadow-sm transition focus-within:ring-2 focus-within:ring-zenko-primary/50 dark:border-white/20 dark:bg-white/10 ${
-                                      autoMoveToDone ? 'cursor-pointer hover:scale-[1.02]' : 'cursor-not-allowed opacity-50'
-                                    }`}
-                                    onClick={(event) => event.stopPropagation()}
+                                return (
+                                  <div
+                                    ref={(node) => {
+                                      taskProvided.innerRef(node);
+                                    }}
+                                    {...taskProvided.droppableProps}
+                                    className={`flex h-full min-h-0 flex-col overflow-hidden rounded-[14px] border border-slate-200/70 bg-white/95 p-2 backdrop-blur dark:border-white/10 dark:bg-slate-900/70 ${highlightClasses}`}
                                   >
-                                    <input
-                                      type="checkbox"
-                                      aria-label={
-                                        task.status === 'done'
-                                          ? 'Marcar tarefa como pendente'
-                                          : 'Marcar tarefa como concluída'
-                                      }
-                                      checked={task.status === 'done'}
-                                      disabled={!autoMoveToDone}
-                                      onChange={(event) => {
-                                        event.stopPropagation();
-                                        handleToggleComplete(task, event.target.checked);
-                                      }}
-                                      className="sr-only"
-                                    />
-                                    {task.status === 'done' ? (
-                                      <svg
-                                        className="h-4 w-4"
-                                        viewBox="0 0 24 24"
-                                        fill="none"
-                                        stroke="currentColor"
-                                        strokeWidth="2"
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        aria-hidden="true"
-                                      >
-                                        <path d="M5 13l4 4L19 7" />
-                                      </svg>
-                                    ) : null}
-                                  </label>
-                                  <div className="flex min-w-0 flex-1 flex-col gap-2.5">
-                                    <div className="flex items-center justify-between gap-2 md:hidden">
-                                      <span
-                                        className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide ${statusChipClass}`}
-                                      >
-                                        {statusLabel}
-                                      </span>
-                                      {dueLabel ? (
-                                        <span className="inline-flex items-center gap-1 rounded-full border border-slate-200/70 bg-white/90 px-2.5 py-1 text-[11px] font-medium text-slate-600 dark:border-white/10 dark:bg-slate-900/60 dark:text-slate-200">
-                                          <svg
-                                            className="h-3.5 w-3.5"
-                                            viewBox="0 0 24 24"
-                                            fill="none"
-                                            stroke="currentColor"
-                                            strokeWidth="1.5"
-                                            strokeLinecap="round"
-                                            strokeLinejoin="round"
-                                            aria-hidden="true"
-                                          >
-                                            <path d="M4 7h16" />
-                                            <path d="M10 11h4" />
-                                            <rect x="3" y="4" width="18" height="18" rx="2" />
-                                          </svg>
-                                          {dueLabel}
-                                        </span>
-                                      ) : (
-                                        <span className="sr-only">Sem prazo definido</span>
-                                      )}
-                                    </div>
-                                    <div className="flex flex-wrap items-start justify-between gap-x-2 gap-y-2">
+                                    <header>
                                       <div
-                                        className="hidden min-w-0 flex-1 flex-wrap gap-1 md:flex"
-                                        aria-label={task.labels.length > 0 ? 'Etiquetas da tarefa' : undefined}
+                                        className={`flex items-center justify-between rounded-[10px] px-1 py-1 ${columnSnapshot.isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
+                                        title="Arraste para reorganizar a lista"
+                                        {...columnProvided.dragHandleProps}
                                       >
                                         <h3
                                           id={`column-${column.key}`}
@@ -1145,86 +785,380 @@ export default function Kanban() {
                                           {column.tasks.length}
                                         </span>
                                       </div>
-                                    </div>
-                                    <div className="space-y-2">
-                                      <h4
-                                        className="clamp-2 break-words text-sm font-semibold leading-5 text-slate-900 dark:text-white"
-                                        title={task.title}
-                                      >
-                                        {task.title}
-                                      </h4>
-                                      {dueLabel ? (
-                                        <p
-                                          className="hidden min-w-0 max-w-full items-center gap-1 rounded-full border border-zenko-primary/30 bg-zenko-primary/10 px-2.5 py-1 text-[11px] font-medium text-zenko-primary dark:border-zenko-primary/40 dark:bg-zenko-primary/15 md:inline-flex"
-                                          title={`Prazo: ${dueLabel}`}
-                                        >
-                                          <svg
-                                            className="h-3.5 w-3.5"
-                                            viewBox="0 0 24 24"
-                                            fill="none"
-                                            stroke="currentColor"
-                                            strokeWidth="1.5"
-                                            strokeLinecap="round"
-                                            strokeLinejoin="round"
-                                            aria-hidden="true"
-                                          >
-                                            <path d="M4 7h16" />
-                                            <path d="M10 11h4" />
-                                            <rect x="3" y="4" width="18" height="18" rx="2" />
-                                          </svg>
-                                          <span className="block max-w-full truncate">Prazo: {dueLabel}</span>
+                                    </header>
+                                    <div
+                                      className="mt-1.5 flex-1 min-h-0 space-y-1.5 overflow-y-auto pr-1"
+                                      role="list"
+                                      aria-label={`Tarefas em ${column.title}`}
+                                    >
+                                      {column.tasks.length === 0 ? (
+                                        <p className="rounded-lg border border-dashed border-slate-200 bg-white/70 px-3 py-3 text-center text-[11px] text-slate-500 dark:border-white/10 dark:bg-white/5 dark:text-slate-400">
+                                          Arraste tarefas para esta coluna
                                         </p>
                                       ) : null}
-                                      {checklistTotal > 0 ? (
-                                        <div className="hidden space-y-2 md:block">
-                                          <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 text-[11px] font-medium text-slate-500 dark:text-slate-300">
-                                            <span>Checklist</span>
-                                            <span>
-                                              {checklistDone}/{checklistTotal}
-                                            </span>
-                                          </div>
-                                          <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-white/10">
-                                            <div
-                                              className={`h-1.5 rounded-full transition-all ${
-                                                checklistDone === checklistTotal && checklistTotal > 0
-                                                  ? 'bg-emerald-500'
-                                                  : 'bg-zenko-primary'
-                                              }`}
-                                              style={{ width: `${checklistPercentage}%` }}
-                                            />
-                                          </div>
-                                        </div>
-                                      ) : null}
-                                    </div>
-                                    <div className="flex flex-wrap gap-2 md:hidden motion-reduce:flex motion-reduce:md:flex">
-                                      <button
-                                        type="button"
-                                        className="flex-1 rounded-full border border-zenko-primary/40 bg-white/90 px-4 py-2 text-xs font-semibold text-zenko-primary shadow-sm transition hover:border-zenko-primary/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/60 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50 dark:bg-slate-900/70 min-h-[44px]"
-                                        onClick={(event) => {
-                                          event.stopPropagation();
-                                          if (previousStatus) {
-                                            placeTaskInStatus(task, previousStatus, 'end');
-                                          }
-                                        }}
-                                        disabled={!previousStatus}
-                                        aria-label={`Mover ${task.title} para ${previousStatus ? columnTitles[previousStatus] : 'coluna anterior'}`}
-                                      >
-                                        Mover para coluna anterior
-                                      </button>
-                                      <button
-                                        type="button"
-                                        className="flex-1 rounded-full border border-zenko-primary/40 bg-white/90 px-4 py-2 text-xs font-semibold text-zenko-primary shadow-sm transition hover:border-zenko-primary/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/60 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50 dark:bg-slate-900/70 min-h-[44px]"
-                                        onClick={(event) => {
-                                          event.stopPropagation();
-                                          if (nextStatus) {
-                                            placeTaskInStatus(task, nextStatus, 'end');
-                                          }
-                                        }}
-                                        disabled={!nextStatus}
-                                        aria-label={`Mover ${task.title} para ${nextStatus ? columnTitles[nextStatus] : 'coluna seguinte'}`}
-                                      >
-                                        Mover para próxima coluna
-                                      </button>
+                                      {column.tasks.map((task, index) => {
+                                        const previousStatus = getAdjacentStatus(task.status, 'previous');
+                                        const nextStatus = getAdjacentStatus(task.status, 'next');
+                                        const nextStatusLabel = nextStatus ? getListTitle(nextStatus) : 'coluna final';
+                                        const ariaInstruction = nextStatus
+                                          ? `Pressione Enter ou Espaço para mover para ${nextStatusLabel}.`
+                                          : 'Esta tarefa está na última coluna.';
+                                        const checklistTotal = task.checklist.length;
+                                        const checklistDone = task.checklist.filter((item) => item.done).length;
+                                        const checklistPercentage = checklistTotal
+                                          ? Math.round((checklistDone / checklistTotal) * 100)
+                                          : 0;
+                                        const isRecentlyCreated = Boolean(recentlyCreatedMap[task.id]);
+                                        const isMenuOpen = openMenuTaskId === task.id;
+
+                                        return (
+                                          <Draggable key={task.id} draggableId={task.id} index={index}>
+                                            {(dragProvided, dragSnapshot) => (
+                                              <div
+                                                ref={dragProvided.innerRef}
+                                                {...dragProvided.draggableProps}
+                                                style={dragProvided.draggableProps.style}
+                                                className="space-y-1.5"
+                                                role="listitem"
+                                                aria-current={highlightedTaskId === task.id ? 'true' : undefined}
+                                              >
+                                                <Card
+                                                  {...dragProvided.dragHandleProps}
+                                                  variant="board"
+                                                  className={`group overflow-hidden border-slate-200/70 bg-white/90 transition-all hover:-translate-y-0.5 hover:border-zenko-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-zenko-primary/60 dark:border-white/5 dark:bg-slate-900/70 ${
+                                                    dragSnapshot.isDragging ? 'border-zenko-primary/60 shadow-lg opacity-0' : 'cursor-grab'
+                                                  } ${
+                                                    highlightedTaskId === task.id
+                                                      ? 'ring-2 ring-inset ring-zenko-primary/60'
+                                                      : isRecentlyCreated
+                                                        ? 'animate-taskHighlight ring-2 ring-inset ring-zenko-primary/30'
+                                                        : ''
+                                                  }`}
+                                                  tabIndex={0}
+                                                  aria-label={`Tarefa ${task.title}. Status atual: ${getListTitle(task.status)}. ${ariaInstruction}`}
+                                                  onFocus={() => {
+                                                    setHighlightedTaskId(task.id);
+                                                    setFocusedColumn(task.status);
+                                                  }}
+                                                  onKeyDown={(event) => handleCardKeyDown(event, task)}
+                                                  onClick={() => openTask(task)}
+                                                >
+                                                  <div className="grid grid-cols-[auto,1fr] items-start gap-1.5">
+                                                    <label
+                                                      className={`mt-0 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white/80 text-zenko-primary shadow-sm transition focus-within:ring-2 focus-within:ring-zenko-primary/50 dark:border-white/20 dark:bg-white/10 ${
+                                                        autoMoveToDone ? 'cursor-pointer hover:scale-[1.02]' : 'cursor-not-allowed opacity-50'
+                                                      }`}
+                                                      onClick={(event) => event.stopPropagation()}
+                                                    >
+                                                      <input
+                                                        type="checkbox"
+                                                        aria-label={
+                                                          doneStatus && task.status === doneStatus
+                                                            ? 'Marcar tarefa como pendente'
+                                                            : 'Marcar tarefa como concluída'
+                                                        }
+                                                        checked={doneStatus ? task.status === doneStatus : false}
+                                                        disabled={!autoMoveToDone}
+                                                        onChange={(event) => {
+                                                          event.stopPropagation();
+                                                          handleToggleComplete(task, event.target.checked);
+                                                        }}
+                                                        className="sr-only"
+                                                      />
+                                                      {doneStatus && task.status === doneStatus ? (
+                                                        <svg
+                                                          className="h-3.5 w-3.5"
+                                                          viewBox="0 0 24 24"
+                                                          fill="none"
+                                                          stroke="currentColor"
+                                                          strokeWidth="2"
+                                                          strokeLinecap="round"
+                                                          strokeLinejoin="round"
+                                                          aria-hidden="true"
+                                                        >
+                                                          <path d="M5 13l4 4L19 7" />
+                                                        </svg>
+                                                      ) : null}
+                                                    </label>
+                                                    <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+                                                      <div className="flex flex-wrap items-start justify-between gap-x-1.5 gap-y-1">
+                                                        <div
+                                                          className="flex min-w-0 flex-1 flex-wrap gap-0.5"
+                                                          aria-label={task.labels.length > 0 ? 'Etiquetas da tarefa' : undefined}
+                                                        >
+                                                          {task.labels.length === 0 ? (
+                                                            <span className="sr-only">Sem etiquetas</span>
+                                                          ) : (
+                                                            task.labels.map((label, labelIndex) => {
+                                                              const normalized = label.toLocaleLowerCase();
+                                                              const definition = labelDefinitionMap.get(normalized);
+                                                              const colors = getLabelColors(label, {
+                                                                colorId: definition?.colorId,
+                                                                fallbackIndex: labelIndex
+                                                              });
+                                                              return (
+                                                                <span
+                                                                  key={`${task.id}-label-${definition?.id ?? labelIndex}`}
+                                                                  className="inline-flex h-2 w-10 items-center rounded-sm border border-black/10 shadow-sm dark:border-white/20"
+                                                                  style={{
+                                                                    backgroundColor: colors.background
+                                                                  }}
+                                                                  title={definition?.value ?? label}
+                                                                >
+                                                                  <span className="sr-only">{definition?.value ?? label}</span>
+                                                                </span>
+                                                              );
+                                                            })
+                                                          )}
+                                                        </div>
+                                                        <div
+                                                          className="relative flex-shrink-0 self-start"
+                                                          ref={(node) => {
+                                                            if (node) {
+                                                              menuRefs.current[task.id] = node;
+                                                            } else {
+                                                              delete menuRefs.current[task.id];
+                                                            }
+                                                          }}
+                                                        >
+                                                          <button
+                                                            type="button"
+                                                            className={`h-8 w-8 rounded-full border border-transparent bg-transparent text-slate-500 opacity-0 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/60 focus-visible:opacity-100 focus-visible:border-zenko-primary/40 focus-visible:bg-white/70 group-focus-within:opacity-100 group-hover:opacity-100 group-hover:border-slate-200/60 group-hover:bg-white/70 group-hover:text-slate-600 hover:border-zenko-primary/30 hover:bg-white/70 hover:text-zenko-primary dark:text-slate-300 dark:hover:border-white/20 dark:hover:bg-slate-900/60 dark:hover:text-white dark:group-hover:border-white/20 dark:group-hover:bg-slate-900/60 dark:group-hover:text-white ${
+                                                              isMenuOpen ? 'opacity-100 border-zenko-primary/40 bg-white/70 text-zenko-primary dark:bg-slate-900/70' : ''
+                                                            }`}
+                                                            aria-haspopup="menu"
+                                                            aria-expanded={isMenuOpen}
+                                                            aria-controls={`task-menu-${task.id}`}
+                                                            onClick={(event) => {
+                                                              event.stopPropagation();
+                                                              setOpenMenuTaskId((current) => (current === task.id ? null : task.id));
+                                                            }}
+                                                            title="Ações rápidas"
+                                                          >
+                                                            <span className="sr-only">Abrir ações rápidas para {task.title}</span>
+                                                            <svg
+                                                              className="mx-auto h-3.5 w-3.5"
+                                                              viewBox="0 0 24 24"
+                                                              fill="none"
+                                                              stroke="currentColor"
+                                                              strokeWidth="2"
+                                                              strokeLinecap="round"
+                                                              strokeLinejoin="round"
+                                                              aria-hidden="true"
+                                                            >
+                                                              <circle cx="5" cy="12" r="1" />
+                                                              <circle cx="12" cy="12" r="1" />
+                                                              <circle cx="19" cy="12" r="1" />
+                                                            </svg>
+                                                          </button>
+                                                          <div
+                                                            id={`task-menu-${task.id}`}
+                                                            role="menu"
+                                                            className={`absolute right-0 top-9 z-30 w-48 rounded-xl border border-slate-200 bg-white/95 p-1.5 text-xs shadow-2xl transition focus:outline-none dark:border-white/10 dark:bg-slate-900/95 ${
+                                                              isMenuOpen
+                                                                ? 'visible translate-y-0 opacity-100'
+                                                                : 'invisible pointer-events-none -translate-y-1 opacity-0'
+                                                            }`}
+                                                          >
+                                                            <button
+                                                              type="button"
+                                                              role="menuitem"
+                                                              className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-slate-700 transition hover:bg-zenko-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/60 dark:text-slate-200 dark:hover:bg-white/10"
+                                                              onClick={(event) => {
+                                                                event.stopPropagation();
+                                                                setOpenMenuTaskId(null);
+                                                                openTask(task);
+                                                              }}
+                                                              autoFocus={isMenuOpen}
+                                                            >
+                                                              <svg
+                                                                className="h-4 w-4"
+                                                                viewBox="0 0 24 24"
+                                                                fill="none"
+                                                                stroke="currentColor"
+                                                                strokeWidth="2"
+                                                                strokeLinecap="round"
+                                                                strokeLinejoin="round"
+                                                                aria-hidden="true"
+                                                              >
+                                                                <path d="M12 20h9" />
+                                                                <polyline points="16 4 20 4 20 8" />
+                                                                <line x1="14" y1="10" x2="20" y2="4" />
+                                                              </svg>
+                                                              Abrir detalhes
+                                                            </button>
+                                                            {nextStatus ? (
+                                                              <button
+                                                                type="button"
+                                                                role="menuitem"
+                                                                className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-slate-700 transition hover:bg-zenko-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/60 dark:text-slate-200 dark:hover:bg-white/10"
+                                                                onClick={(event) => {
+                                                                  event.stopPropagation();
+                                                                  setOpenMenuTaskId(null);
+                                                                  placeTaskInStatus(task, nextStatus, 'end');
+                                                                }}
+                                                              >
+                                                                <svg
+                                                                  className="h-4 w-4"
+                                                                  viewBox="0 0 24 24"
+                                                                  fill="none"
+                                                                  stroke="currentColor"
+                                                                  strokeWidth="2"
+                                                                  strokeLinecap="round"
+                                                                  strokeLinejoin="round"
+                                                                  aria-hidden="true"
+                                                                >
+                                                                  <path d="M5 12h14" />
+                                                                  <path d="M12 5l7 7-7 7" />
+                                                                </svg>
+                                                                Mover para {getListTitle(nextStatus)}
+                                                              </button>
+                                                            ) : null}
+                                                            {previousStatus ? (
+                                                              <button
+                                                                type="button"
+                                                                role="menuitem"
+                                                                className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-slate-700 transition hover:bg-zenko-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/60 dark:text-slate-200 dark:hover:bg-white/10"
+                                                                onClick={(event) => {
+                                                                  event.stopPropagation();
+                                                                  setOpenMenuTaskId(null);
+                                                                  placeTaskInStatus(task, previousStatus, 'end');
+                                                                }}
+                                                              >
+                                                                <svg
+                                                                  className="h-4 w-4"
+                                                                  viewBox="0 0 24 24"
+                                                                  fill="none"
+                                                                  stroke="currentColor"
+                                                                  strokeWidth="2"
+                                                                  strokeLinecap="round"
+                                                                  strokeLinejoin="round"
+                                                                  aria-hidden="true"
+                                                                >
+                                                                  <path d="M19 12H5" />
+                                                                  <path d="M12 19l-7-7 7-7" />
+                                                                </svg>
+                                                                Mover para {getListTitle(previousStatus)}
+                                                              </button>
+                                                            ) : null}
+                                                            <button
+                                                              type="button"
+                                                              role="menuitem"
+                                                              className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-semibold text-rose-600 transition hover:bg-rose-500/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500/60 dark:text-rose-300 dark:hover:bg-rose-400/10"
+                                                              onClick={(event) => {
+                                                                event.stopPropagation();
+                                                                setOpenMenuTaskId(null);
+                                                                void deleteTask(task.id);
+                                                              }}
+                                                            >
+                                                              <svg
+                                                                className="h-4 w-4"
+                                                                viewBox="0 0 24 24"
+                                                                fill="none"
+                                                                stroke="currentColor"
+                                                                strokeWidth="2"
+                                                                strokeLinecap="round"
+                                                                strokeLinejoin="round"
+                                                                aria-hidden="true"
+                                                              >
+                                                                <polyline points="3 6 5 6 21 6" />
+                                                                <path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" />
+                                                                <path d="M10 11v6" />
+                                                                <path d="M14 11v6" />
+                                                                <path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2" />
+                                                              </svg>
+                                                              Excluir tarefa
+                                                            </button>
+                                                          </div>
+                                                        </div>
+                                                      </div>
+                                                      <div className="space-y-1">
+                                                        <h4 className="break-words text-[12px] font-semibold leading-[16px] text-slate-900 dark:text-white">
+                                                          {task.title}
+                                                        </h4>
+                                                        {task.due_date ? (
+                                                          <p className="inline-flex min-w-0 max-w-full items-center gap-1 rounded-full bg-zenko-primary/10 px-2 py-0.5 text-[10px] font-medium text-zenko-primary dark:bg-zenko-primary/15">
+                                                            <svg
+                                                              className="h-3 w-3"
+                                                              viewBox="0 0 24 24"
+                                                              fill="none"
+                                                              stroke="currentColor"
+                                                              strokeWidth="1.5"
+                                                              strokeLinecap="round"
+                                                              strokeLinejoin="round"
+                                                              aria-hidden="true"
+                                                            >
+                                                              <path d="M4 7h16" />
+                                                              <path d="M10 11h4" />
+                                                              <rect x="3" y="4" width="18" height="18" rx="2" />
+                                                            </svg>
+                                                            <span className="block max-w-full truncate">Prazo: {new Date(task.due_date).toLocaleDateString('pt-BR')}</span>
+                                                          </p>
+                                                        ) : null}
+                                                        {checklistTotal > 0 ? (
+                                                          <div className="space-y-1">
+                                                            <div className="flex flex-wrap items-center justify-between gap-x-1.5 gap-y-0.5 text-[10px] font-medium text-slate-500 dark:text-slate-300">
+                                                              <span>Checklist</span>
+                                                              <span>
+                                                                {checklistDone}/{checklistTotal}
+                                                              </span>
+                                                            </div>
+                                                            <div className="h-1 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-white/10">
+                                                              <div
+                                                                className={`h-1 rounded-full transition-all ${
+                                                                  checklistDone === checklistTotal && checklistTotal > 0
+                                                                    ? 'bg-emerald-500'
+                                                                    : 'bg-zenko-primary'
+                                                                }`}
+                                                                style={{ width: `${checklistPercentage}%` }}
+                                                              />
+                                                            </div>
+                                                          </div>
+                                                        ) : null}
+                                                      </div>
+                                                      <div className="flex flex-wrap gap-1.5 md:hidden motion-reduce:flex motion-reduce:md:flex">
+                                                        <button
+                                                          type="button"
+                                                          className="flex-1 rounded-full border border-zenko-primary/40 bg-white/90 px-4 py-2 text-xs font-semibold text-zenko-primary shadow-sm transition hover:border-zenko-primary/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/60 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50 dark:bg-slate-900/70 min-h-[44px]"
+                                                          onClick={(event) => {
+                                                            event.stopPropagation();
+                                                            if (previousStatus) {
+                                                              placeTaskInStatus(task, previousStatus, 'end');
+                                                            }
+                                                          }}
+                                                          disabled={!previousStatus}
+                                                          aria-label={`Mover ${task.title} para ${
+                                                            previousStatus ? getListTitle(previousStatus) : 'coluna anterior'
+                                                          }`}
+                                                        >
+                                                          Mover para coluna anterior
+                                                        </button>
+                                                        <button
+                                                          type="button"
+                                                          className="flex-1 rounded-full border border-zenko-primary/40 bg-white/90 px-4 py-2 text-xs font-semibold text-zenko-primary shadow-sm transition hover:border-zenko-primary/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/60 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50 dark:bg-slate-900/70 min-h-[44px]"
+                                                          onClick={(event) => {
+                                                            event.stopPropagation();
+                                                            if (nextStatus) {
+                                                              placeTaskInStatus(task, nextStatus, 'end');
+                                                            }
+                                                          }}
+                                                          disabled={!nextStatus}
+                                                          aria-label={`Mover ${task.title} para ${
+                                                            nextStatus ? getListTitle(nextStatus) : 'coluna seguinte'
+                                                          }`}
+                                                        >
+                                                          Mover para próxima coluna
+                                                        </button>
+                                                      </div>
+                                                    </div>
+                                                  </div>
+                                                </Card>
+                                              </div>
+                                            )}
+                                          </Draggable>
+                                        );
+                                      })}
+                                      {taskProvided.placeholder}
                                     </div>
                                     <button
                                       type="button"
