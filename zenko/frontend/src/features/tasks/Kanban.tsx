@@ -755,120 +755,102 @@ export default function Kanban() {
       <div className="flex-1 min-h-0 overflow-hidden">
         <DragDropContext onDragEnd={handleDragEnd}>
           <Droppable droppableId={BOARD_COLUMNS_DROPPABLE_ID} direction="horizontal" type="COLUMN">
-            {(boardProvided, boardSnapshot) => (
+            {(boardProvided) => (
               <div
                 ref={boardProvided.innerRef}
                 {...boardProvided.droppableProps}
                 className="flex h-full min-h-0 snap-x snap-mandatory gap-2.5 overflow-x-auto overflow-y-hidden pb-3 md:snap-none"
               >
+
                 {columnsData.map((column, columnIndex) => {
                   const columnDraggableId = `column:${column.key}`;
-                  const shouldRenderPlaceholder = boardSnapshot.placeholder?.index === columnIndex;
                   return (
-                    <Fragment key={column.key}>
-                      {shouldRenderPlaceholder ? (
-                        <div
-                          aria-hidden="true"
-                          className="flex h-full min-h-[20rem] w-[272px] flex-none snap-start"
-                          style={{
-                            width: boardSnapshot.placeholder?.dimensions.width,
-                            height: boardSnapshot.placeholder?.dimensions.height
-                          }}
-                        />
-                      ) : null}
-                      <Draggable draggableId={columnDraggableId} index={columnIndex}>
-                        {(columnProvided, columnSnapshot) => {
-                          const isFocused = focusedColumn === column.key;
-                          const columnTabIndex = focusedColumn ? (isFocused ? 0 : -1) : 0;
+                    <Draggable key={column.key} draggableId={columnDraggableId} index={columnIndex}>
+                      {(columnProvided, columnSnapshot) => {
+                        const isFocused = focusedColumn === column.key;
+                        const columnTabIndex = focusedColumn ? (isFocused ? 0 : -1) : 0;
 
-                          return (
-                            <section
-                              ref={(node) => {
-                                columnProvided.innerRef(node);
-                                columnRefs.current[column.key] = node;
-                              }}
-                              {...columnProvided.draggableProps}
-                              style={columnProvided.draggableProps.style}
-                              className={`group relative flex h-full min-h-[20rem] w-[272px] flex-none snap-start flex-col rounded-[20px] bg-gradient-to-br p-[1px] transition-transform transition-shadow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/60 ${column.accent} ${columnSnapshot.isDragging ? 'scale-[1.01]' : ''}`}
-                              role="region"
-                              aria-labelledby={`column-${column.key}`}
-                              aria-describedby={`column-${column.key}-meta`}
-                              tabIndex={columnTabIndex}
-                              onFocus={() => {
-                                focusColumn(column.key);
-                              }}
-                            >
-                              <Droppable droppableId={column.key} type="TASK">
-                                {(taskProvided, taskSnapshot) => {
-                                  const highlightClasses = taskSnapshot.isDraggingOver
-                                    ? 'ring-2 ring-zenko-primary/60 shadow-xl'
-                                    : isFocused
-                                      ? 'border-zenko-primary/40 ring-1 ring-zenko-primary/25 shadow-lg'
-                                      : 'shadow-[0_18px_40px_-22px_rgba(15,23,42,0.12)] dark:shadow-[0_18px_40px_-32px_rgba(15,23,42,0.8)]';
-                                  const placeholderIndex = taskSnapshot.placeholder?.index ?? null;
-                                  const placeholderHeight = taskSnapshot.placeholder?.dimensions.height ?? null;
+                        return (
+                          <section
+                            ref={(node) => {
+                              columnProvided.innerRef(node);
+                              columnRefs.current[column.key] = node;
+                            }}
+                            {...columnProvided.draggableProps}
+                            style={columnProvided.draggableProps.style}
+                            className={`group relative flex h-full min-h-[20rem] w-[272px] flex-none snap-start flex-col rounded-[20px] bg-gradient-to-br p-[1px] transition-transform transition-shadow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/60 ${column.accent} ${columnSnapshot.isDragging ? 'scale-[1.01]' : ''}`}
+                            role="region"
+                            aria-labelledby={`column-${column.key}`}
+                            aria-describedby={`column-${column.key}-meta`}
+                            tabIndex={columnTabIndex}
+                            onFocus={() => {
+                              focusColumn(column.key);
+                            }}
+                          >
+                            <Droppable droppableId={column.key} type="TASK">
+                              {(taskProvided, taskSnapshot) => {
+                                const highlightClasses = taskSnapshot.isDraggingOver
+                                  ? 'ring-2 ring-zenko-primary/60 shadow-xl'
+                                  : isFocused
+                                    ? 'border-zenko-primary/40 ring-1 ring-zenko-primary/25 shadow-lg'
+                                    : 'shadow-[0_18px_40px_-22px_rgba(15,23,42,0.12)] dark:shadow-[0_18px_40px_-32px_rgba(15,23,42,0.8)]';
 
-                                  return (
-                                    <div
-                                      ref={(node) => {
-                                        taskProvided.innerRef(node);
-                                      }}
-                                      {...taskProvided.droppableProps}
-                                      className={`flex h-full min-h-0 flex-col overflow-hidden rounded-[14px] border border-slate-200/70 bg-white/95 p-2 backdrop-blur dark:border-white/10 dark:bg-slate-900/70 ${highlightClasses}`}
-                                    >
-                                      <header>
-                                        <div
-                                          className={`flex items-center justify-between rounded-[10px] px-1 py-1 ${columnSnapshot.isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
-                                          title="Arraste para reorganizar a lista"
-                                          {...columnProvided.dragHandleProps}
-                                        >
-                                          <h3
-                                            id={`column-${column.key}`}
-                                            className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-600 dark:text-slate-200"
-                                          >
-                                            {column.title}
-                                          </h3>
-                                          <span className="sr-only">Arraste para reorganizar a lista</span>
-                                          <span
-                                            id={`column-${column.key}-meta`}
-                                            className="rounded-full bg-zenko-primary/10 px-1.5 py-0.5 text-[11px] text-zenko-primary dark:bg-white/10"
-                                          >
-                                            {column.tasks.length}
-                                          </span>
-                                        </div>
-                                      </header>
+                                return (
+                                  <div
+                                    ref={(node) => {
+                                      taskProvided.innerRef(node);
+                                    }}
+                                    {...taskProvided.droppableProps}
+                                    className={`flex h-full min-h-0 flex-col overflow-hidden rounded-[14px] border border-slate-200/70 bg-white/95 p-2 backdrop-blur dark:border-white/10 dark:bg-slate-900/70 ${highlightClasses}`}
+                                  >
+                                    <header>
                                       <div
-                                        className="mt-1.5 flex-1 min-h-0 space-y-1.5 overflow-y-auto pr-1"
-                                        role="list"
-                                        aria-label={`Tarefas em ${column.title}`}
+                                        className={`flex items-center justify-between rounded-[10px] px-1 py-1 ${columnSnapshot.isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
+                                        title="Arraste para reorganizar a lista"
+                                        {...columnProvided.dragHandleProps}
                                       >
-                                        {column.tasks.map((task, index) => {
-                                      const renderPlaceholderBefore = placeholderIndex === index && placeholderHeight;
-                                      const previousStatus = getAdjacentStatus(task.status, 'previous');
-                                      const nextStatus = getAdjacentStatus(task.status, 'next');
-                                      const nextStatusLabel = nextStatus ? getListTitle(nextStatus) : 'coluna final';
-                                      const ariaInstruction = nextStatus
-                                        ? `Pressione Enter ou Espaço para mover para ${nextStatusLabel}.`
-                                        : 'Esta tarefa está na última coluna.';
+                                        <h3
+                                          id={`column-${column.key}`}
+                                          className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-600 dark:text-slate-200"
+                                        >
+                                          {column.title}
+                                        </h3>
+                                        <span className="sr-only">Arraste para reorganizar a lista</span>
+                                        <span
+                                          id={`column-${column.key}-meta`}
+                                          className="rounded-full bg-zenko-primary/10 px-1.5 py-0.5 text-[11px] text-zenko-primary dark:bg-white/10"
+                                        >
+                                          {column.tasks.length}
+                                        </span>
+                                      </div>
+                                    </header>
+                                    <div
+                                      className="mt-1.5 flex-1 min-h-0 space-y-1.5 overflow-y-auto pr-1"
+                                      role="list"
+                                      aria-label={`Tarefas em ${column.title}`}
+                                    >
+                                      {column.tasks.length === 0 ? (
+                                        <p className="rounded-lg border border-dashed border-slate-200 bg-white/70 px-3 py-3 text-center text-[11px] text-slate-500 dark:border-white/10 dark:bg-white/5 dark:text-slate-400">
+                                          Arraste tarefas para esta coluna
+                                        </p>
+                                      ) : null}
+                                      {column.tasks.map((task, index) => {
+                                        const previousStatus = getAdjacentStatus(task.status, 'previous');
+                                        const nextStatus = getAdjacentStatus(task.status, 'next');
+                                        const nextStatusLabel = nextStatus ? getListTitle(nextStatus) : 'coluna final';
+                                        const ariaInstruction = nextStatus
+                                          ? `Pressione Enter ou Espaço para mover para ${nextStatusLabel}.`
+                                          : 'Esta tarefa está na última coluna.';
+                                        const checklistTotal = task.checklist.length;
+                                        const checklistDone = task.checklist.filter((item) => item.done).length;
+                                        const checklistPercentage = checklistTotal
+                                          ? Math.round((checklistDone / checklistTotal) * 100)
+                                          : 0;
+                                        const isRecentlyCreated = Boolean(recentlyCreatedMap[task.id]);
+                                        const isMenuOpen = openMenuTaskId === task.id;
 
-                                      const checklistTotal = task.checklist.length;
-                                      const checklistDone = task.checklist.filter((item) => item.done).length;
-                                      const checklistPercentage = checklistTotal
-                                        ? Math.round((checklistDone / checklistTotal) * 100)
-                                        : 0;
-                                      const isRecentlyCreated = Boolean(recentlyCreatedMap[task.id]);
-                                      const isMenuOpen = openMenuTaskId === task.id;
-
-                                      return (
-                                        <Fragment key={task.id}>
-                                          {renderPlaceholderBefore ? (
-                                            <div
-                                              aria-hidden="true"
-                                              className="rounded-2xl border border-dashed border-transparent"
-                                              style={{ height: placeholderHeight ?? undefined }}
-                                            />
-                                          ) : null}
-                                          <Draggable draggableId={task.id} index={index}>
+                                        return (
+                                          <Draggable key={task.id} draggableId={task.id} index={index}>
                                             {(dragProvided, dragSnapshot) => (
                                               <div
                                                 ref={dragProvided.innerRef}
@@ -881,8 +863,8 @@ export default function Kanban() {
                                                 <Card
                                                   {...dragProvided.dragHandleProps}
                                                   variant="board"
-                                                  className={`group cursor-grab overflow-hidden border-slate-200/70 bg-white/90 transition-all hover:-translate-y-0.5 hover:border-zenko-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-zenko-primary/60 dark:border-white/5 dark:bg-slate-900/70 ${
-                                                    dragSnapshot.isDragging ? 'border-zenko-primary/60 shadow-lg' : ''
+                                                  className={`group overflow-hidden border-slate-200/70 bg-white/90 transition-all hover:-translate-y-0.5 hover:border-zenko-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-zenko-primary/60 dark:border-white/5 dark:bg-slate-900/70 ${
+                                                    dragSnapshot.isDragging ? 'border-zenko-primary/60 shadow-lg opacity-0' : 'cursor-grab'
                                                   } ${
                                                     highlightedTaskId === task.id
                                                       ? 'ring-2 ring-inset ring-zenko-primary/60'
@@ -938,328 +920,308 @@ export default function Kanban() {
                                                     </label>
                                                     <div className="flex min-w-0 flex-1 flex-col gap-1.5">
                                                       <div className="flex flex-wrap items-start justify-between gap-x-1.5 gap-y-1">
-                                      <div
-                                        className="flex min-w-0 flex-1 flex-wrap gap-0.5"
-                                        aria-label={task.labels.length > 0 ? 'Etiquetas da tarefa' : undefined}
-                                      >
-                                        {task.labels.length === 0 ? (
-                                          <span className="sr-only">Sem etiquetas</span>
-                                        ) : (
-                                          task.labels.map((label, labelIndex) => {
-                                            const normalized = label.toLocaleLowerCase();
-                                            const definition = labelDefinitionMap.get(normalized);
-                                            const colors = getLabelColors(label, {
-                                              colorId: definition?.colorId,
-                                              fallbackIndex: labelIndex
-                                            });
-                                            return (
-                                              <span
-                                                key={`${task.id}-label-${definition?.id ?? labelIndex}`}
-                                                className="inline-flex h-2 w-10 items-center rounded-sm border border-black/10 shadow-sm dark:border-white/20"
-                                                style={{
-                                                  backgroundColor: colors.background
-                                                }}
-                                                title={definition?.value ?? label}
-                                              >
-                                                <span className="sr-only">{definition?.value ?? label}</span>
-                                              </span>
-                                            );
-                                          })
-                                        )}
-                                      </div>
-                                      <div
-                                        className="relative flex-shrink-0 self-start"
-                                        ref={(node) => {
-                                          if (node) {
-                                            menuRefs.current[task.id] = node;
-                                          } else {
-                                            delete menuRefs.current[task.id];
-                                          }
-                                        }}
-                                      >
-                                        <button
-                                          type="button"
-                                          className={`h-8 w-8 rounded-full border border-transparent bg-transparent text-slate-500 opacity-0 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/60 focus-visible:opacity-100 focus-visible:border-zenko-primary/40 focus-visible:bg-white/70 group-focus-within:opacity-100 group-hover:opacity-100 group-hover:border-slate-200/60 group-hover:bg-white/70 group-hover:text-slate-600 hover:border-zenko-primary/30 hover:bg-white/70 hover:text-zenko-primary dark:text-slate-300 dark:hover:border-white/20 dark:hover:bg-slate-900/60 dark:hover:text-white dark:group-hover:border-white/20 dark:group-hover:bg-slate-900/60 dark:group-hover:text-white ${
-                                            isMenuOpen ? 'opacity-100 border-zenko-primary/40 bg-white/70 text-zenko-primary dark:bg-slate-900/70' : ''
-                                          }`}
-                                          aria-haspopup="menu"
-                                          aria-expanded={isMenuOpen}
-                                          aria-controls={`task-menu-${task.id}`}
-                                          onClick={(event) => {
-                                            event.stopPropagation();
-                                            setOpenMenuTaskId((current) => (current === task.id ? null : task.id));
-                                          }}
-                                          title="Ações rápidas"
-                                        >
-                                          <span className="sr-only">Abrir ações rápidas para {task.title}</span>
-                                          <svg
-                                            className="mx-auto h-3.5 w-3.5"
-                                            viewBox="0 0 24 24"
-                                            fill="none"
-                                            stroke="currentColor"
-                                            strokeWidth="2"
-                                            strokeLinecap="round"
-                                            strokeLinejoin="round"
-                                            aria-hidden="true"
-                                          >
-                                            <circle cx="5" cy="12" r="1" />
-                                            <circle cx="12" cy="12" r="1" />
-                                            <circle cx="19" cy="12" r="1" />
-                                          </svg>
-                                        </button>
-                                        <div
-                                          id={`task-menu-${task.id}`}
-                                          role="menu"
-                                          className={`absolute right-0 top-9 z-30 w-48 rounded-xl border border-slate-200 bg-white/95 p-1.5 text-xs shadow-2xl transition focus:outline-none dark:border-white/10 dark:bg-slate-900/95 ${
-                                            isMenuOpen
-                                              ? 'visible translate-y-0 opacity-100'
-                                              : 'invisible pointer-events-none -translate-y-1 opacity-0'
-                                          }`}
-                                        >
-                                          <button
-                                            type="button"
-                                            role="menuitem"
-                                            className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-slate-700 transition hover:bg-zenko-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/60 dark:text-slate-200 dark:hover:bg-white/10"
-                                            onClick={(event) => {
-                                              event.stopPropagation();
-                                              setOpenMenuTaskId(null);
-                                              openTask(task);
-                                            }}
-                                            autoFocus={isMenuOpen}
-                                          >
-                                            <svg
-                                              className="h-4 w-4"
-                                              viewBox="0 0 24 24"
-                                              fill="none"
-                                              stroke="currentColor"
-                                              strokeWidth="2"
-                                              strokeLinecap="round"
-                                              strokeLinejoin="round"
-                                              aria-hidden="true"
-                                            >
-                                              <path d="M12 20h9" />
-                                              <path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4 12.5-12.5z" />
-                                            </svg>
-                                            Editar tarefa
-                                          </button>
-                                          {nextStatus ? (
-                                            <button
-                                              type="button"
-                                              role="menuitem"
-                                            className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-slate-700 transition hover:bg-zenko-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/60 dark:text-slate-200 dark:hover:bg-white/10"
-                                              onClick={(event) => {
-                                                event.stopPropagation();
-                                                setOpenMenuTaskId(null);
-                                                placeTaskInStatus(task, nextStatus, 'end');
-                                              }}
-                                            >
-                                              <svg
-                                                className="h-4 w-4"
-                                                viewBox="0 0 24 24"
-                                                fill="none"
-                                                stroke="currentColor"
-                                                strokeWidth="2"
-                                                strokeLinecap="round"
-                                                strokeLinejoin="round"
-                                                aria-hidden="true"
-                                              >
-                                                <path d="M5 12h14" />
-                                                <path d="M12 5l7 7-7 7" />
-                                              </svg>
-                                              Mover para {getListTitle(nextStatus)}
-                                            </button>
-                                          ) : null}
-                                          {previousStatus ? (
-                                            <button
-                                              type="button"
-                                              role="menuitem"
-                                            className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-slate-700 transition hover:bg-zenko-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/60 dark:text-slate-200 dark:hover:bg-white/10"
-                                              onClick={(event) => {
-                                                event.stopPropagation();
-                                                setOpenMenuTaskId(null);
-                                                placeTaskInStatus(task, previousStatus, 'end');
-                                              }}
-                                            >
-                                              <svg
-                                                className="h-4 w-4"
-                                                viewBox="0 0 24 24"
-                                                fill="none"
-                                                stroke="currentColor"
-                                                strokeWidth="2"
-                                                strokeLinecap="round"
-                                                strokeLinejoin="round"
-                                                aria-hidden="true"
-                                              >
-                                                <path d="M19 12H5" />
-                                                <path d="M12 19l-7-7 7-7" />
-                                              </svg>
-                                              Mover para {getListTitle(previousStatus)}
-                                            </button>
-                                          ) : null}
-                                          <button
-                                            type="button"
-                                            role="menuitem"
-                                            className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-semibold text-rose-600 transition hover:bg-rose-500/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500/60 dark:text-rose-300 dark:hover:bg-rose-400/10"
-                                            onClick={(event) => {
-                                              event.stopPropagation();
-                                              setOpenMenuTaskId(null);
-                                              void deleteTask(task.id);
-                                            }}
-                                          >
-                                            <svg
-                                              className="h-4 w-4"
-                                              viewBox="0 0 24 24"
-                                              fill="none"
-                                              stroke="currentColor"
-                                              strokeWidth="2"
-                                              strokeLinecap="round"
-                                              strokeLinejoin="round"
-                                              aria-hidden="true"
-                                            >
-                                              <polyline points="3 6 5 6 21 6" />
-                                              <path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" />
-                                              <path d="M10 11v6" />
-                                              <path d="M14 11v6" />
-                                              <path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2" />
-                                            </svg>
-                                            Excluir tarefa
-                                          </button>
-                                        </div>
-                                      </div>
-                                    </div>
-                                    <div className="space-y-1">
-                                      <h4 className="break-words text-[12px] font-semibold leading-[16px] text-slate-900 dark:text-white">
-                                        {task.title}
-                                      </h4>
-                                      {task.due_date ? (
-                                        <p className="inline-flex min-w-0 max-w-full items-center gap-1 rounded-full bg-zenko-primary/10 px-2 py-0.5 text-[10px] font-medium text-zenko-primary dark:bg-zenko-primary/15">
-                                          <svg
-                                            className="h-3 w-3"
-                                            viewBox="0 0 24 24"
-                                            fill="none"
-                                            stroke="currentColor"
-                                            strokeWidth="1.5"
-                                            strokeLinecap="round"
-                                            strokeLinejoin="round"
-                                            aria-hidden="true"
-                                          >
-                                            <path d="M4 7h16" />
-                                            <path d="M10 11h4" />
-                                            <rect x="3" y="4" width="18" height="18" rx="2" />
-                                          </svg>
-                                          <span className="block max-w-full truncate">Prazo: {new Date(task.due_date).toLocaleDateString('pt-BR')}</span>
-                                        </p>
-                                      ) : null}
-                                      {checklistTotal > 0 ? (
-                                        <div className="space-y-1">
-                                          <div className="flex flex-wrap items-center justify-between gap-x-1.5 gap-y-0.5 text-[10px] font-medium text-slate-500 dark:text-slate-300">
-                                            <span>Checklist</span>
-                                            <span>
-                                              {checklistDone}/{checklistTotal}
-                                            </span>
-                                          </div>
-                                          <div className="h-1 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-white/10">
-                                            <div
-                                              className={`h-1 rounded-full transition-all ${
-                                                checklistDone === checklistTotal && checklistTotal > 0
-                                                  ? 'bg-emerald-500'
-                                                  : 'bg-zenko-primary'
-                                              }`}
-                                              style={{ width: `${checklistPercentage}%` }}
-                                            />
-                                          </div>
-                                        </div>
-                                      ) : null}
-                                    </div>
-                                    <div className="flex flex-wrap gap-1.5 md:hidden motion-reduce:flex motion-reduce:md:flex">
-                                      <button
-                                        type="button"
-                                        className="flex-1 rounded-full border border-zenko-primary/40 bg-white/90 px-4 py-2 text-xs font-semibold text-zenko-primary shadow-sm transition hover:border-zenko-primary/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/60 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50 dark:bg-slate-900/70 min-h-[44px]"
-                                        onClick={(event) => {
-                                          event.stopPropagation();
-                                          if (previousStatus) {
-                                            placeTaskInStatus(task, previousStatus, 'end');
-                                          }
-                                        }}
-                                        disabled={!previousStatus}
-                                        aria-label={`Mover ${task.title} para ${
-                                          previousStatus ? getListTitle(previousStatus) : 'coluna anterior'
-                                        }`}
-                                      >
-                                        Mover para coluna anterior
-                                      </button>
-                                      <button
-                                        type="button"
-                                        className="flex-1 rounded-full border border-zenko-primary/40 bg-white/90 px-4 py-2 text-xs font-semibold text-zenko-primary shadow-sm transition hover:border-zenko-primary/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/60 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50 dark:bg-slate-900/70 min-h-[44px]"
-                                        onClick={(event) => {
-                                          event.stopPropagation();
-                                          if (nextStatus) {
-                                            placeTaskInStatus(task, nextStatus, 'end');
-                                          }
-                                        }}
-                                        disabled={!nextStatus}
-                                        aria-label={`Mover ${task.title} para ${
-                                          nextStatus ? getListTitle(nextStatus) : 'coluna seguinte'
-                                        }`}
-                                      >
-                                        Mover para próxima coluna
-                                      </button>
-                                    </div>
-                                  </div>
-                                </div>
+                                                        <div
+                                                          className="flex min-w-0 flex-1 flex-wrap gap-0.5"
+                                                          aria-label={task.labels.length > 0 ? 'Etiquetas da tarefa' : undefined}
+                                                        >
+                                                          {task.labels.length === 0 ? (
+                                                            <span className="sr-only">Sem etiquetas</span>
+                                                          ) : (
+                                                            task.labels.map((label, labelIndex) => {
+                                                              const normalized = label.toLocaleLowerCase();
+                                                              const definition = labelDefinitionMap.get(normalized);
+                                                              const colors = getLabelColors(label, {
+                                                                colorId: definition?.colorId,
+                                                                fallbackIndex: labelIndex
+                                                              });
+                                                              return (
+                                                                <span
+                                                                  key={`${task.id}-label-${definition?.id ?? labelIndex}`}
+                                                                  className="inline-flex h-2 w-10 items-center rounded-sm border border-black/10 shadow-sm dark:border-white/20"
+                                                                  style={{
+                                                                    backgroundColor: colors.background
+                                                                  }}
+                                                                  title={definition?.value ?? label}
+                                                                >
+                                                                  <span className="sr-only">{definition?.value ?? label}</span>
+                                                                </span>
+                                                              );
+                                                            })
+                                                          )}
+                                                        </div>
+                                                        <div
+                                                          className="relative flex-shrink-0 self-start"
+                                                          ref={(node) => {
+                                                            if (node) {
+                                                              menuRefs.current[task.id] = node;
+                                                            } else {
+                                                              delete menuRefs.current[task.id];
+                                                            }
+                                                          }}
+                                                        >
+                                                          <button
+                                                            type="button"
+                                                            className={`h-8 w-8 rounded-full border border-transparent bg-transparent text-slate-500 opacity-0 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/60 focus-visible:opacity-100 focus-visible:border-zenko-primary/40 focus-visible:bg-white/70 group-focus-within:opacity-100 group-hover:opacity-100 group-hover:border-slate-200/60 group-hover:bg-white/70 group-hover:text-slate-600 hover:border-zenko-primary/30 hover:bg-white/70 hover:text-zenko-primary dark:text-slate-300 dark:hover:border-white/20 dark:hover:bg-slate-900/60 dark:hover:text-white dark:group-hover:border-white/20 dark:group-hover:bg-slate-900/60 dark:group-hover:text-white ${
+                                                              isMenuOpen ? 'opacity-100 border-zenko-primary/40 bg-white/70 text-zenko-primary dark:bg-slate-900/70' : ''
+                                                            }`}
+                                                            aria-haspopup="menu"
+                                                            aria-expanded={isMenuOpen}
+                                                            aria-controls={`task-menu-${task.id}`}
+                                                            onClick={(event) => {
+                                                              event.stopPropagation();
+                                                              setOpenMenuTaskId((current) => (current === task.id ? null : task.id));
+                                                            }}
+                                                            title="Ações rápidas"
+                                                          >
+                                                            <span className="sr-only">Abrir ações rápidas para {task.title}</span>
+                                                            <svg
+                                                              className="mx-auto h-3.5 w-3.5"
+                                                              viewBox="0 0 24 24"
+                                                              fill="none"
+                                                              stroke="currentColor"
+                                                              strokeWidth="2"
+                                                              strokeLinecap="round"
+                                                              strokeLinejoin="round"
+                                                              aria-hidden="true"
+                                                            >
+                                                              <circle cx="5" cy="12" r="1" />
+                                                              <circle cx="12" cy="12" r="1" />
+                                                              <circle cx="19" cy="12" r="1" />
+                                                            </svg>
+                                                          </button>
+                                                          <div
+                                                            id={`task-menu-${task.id}`}
+                                                            role="menu"
+                                                            className={`absolute right-0 top-9 z-30 w-48 rounded-xl border border-slate-200 bg-white/95 p-1.5 text-xs shadow-2xl transition focus:outline-none dark:border-white/10 dark:bg-slate-900/95 ${
+                                                              isMenuOpen
+                                                                ? 'visible translate-y-0 opacity-100'
+                                                                : 'invisible pointer-events-none -translate-y-1 opacity-0'
+                                                            }`}
+                                                          >
+                                                            <button
+                                                              type="button"
+                                                              role="menuitem"
+                                                              className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-slate-700 transition hover:bg-zenko-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/60 dark:text-slate-200 dark:hover:bg-white/10"
+                                                              onClick={(event) => {
+                                                                event.stopPropagation();
+                                                                setOpenMenuTaskId(null);
+                                                                openTask(task);
+                                                              }}
+                                                              autoFocus={isMenuOpen}
+                                                            >
+                                                              <svg
+                                                                className="h-4 w-4"
+                                                                viewBox="0 0 24 24"
+                                                                fill="none"
+                                                                stroke="currentColor"
+                                                                strokeWidth="2"
+                                                                strokeLinecap="round"
+                                                                strokeLinejoin="round"
+                                                                aria-hidden="true"
+                                                              >
+                                                                <path d="M12 20h9" />
+                                                                <polyline points="16 4 20 4 20 8" />
+                                                                <line x1="14" y1="10" x2="20" y2="4" />
+                                                              </svg>
+                                                              Abrir detalhes
+                                                            </button>
+                                                            {nextStatus ? (
+                                                              <button
+                                                                type="button"
+                                                                role="menuitem"
+                                                                className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-slate-700 transition hover:bg-zenko-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/60 dark:text-slate-200 dark:hover:bg-white/10"
+                                                                onClick={(event) => {
+                                                                  event.stopPropagation();
+                                                                  setOpenMenuTaskId(null);
+                                                                  placeTaskInStatus(task, nextStatus, 'end');
+                                                                }}
+                                                              >
+                                                                <svg
+                                                                  className="h-4 w-4"
+                                                                  viewBox="0 0 24 24"
+                                                                  fill="none"
+                                                                  stroke="currentColor"
+                                                                  strokeWidth="2"
+                                                                  strokeLinecap="round"
+                                                                  strokeLinejoin="round"
+                                                                  aria-hidden="true"
+                                                                >
+                                                                  <path d="M5 12h14" />
+                                                                  <path d="M12 5l7 7-7 7" />
+                                                                </svg>
+                                                                Mover para {getListTitle(nextStatus)}
+                                                              </button>
+                                                            ) : null}
+                                                            {previousStatus ? (
+                                                              <button
+                                                                type="button"
+                                                                role="menuitem"
+                                                                className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-slate-700 transition hover:bg-zenko-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/60 dark:text-slate-200 dark:hover:bg-white/10"
+                                                                onClick={(event) => {
+                                                                  event.stopPropagation();
+                                                                  setOpenMenuTaskId(null);
+                                                                  placeTaskInStatus(task, previousStatus, 'end');
+                                                                }}
+                                                              >
+                                                                <svg
+                                                                  className="h-4 w-4"
+                                                                  viewBox="0 0 24 24"
+                                                                  fill="none"
+                                                                  stroke="currentColor"
+                                                                  strokeWidth="2"
+                                                                  strokeLinecap="round"
+                                                                  strokeLinejoin="round"
+                                                                  aria-hidden="true"
+                                                                >
+                                                                  <path d="M19 12H5" />
+                                                                  <path d="M12 19l-7-7 7-7" />
+                                                                </svg>
+                                                                Mover para {getListTitle(previousStatus)}
+                                                              </button>
+                                                            ) : null}
+                                                            <button
+                                                              type="button"
+                                                              role="menuitem"
+                                                              className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left font-semibold text-rose-600 transition hover:bg-rose-500/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500/60 dark:text-rose-300 dark:hover:bg-rose-400/10"
+                                                              onClick={(event) => {
+                                                                event.stopPropagation();
+                                                                setOpenMenuTaskId(null);
+                                                                void deleteTask(task.id);
+                                                              }}
+                                                            >
+                                                              <svg
+                                                                className="h-4 w-4"
+                                                                viewBox="0 0 24 24"
+                                                                fill="none"
+                                                                stroke="currentColor"
+                                                                strokeWidth="2"
+                                                                strokeLinecap="round"
+                                                                strokeLinejoin="round"
+                                                                aria-hidden="true"
+                                                              >
+                                                                <polyline points="3 6 5 6 21 6" />
+                                                                <path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" />
+                                                                <path d="M10 11v6" />
+                                                                <path d="M14 11v6" />
+                                                                <path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2" />
+                                                              </svg>
+                                                              Excluir tarefa
+                                                            </button>
+                                                          </div>
+                                                        </div>
+                                                      </div>
+                                                      <div className="space-y-1">
+                                                        <h4 className="break-words text-[12px] font-semibold leading-[16px] text-slate-900 dark:text-white">
+                                                          {task.title}
+                                                        </h4>
+                                                        {task.due_date ? (
+                                                          <p className="inline-flex min-w-0 max-w-full items-center gap-1 rounded-full bg-zenko-primary/10 px-2 py-0.5 text-[10px] font-medium text-zenko-primary dark:bg-zenko-primary/15">
+                                                            <svg
+                                                              className="h-3 w-3"
+                                                              viewBox="0 0 24 24"
+                                                              fill="none"
+                                                              stroke="currentColor"
+                                                              strokeWidth="1.5"
+                                                              strokeLinecap="round"
+                                                              strokeLinejoin="round"
+                                                              aria-hidden="true"
+                                                            >
+                                                              <path d="M4 7h16" />
+                                                              <path d="M10 11h4" />
+                                                              <rect x="3" y="4" width="18" height="18" rx="2" />
+                                                            </svg>
+                                                            <span className="block max-w-full truncate">Prazo: {new Date(task.due_date).toLocaleDateString('pt-BR')}</span>
+                                                          </p>
+                                                        ) : null}
+                                                        {checklistTotal > 0 ? (
+                                                          <div className="space-y-1">
+                                                            <div className="flex flex-wrap items-center justify-between gap-x-1.5 gap-y-0.5 text-[10px] font-medium text-slate-500 dark:text-slate-300">
+                                                              <span>Checklist</span>
+                                                              <span>
+                                                                {checklistDone}/{checklistTotal}
+                                                              </span>
+                                                            </div>
+                                                            <div className="h-1 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-white/10">
+                                                              <div
+                                                                className={`h-1 rounded-full transition-all ${
+                                                                  checklistDone === checklistTotal && checklistTotal > 0
+                                                                    ? 'bg-emerald-500'
+                                                                    : 'bg-zenko-primary'
+                                                                }`}
+                                                                style={{ width: `${checklistPercentage}%` }}
+                                                              />
+                                                            </div>
+                                                          </div>
+                                                        ) : null}
+                                                      </div>
+                                                      <div className="flex flex-wrap gap-1.5 md:hidden motion-reduce:flex motion-reduce:md:flex">
+                                                        <button
+                                                          type="button"
+                                                          className="flex-1 rounded-full border border-zenko-primary/40 bg-white/90 px-4 py-2 text-xs font-semibold text-zenko-primary shadow-sm transition hover:border-zenko-primary/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/60 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50 dark:bg-slate-900/70 min-h-[44px]"
+                                                          onClick={(event) => {
+                                                            event.stopPropagation();
+                                                            if (previousStatus) {
+                                                              placeTaskInStatus(task, previousStatus, 'end');
+                                                            }
+                                                          }}
+                                                          disabled={!previousStatus}
+                                                          aria-label={`Mover ${task.title} para ${
+                                                            previousStatus ? getListTitle(previousStatus) : 'coluna anterior'
+                                                          }`}
+                                                        >
+                                                          Mover para coluna anterior
+                                                        </button>
+                                                        <button
+                                                          type="button"
+                                                          className="flex-1 rounded-full border border-zenko-primary/40 bg-white/90 px-4 py-2 text-xs font-semibold text-zenko-primary shadow-sm transition hover:border-zenko-primary/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/60 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50 dark:bg-slate-900/70 min-h-[44px]"
+                                                          onClick={(event) => {
+                                                            event.stopPropagation();
+                                                            if (nextStatus) {
+                                                              placeTaskInStatus(task, nextStatus, 'end');
+                                                            }
+                                                          }}
+                                                          disabled={!nextStatus}
+                                                          aria-label={`Mover ${task.title} para ${
+                                                            nextStatus ? getListTitle(nextStatus) : 'coluna seguinte'
+                                                          }`}
+                                                        >
+                                                          Mover para próxima coluna
+                                                        </button>
+                                                      </div>
+                                                    </div>
+                                                  </div>
                                                 </Card>
                                               </div>
                                             )}
                                           </Draggable>
-                                        </Fragment>
-                                      );
-                                    })}
-                          {column.tasks.length === 0 ? (
-                            <p className="rounded-lg border border-dashed border-slate-200 bg-white/70 px-3 py-3 text-center text-[11px] text-slate-500 dark:border-white/10 dark:bg-white/5 dark:text-slate-400">
-                              Arraste tarefas para esta coluna
-                            </p>
-                          ) : null}
-                                    {placeholderIndex === column.tasks.length && placeholderHeight ? (
-                                      <div
-                                        aria-hidden="true"
-                                        className="rounded-2xl border border-dashed border-transparent"
-                                        style={{ height: placeholderHeight }}
-                                      />
-                                    ) : null}
+                                        );
+                                      })}
+                                      {taskProvided.placeholder}
+                                    </div>
+                                    <button
+                                      type="button"
+                                      className="mt-2 inline-flex w-full min-h-[40px] items-center justify-center gap-1.5 rounded-lg border border-dashed border-slate-300/80 bg-white/70 px-3 py-2 text-[12px] font-semibold text-slate-600 transition hover:border-slate-400 hover:bg-white/90 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/60 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:border-white/15 dark:bg-white/10 dark:text-slate-200 dark:hover:border-white/25 dark:hover:bg-white/15 dark:hover:text-white dark:focus-visible:ring-offset-slate-950"
+                                      onClick={(event) => {
+                                        event.stopPropagation();
+                                        openCreate(column.key);
+                                      }}
+                                      title="Adicionar nova tarefa"
+                                      aria-label={`Adicionar tarefa na coluna ${column.title}`}
+                                    >
+                                      <span className="text-sm leading-none">+</span>
+                                      <span>Adicionar tarefa</span>
+                                    </button>
                                   </div>
-                                  <button
-                                    type="button"
-                                    className="mt-2 inline-flex w-full min-h-[40px] items-center justify-center gap-1.5 rounded-lg border border-dashed border-slate-300/80 bg-white/70 px-3 py-2 text-[12px] font-semibold text-slate-600 transition hover:border-slate-400 hover:bg-white/90 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/60 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:border-white/15 dark:bg-white/10 dark:text-slate-200 dark:hover:border-white/25 dark:hover:bg-white/15 dark:hover:text-white dark:focus-visible:ring-offset-slate-950"
-                                    onClick={(event) => {
-                                      event.stopPropagation();
-                                      openCreate(column.key);
-                                    }}
-                                    title="Adicionar nova tarefa"
-                                    aria-label={`Adicionar tarefa na coluna ${column.title}`}
-                                  >
-                                    <span className="text-sm leading-none">+</span>
-                                    <span>Adicionar tarefa</span>
-                                  </button>
-                                </div>
-                              );
-                            }}
-                          </Droppable>
-                        </section>
-                      );
-                      </Draggable>
-                    </Fragment>
+                                );
+                              }}
+                            </Droppable>
+                          </section>
+                        );
+                      }}
+                    </Draggable>
                   );
                 })}
-                {boardSnapshot.placeholder?.index === columnsData.length ? (
-                  <div
-                    aria-hidden="true"
-                    className="flex h-full min-h-[20rem] w-[272px] flex-none snap-start"
-                    style={{
-                      width: boardSnapshot.placeholder?.dimensions.width,
-                      height: boardSnapshot.placeholder?.dimensions.height
-                    }}
-                  />
-                ) : null}
+                {boardProvided.placeholder}
                 <div className="w-[272px] flex-none self-start">
                   {isAddingList ? (
                     <div className="rounded-xl border border-slate-300/80 bg-white/80 p-3 shadow-sm backdrop-blur dark:border-white/15 dark:bg-white/10">
