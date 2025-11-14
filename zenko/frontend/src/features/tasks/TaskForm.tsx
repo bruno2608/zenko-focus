@@ -581,7 +581,7 @@ const sanitizeChecklistItems = (items: ChecklistEntry[]) =>
 
 const schema = z
   .object({
-    title: z.string().min(1, 'Título obrigatório'),
+    title: z.string().min(1, 'Título obrigatório').max(120, 'Limite de 120 caracteres'),
     description: z.string().optional(),
     due_date: z.string().optional(),
     start_date: z.string().optional(),
@@ -2457,6 +2457,8 @@ export default function TaskForm({
               runAutoSave({ title: trimmed });
             }
           }}
+          maxLength={120}
+          placeholder="Descreva a tarefa em até 120 caracteres"
         />
         {errors.title && <p className="mt-1 text-xs text-rose-600 dark:text-rose-300">{errors.title.message}</p>}
       </div>

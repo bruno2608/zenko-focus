@@ -247,6 +247,7 @@ export function useTasks() {
     deleteTask: deleteMutation.mutateAsync,
     updateStatus: statusMutation.mutateAsync,
     reorderTasks: (changes: TaskPositionChange[]) => reorderMutation.mutateAsync({ changes }),
+    reorderTasksIsPending: reorderMutation.isPending,
     filters,
     setFilter
   };
