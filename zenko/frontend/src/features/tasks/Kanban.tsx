@@ -471,9 +471,14 @@ export default function Kanban() {
           updates.push({ id, status: destinationStatus, sort_order: index });
         });
       } else {
-        const sourceIds = sourceTasks.map((task) => task.id).filter((id, index) => index !== source.index);
-        const destinationIds = destinationTasks.map((task) => task.id);
-        destinationIds.splice(destination.index, 0, draggableId);
+        const sourceIds = sourceTasks
+          .map((task) => task.id)
+          .filter((id) => id !== draggableId);
+        const destinationIds = destinationTasks
+          .map((task) => task.id)
+          .filter((id) => id !== draggableId);
+        const targetIndex = Math.min(destination.index, destinationIds.length);
+        destinationIds.splice(targetIndex, 0, draggableId);
         sourceIds.forEach((id, index) => {
           updates.push({ id, status: sourceStatus, sort_order: index });
         });

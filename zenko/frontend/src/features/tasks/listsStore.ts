@@ -183,8 +183,9 @@ export const useTaskListsStore = create(
           return;
         }
         set((state) => {
-          const withinBounds = (index: number) => index >= 0 && index < state.lists.length;
-          if (!withinBounds(sourceIndex) || !withinBounds(destinationIndex)) {
+          const isValidSource = sourceIndex >= 0 && sourceIndex < state.lists.length;
+          const isValidDestination = destinationIndex >= 0 && destinationIndex <= state.lists.length;
+          if (!isValidSource || !isValidDestination) {
             return state;
           }
           const reordered = [...state.lists];
