@@ -57,3 +57,43 @@ body {
 .animate-taskHighlight {
   animation: taskHighlight 2s ease-out forwards;
 }
+
+@layer utilities {
+  .kanban-scroll {
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .kanban-column {
+    flex: 0 0 100%;
+    min-width: min(100%, 20rem);
+  }
+
+  @media (min-width: 640px) {
+    .kanban-column {
+      flex-basis: calc(50% - 0.75rem);
+      min-width: calc(50% - 0.75rem);
+    }
+  }
+
+  @media (min-width: 1024px) {
+    .kanban-column {
+      flex-basis: 320px;
+      min-width: 320px;
+    }
+  }
+
+  @media (min-width: 1440px) {
+    .kanban-column {
+      flex-basis: 360px;
+      min-width: 360px;
+    }
+  }
+
+  .clamp-2 {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+}

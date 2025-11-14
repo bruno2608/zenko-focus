@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { KeyboardEvent as ReactKeyboardEvent } from 'react';
+import type { KeyboardEvent as ReactKeyboardEvent, TouchEvent as ReactTouchEvent } from 'react';
 import { DragDropContext, Draggable, Droppable, type DropResult } from 'react-beautiful-dnd';
 import Button from '../../components/ui/Button';
 import Card from '../../components/ui/Card';
@@ -19,24 +19,6 @@ import type { TaskPositionChange } from './api';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useToastStore } from '../../components/ui/ToastProvider';
 
-const columns: { key: TaskStatus; title: string; accent: string }[] = [
-  {
-    key: 'todo',
-    title: 'A Fazer',
-    accent: 'from-slate-200/70 via-slate-200/40 to-slate-200/20 dark:from-white/15 dark:via-white/10 dark:to-white/5'
-  },
-  {
-    key: 'doing',
-    title: 'Fazendo',
-    accent: 'from-slate-200/70 via-slate-200/40 to-slate-200/20 dark:from-white/15 dark:via-white/10 dark:to-white/5'
-  },
-  {
-    key: 'done',
-    title: 'Concluídas',
-    accent: 'from-slate-200/70 via-slate-200/40 to-slate-200/20 dark:from-white/15 dark:via-white/10 dark:to-white/5'
-  }
-];
-
 const columnTitles: Record<TaskStatus, string> = {
   todo: 'A Fazer',
   doing: 'Fazendo',
@@ -44,6 +26,60 @@ const columnTitles: Record<TaskStatus, string> = {
 };
 
 const statusOrder: TaskStatus[] = ['todo', 'doing', 'done'];
+
+const columnVisuals: Record<
+  TaskStatus,
+  { accent: string; badge: string; statusChip: string }
+> = {
+  todo: {
+    accent:
+      'from-sky-100/80 via-sky-50/80 to-white/60 dark:from-sky-500/25 dark:via-sky-500/10 dark:to-transparent',
+    badge: 'border border-sky-200/70 bg-sky-100/70 text-sky-700 dark:border-sky-400/40 dark:bg-sky-400/15 dark:text-sky-200',
+    statusChip:
+      'border border-sky-200/80 bg-sky-100/80 text-sky-700 dark:border-sky-400/40 dark:bg-sky-400/15 dark:text-sky-100'
+  },
+  doing: {
+    accent:
+      'from-violet-100/80 via-violet-50/80 to-white/60 dark:from-violet-500/25 dark:via-violet-500/10 dark:to-transparent',
+    badge:
+      'border border-violet-200/70 bg-violet-100/80 text-violet-700 dark:border-violet-400/30 dark:bg-violet-500/15 dark:text-violet-100',
+    statusChip:
+      'border border-violet-200/70 bg-violet-100/80 text-violet-700 dark:border-violet-400/30 dark:bg-violet-500/15 dark:text-violet-100'
+  },
+  done: {
+    accent:
+      'from-emerald-100/80 via-emerald-50/80 to-white/60 dark:from-emerald-500/25 dark:via-emerald-500/10 dark:to-transparent',
+    badge:
+      'border border-emerald-200/70 bg-emerald-100/70 text-emerald-700 dark:border-emerald-400/30 dark:bg-emerald-500/15 dark:text-emerald-100',
+    statusChip:
+      'border border-emerald-200/70 bg-emerald-100/80 text-emerald-700 dark:border-emerald-400/30 dark:bg-emerald-500/20 dark:text-emerald-100'
+  }
+};
+
+const columns = statusOrder.map((status) => ({
+  key: status,
+  title: columnTitles[status],
+  accent: columnVisuals[status].accent,
+  badge: columnVisuals[status].badge,
+  statusChip: columnVisuals[status].statusChip
+}));
+
+const dueDateFormatter =
+  typeof Intl !== 'undefined'
+    ? new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: 'short' })
+    : null;
+
+const formatDueDate = (value: string) => {
+  try {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+      return null;
+    }
+    return dueDateFormatter ? dueDateFormatter.format(date) : date.toLocaleDateString('pt-BR');
+  } catch (error) {
+    return null;
+  }
+};
 
 function useLabelDefinitionMap() {
   const labelsLibrary = useTasksStore((state) => state.labelsLibrary);
@@ -91,20 +127,22 @@ function BoardSkeleton() {
         <div className="h-7 w-48 rounded-xl bg-slate-200/80 dark:bg-slate-700/60 animate-pulse" />
         <div className="h-4 w-72 rounded-xl bg-slate-100/70 dark:bg-slate-800/50 animate-pulse" />
       </div>
-      <div className="flex snap-x snap-mandatory gap-4 overflow-x-auto pb-4">
+      <div className="kanban-scroll flex snap-x snap-mandatory gap-4 overflow-x-auto pb-4">
         {columns.map((column) => (
           <div
             key={`skeleton-${column.key}`}
-            className="min-w-[260px] flex-1 rounded-3xl border border-slate-200/70 bg-white/70 p-4 backdrop-blur dark:border-white/10 dark:bg-slate-900/60"
+            className={`kanban-column min-h-[20rem] rounded-[26px] bg-gradient-to-br p-[1px] ${column.accent}`}
           >
-            <div className="mb-4 h-5 w-24 rounded-lg bg-slate-200/90 dark:bg-slate-800/80 animate-pulse" />
-            <div className="space-y-3">
-              {[0, 1, 2].map((item) => (
-                <div
-                  key={`skeleton-card-${column.key}-${item}`}
-                  className="h-24 rounded-2xl bg-slate-100/90 shadow-inner animate-pulse dark:bg-slate-800/70"
-                />
-              ))}
+            <div className="flex h-full min-h-0 flex-col rounded-2xl border border-slate-200/70 bg-white/80 p-4 backdrop-blur dark:border-white/10 dark:bg-slate-900/70">
+              <div className="mb-4 h-5 w-24 rounded-lg bg-slate-200/90 dark:bg-slate-800/80 animate-pulse" />
+              <div className="space-y-3">
+                {[0, 1, 2].map((item) => (
+                  <div
+                    key={`skeleton-card-${column.key}-${item}`}
+                    className="h-24 rounded-2xl bg-slate-100/90 shadow-inner animate-pulse dark:bg-slate-800/70"
+                  />
+                ))}
+              </div>
             </div>
           </div>
         ))}
@@ -125,7 +163,10 @@ export default function Kanban() {
     updateTask,
     deleteTask,
     createTaskIsPending,
-    updateTaskIsPending
+    updateTaskIsPending,
+    reorderTasksIsPending,
+    updateStatusIsPending,
+    pendingTaskIds
   } = useTasks();
   const { profile } = useProfile();
   const params = useParams<{ taskId?: string }>();
@@ -147,6 +188,7 @@ export default function Kanban() {
   const labelDefinitionMap = useLabelDefinitionMap();
   const menuRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const creationTimeouts = useRef<Map<string, number>>(new Map());
+  const touchSwipeRef = useRef<{ id: string; x: number; y: number; time: number } | null>(null);
 
   const tasksById = useMemo(() => {
     const map = new Map<string, Task>();
@@ -187,7 +229,8 @@ export default function Kanban() {
     }));
   }, [columnsMap]);
 
-  const isMutationPending = createTaskIsPending || updateTaskIsPending;
+  const isBoardMutating =
+    createTaskIsPending || updateTaskIsPending || reorderTasksIsPending || updateStatusIsPending;
 
   const columnRefs = useRef<Record<TaskStatus, HTMLElement | null>>({
     todo: null,
@@ -366,6 +409,72 @@ export default function Kanban() {
       }
     },
     [placeTaskInStatus]
+  );
+
+  const handleTouchStart = useCallback(
+    (event: ReactTouchEvent<HTMLDivElement>, task: Task) => {
+      if (event.touches.length !== 1) {
+        return;
+      }
+      const touch = event.touches[0];
+      touchSwipeRef.current = {
+        id: task.id,
+        x: touch.clientX,
+        y: touch.clientY,
+        time: Date.now()
+      };
+    },
+    []
+  );
+
+  const handleTouchMove = useCallback((event: ReactTouchEvent<HTMLDivElement>) => {
+    if (!touchSwipeRef.current) return;
+    if (event.touches.length !== 1) {
+      touchSwipeRef.current = null;
+      return;
+    }
+    const touch = event.touches[0];
+    const deltaX = Math.abs(touch.clientX - touchSwipeRef.current.x);
+    const deltaY = Math.abs(touch.clientY - touchSwipeRef.current.y);
+    if (deltaY > deltaX * 1.2) {
+      touchSwipeRef.current = null;
+    }
+  }, []);
+
+  const handleTouchEnd = useCallback(
+    (event: ReactTouchEvent<HTMLDivElement>, task: Task) => {
+      const start = touchSwipeRef.current;
+      touchSwipeRef.current = null;
+      if (!start || start.id !== task.id) {
+        return;
+      }
+      const touch = event.changedTouches[0];
+      if (!touch) {
+        return;
+      }
+      const deltaX = touch.clientX - start.x;
+      const deltaY = Math.abs(touch.clientY - start.y);
+      const duration = Date.now() - start.time;
+      if (deltaY > 80 || duration > 600 || Math.abs(deltaX) < 60) {
+        return;
+      }
+      if (deltaX < 0) {
+        const nextStatus = getAdjacentStatus(task.status, 'next');
+        if (nextStatus) {
+          placeTaskInStatus(task, nextStatus);
+        } else {
+          toast({ title: 'Já está na última coluna', type: 'warning' });
+        }
+      } else {
+        const previousStatus = getAdjacentStatus(task.status, 'previous');
+        if (previousStatus) {
+          placeTaskInStatus(task, previousStatus, 'end');
+        } else {
+          toast({ title: 'Esta é a primeira coluna', type: 'warning' });
+        }
+      }
+    },
+    [placeTaskInStatus, toast]
   );
 
   const handleDragEnd = useCallback(
@@ -570,9 +679,9 @@ export default function Kanban() {
   }
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-6" aria-live="polite">
+    <div className="flex h-full min-h-0 flex-col gap-6" aria-live="polite" aria-busy={isBoardMutating}>
       {showOffline ? <OfflineNotice feature="Tarefas" /> : null}
-      {isMutationPending ? (
+      {isBoardMutating ? (
         <div
           className="pointer-events-none fixed bottom-6 left-1/2 z-40 flex -translate-x-1/2 items-center gap-2 rounded-full border border-white/20 bg-slate-900/85 px-4 py-2 text-xs font-medium text-white shadow-xl backdrop-blur dark:border-white/10 dark:bg-slate-800/85"
           role="status"
@@ -629,7 +738,7 @@ export default function Kanban() {
       </div>
       <div className="flex-1 min-h-0">
         <DragDropContext onDragEnd={handleDragEnd}>
-          <div className="flex h-full min-h-0 snap-x snap-mandatory gap-4 overflow-x-auto overflow-y-hidden pb-4 md:snap-none">
+          <div className="kanban-scroll flex h-full min-h-0 snap-x snap-mandatory gap-4 overflow-x-auto overflow-y-hidden pb-4 md:snap-none">
             {columnsData.map((column) => (
               <Droppable droppableId={column.key} key={column.key}>
                 {(provided, snapshot) => {
@@ -640,6 +749,7 @@ export default function Kanban() {
                     : isFocused
                       ? 'border-zenko-primary/40 ring-1 ring-zenko-primary/25 shadow-lg'
                       : 'shadow-[0_18px_40px_-22px_rgba(15,23,42,0.12)] dark:shadow-[0_18px_40px_-32px_rgba(15,23,42,0.8)]';
+                  const columnIsPending = column.tasks.some((task) => pendingTaskIds.has(task.id));
 
                   return (
                     <section
@@ -648,7 +758,7 @@ export default function Kanban() {
                         columnRefs.current[column.key] = node;
                       }}
                       {...provided.droppableProps}
-                      className={`group relative flex h-full min-h-[20rem] min-w-[272px] snap-start flex-col rounded-[26px] bg-gradient-to-br p-[1px] transition-shadow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/60 md:min-w-0 md:flex-1 ${column.accent}`}
+                      className={`kanban-column group relative flex h-full min-h-[20rem] snap-start flex-col rounded-[26px] bg-gradient-to-br p-[1px] transition-shadow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/60 ${column.accent}`}
                       role="region"
                       aria-labelledby={`column-${column.key}`}
                       aria-describedby={`column-${column.key}-meta`}
@@ -659,6 +769,7 @@ export default function Kanban() {
                     >
                       <div
                         className={`flex h-full min-h-0 flex-col overflow-hidden rounded-2xl border border-slate-200/70 bg-white/95 p-3 backdrop-blur dark:border-white/10 dark:bg-slate-900/70 ${highlightClasses}`}
+                        aria-busy={columnIsPending || undefined}
                       >
                         <header className="flex items-center justify-between">
                           <h3
@@ -669,7 +780,7 @@ export default function Kanban() {
                           </h3>
                           <span
                             id={`column-${column.key}-meta`}
-                            className="rounded-full bg-zenko-primary/10 px-2 py-1 text-xs text-zenko-primary dark:bg-white/10"
+                            className={`rounded-full px-2 py-1 text-xs font-semibold ${column.badge}`}
                           >
                             {column.tasks.length}
                           </span>
@@ -694,6 +805,11 @@ export default function Kanban() {
                         : 0;
                       const isRecentlyCreated = Boolean(recentlyCreatedMap[task.id]);
                       const isMenuOpen = openMenuTaskId === task.id;
+                      const columnVisual = columnVisuals[task.status];
+                      const statusChipClass = columnVisual.statusChip;
+                      const isCardPending = pendingTaskIds.has(task.id);
+                      const dueLabel = task.due_date ? formatDueDate(task.due_date) : null;
+                      const statusLabel = columnTitles[task.status];
 
                       return (
                         <Draggable draggableId={task.id} index={index} key={task.id}>
@@ -708,7 +824,7 @@ export default function Kanban() {
                             >
                               <Card
                                 variant="board"
-                                className={`group cursor-grab overflow-hidden border-slate-200/80 bg-white/90 transition-all hover:-translate-y-0.5 hover:border-zenko-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-zenko-primary/60 dark:border-white/5 dark:bg-slate-900/70 ${
+                                className={`group relative cursor-grab overflow-hidden border-slate-200/80 bg-white/90 transition-all hover:-translate-y-1 hover:border-zenko-primary/40 hover:shadow-[0_20px_45px_-24px_rgba(14,165,233,0.45)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-zenko-primary/60 dark:border-white/5 dark:bg-slate-900/70 ${
                                   dragSnapshot.isDragging ? 'border-zenko-primary/60 shadow-lg' : ''
                                 } ${
                                   highlightedTaskId === task.id
@@ -716,7 +832,7 @@ export default function Kanban() {
                                     : isRecentlyCreated
                                       ? 'animate-taskHighlight ring-2 ring-inset ring-zenko-primary/30'
                                       : ''
-                                }`}
+                                } ${isCardPending ? 'pointer-events-none' : ''}`}
                                 tabIndex={0}
                                 aria-label={`Tarefa ${task.title}. Status atual: ${columnTitles[task.status]}. ${ariaInstruction}`}
                                 onFocus={() => {
@@ -725,8 +841,33 @@ export default function Kanban() {
                                 }}
                                 onKeyDown={(event) => handleCardKeyDown(event, task)}
                                 onClick={() => openTask(task)}
+                                aria-busy={isCardPending || undefined}
+                                onTouchStart={(event) => handleTouchStart(event, task)}
+                                onTouchMove={handleTouchMove}
+                                onTouchEnd={(event) => handleTouchEnd(event, task)}
+                                onTouchCancel={() => {
+                                  touchSwipeRef.current = null;
+                                }}
                               >
-                                <div className="grid grid-cols-[auto,1fr] items-start gap-2.5">
+                                {isCardPending ? (
+                                  <div className="absolute inset-0 z-20 flex items-center justify-center rounded-xl bg-white/70 backdrop-blur-sm dark:bg-slate-950/70">
+                                    <svg
+                                      className="h-5 w-5 animate-spin text-zenko-primary"
+                                      viewBox="0 0 24 24"
+                                      fill="none"
+                                      stroke="currentColor"
+                                      strokeWidth="2"
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      aria-hidden="true"
+                                    >
+                                      <circle cx="12" cy="12" r="10" className="opacity-30" />
+                                      <path d="M4 12a8 8 0 018-8" className="opacity-80" />
+                                    </svg>
+                                    <span className="sr-only">Atualizando tarefa...</span>
+                                  </div>
+                                ) : null}
+                                <div className={`grid grid-cols-[auto,1fr] items-start gap-2.5 ${isCardPending ? 'opacity-60' : ''}`}>
                                   <label
                                     className={`mt-1 flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-slate-300 bg-white/80 text-zenko-primary shadow-sm transition focus-within:ring-2 focus-within:ring-zenko-primary/50 dark:border-white/20 dark:bg-white/10 ${
                                       autoMoveToDone ? 'cursor-pointer hover:scale-[1.02]' : 'cursor-not-allowed opacity-50'
@@ -764,9 +905,37 @@ export default function Kanban() {
                                     ) : null}
                                   </label>
                                   <div className="flex min-w-0 flex-1 flex-col gap-2.5">
+                                    <div className="flex items-center justify-between gap-2 md:hidden">
+                                      <span
+                                        className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide ${statusChipClass}`}
+                                      >
+                                        {statusLabel}
+                                      </span>
+                                      {dueLabel ? (
+                                        <span className="inline-flex items-center gap-1 rounded-full border border-slate-200/70 bg-white/90 px-2.5 py-1 text-[11px] font-medium text-slate-600 dark:border-white/10 dark:bg-slate-900/60 dark:text-slate-200">
+                                          <svg
+                                            className="h-3.5 w-3.5"
+                                            viewBox="0 0 24 24"
+                                            fill="none"
+                                            stroke="currentColor"
+                                            strokeWidth="1.5"
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                            aria-hidden="true"
+                                          >
+                                            <path d="M4 7h16" />
+                                            <path d="M10 11h4" />
+                                            <rect x="3" y="4" width="18" height="18" rx="2" />
+                                          </svg>
+                                          {dueLabel}
+                                        </span>
+                                      ) : (
+                                        <span className="sr-only">Sem prazo definido</span>
+                                      )}
+                                    </div>
                                     <div className="flex flex-wrap items-start justify-between gap-x-2 gap-y-2">
                                       <div
-                                        className="flex min-w-0 flex-1 flex-wrap gap-1"
+                                        className="hidden min-w-0 flex-1 flex-wrap gap-1 md:flex"
                                         aria-label={task.labels.length > 0 ? 'Etiquetas da tarefa' : undefined}
                                       >
                                         {task.labels.length === 0 ? (
@@ -955,11 +1124,17 @@ export default function Kanban() {
                                       </div>
                                     </div>
                                     <div className="space-y-2">
-                                      <h4 className="break-words text-sm font-semibold leading-5 text-slate-900 dark:text-white">
+                                      <h4
+                                        className="clamp-2 break-words text-sm font-semibold leading-5 text-slate-900 dark:text-white"
+                                        title={task.title}
+                                      >
                                         {task.title}
                                       </h4>
-                                      {task.due_date ? (
-                                        <p className="inline-flex min-w-0 max-w-full items-center gap-1 rounded-full bg-zenko-primary/10 px-2.5 py-1 text-[11px] font-medium text-zenko-primary dark:bg-zenko-primary/15">
+                                      {dueLabel ? (
+                                        <p
+                                          className="hidden min-w-0 max-w-full items-center gap-1 rounded-full border border-zenko-primary/30 bg-zenko-primary/10 px-2.5 py-1 text-[11px] font-medium text-zenko-primary dark:border-zenko-primary/40 dark:bg-zenko-primary/15 md:inline-flex"
+                                          title={`Prazo: ${dueLabel}`}
+                                        >
                                           <svg
                                             className="h-3.5 w-3.5"
                                             viewBox="0 0 24 24"
@@ -974,11 +1149,11 @@ export default function Kanban() {
                                             <path d="M10 11h4" />
                                             <rect x="3" y="4" width="18" height="18" rx="2" />
                                           </svg>
-                                          <span className="block max-w-full truncate">Prazo: {new Date(task.due_date).toLocaleDateString('pt-BR')}</span>
+                                          <span className="block max-w-full truncate">Prazo: {dueLabel}</span>
                                         </p>
                                       ) : null}
                                       {checklistTotal > 0 ? (
-                                        <div className="space-y-2">
+                                        <div className="hidden space-y-2 md:block">
                                           <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 text-[11px] font-medium text-slate-500 dark:text-slate-300">
                                             <span>Checklist</span>
                                             <span>

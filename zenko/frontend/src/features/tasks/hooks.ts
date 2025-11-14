@@ -225,6 +225,27 @@ export function useTasks() {
     registerLabels(Array.from(collected));
   }, [query.data, registerLabels]);
 
+  const pendingTaskIds = useMemo(() => {
+    const pending = new Set<string>();
+    if (statusMutation.isPending && statusMutation.variables?.id) {
+      pending.add(statusMutation.variables.id);
+    }
+    if (reorderMutation.isPending) {
+      reorderMutation.variables?.changes.forEach((change) => pending.add(change.id));
+    }
+    if (updateMutation.isPending && updateMutation.variables?.id) {
+      pending.add(updateMutation.variables.id);
+    }
+    return pending;
+  }, [
+    reorderMutation.isPending,
+    reorderMutation.variables,
+    statusMutation.isPending,
+    statusMutation.variables,
+    updateMutation.isPending,
+    updateMutation.variables
+  ]);
+
   return {
     userId,
     tasks: filteredTasks,
@@ -236,6 +257,9 @@ export function useTasks() {
     deleteTask: deleteMutation.mutateAsync,
     updateStatus: statusMutation.mutateAsync,
     reorderTasks: (changes: TaskPositionChange[]) => reorderMutation.mutateAsync({ changes }),
+    reorderTasksIsPending: reorderMutation.isPending,
+    updateStatusIsPending: statusMutation.isPending,
+    pendingTaskIds,
     filters,
     setFilter
   };

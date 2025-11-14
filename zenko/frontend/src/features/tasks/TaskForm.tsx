@@ -2446,6 +2446,7 @@ export default function TaskForm({
           name={titleField.name}
           ref={titleField.ref}
           value={titleValue}
+          maxLength={120}
           onChange={(event) => setValue('title', event.target.value, { shouldDirty: true })}
           onBlur={(event) => {
             titleField.onBlur(event);

@@ -2,7 +2,7 @@ import { create } from 'zustand';
 
 export type ThemeMode = 'light' | 'dark';
 
-const STORAGE_KEY = 'zenko-theme';
+export const THEME_STORAGE_KEY = 'zenko-theme';
 
 function applyTheme(theme: ThemeMode) {
   if (typeof document === 'undefined') return;
@@ -17,7 +17,7 @@ function getInitialTheme(): ThemeMode {
     return 'dark';
   }
 
-  const stored = window.localStorage.getItem(STORAGE_KEY);
+  const stored = window.localStorage.getItem(THEME_STORAGE_KEY);
   if (stored === 'light' || stored === 'dark') {
     return stored;
   }
@@ -40,7 +40,7 @@ export const useThemeStore = create<ThemeState>((set) => ({
   theme: initialTheme,
   setTheme: (theme) => {
     if (typeof window !== 'undefined') {
-      window.localStorage.setItem(STORAGE_KEY, theme);
+      window.localStorage.setItem(THEME_STORAGE_KEY, theme);
     }
     applyTheme(theme);
     set({ theme });
@@ -49,7 +49,7 @@ export const useThemeStore = create<ThemeState>((set) => ({
     set((state) => {
       const nextTheme: ThemeMode = state.theme === 'dark' ? 'light' : 'dark';
       if (typeof window !== 'undefined') {
-        window.localStorage.setItem(STORAGE_KEY, nextTheme);
+        window.localStorage.setItem(THEME_STORAGE_KEY, nextTheme);
       }
       applyTheme(nextTheme);
       return { theme: nextTheme };
