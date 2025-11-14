@@ -151,7 +151,7 @@ export function DragDropContext({ onDragEnd, children }: DragDropContextProps) {
 export function Droppable({
   droppableId,
   type = 'DEFAULT',
-  direction: _direction = 'vertical',
+  direction = 'vertical',
   children
 }: {
   droppableId: string;
@@ -177,6 +177,44 @@ export function Droppable({
 
   const getCount = useCallback(() => itemsRef.current.size, []);
 
+  const getSortedItems = useCallback(() => {
+    return Array.from(itemsRef.current.entries())
+      .map(([id, item]) => ({ id, element: item.element, order: item.index }))
+      .filter((entry) => entry.element)
+      .sort((a, b) => a.order - b.order);
+  }, []);
+
+  const computeDestinationIndex = useCallback(
+    (event: ReactDragEvent) => {
+      const sorted = getSortedItems().filter((entry) => entry.id !== context.activeId);
+      if (sorted.length === 0) {
+        return 0;
+      }
+
+      const pointer = direction === 'horizontal' ? event.clientX : event.clientY;
+      if (!Number.isFinite(pointer)) {
+        if (context.over?.droppableId === droppableId) {
+          return Math.min(context.over.index, sorted.length);
+        }
+        return sorted.length;
+      }
+
+      for (let index = 0; index < sorted.length; index += 1) {
+        const element = sorted[index].element!;
+        const rect = element.getBoundingClientRect();
+        const start = direction === 'horizontal' ? rect.left : rect.top;
+        const size = direction === 'horizontal' ? rect.width : rect.height;
+        const midpoint = start + size / 2;
+        if (pointer < midpoint) {
+          return index;
+        }
+      }
+
+      return sorted.length;
+    },
+    [context.activeId, context.over, direction, droppableId, getSortedItems]
+  );
+
   const handleDragOver = useCallback(
     (event: ReactDragEvent) => {
       event.preventDefault();
@@ -186,12 +224,10 @@ export function Droppable({
       if (event.dataTransfer) {
         event.dataTransfer.dropEffect = 'move';
       }
-      const current = context.over;
-      if (!current || current.droppableId !== droppableId) {
-        context.updateOver({ droppableId, index: itemsRef.current.size });
-      }
+      const nextIndex = computeDestinationIndex(event);
+      context.updateOver({ droppableId, index: nextIndex });
     },
-    [context, droppableId, type]
+    [computeDestinationIndex, context, droppableId, type]
   );
 
   const handleDragEnter = useCallback(
@@ -203,9 +239,10 @@ export function Droppable({
       if (event.dataTransfer) {
         event.dataTransfer.dropEffect = 'move';
       }
-      context.updateOver({ droppableId, index: itemsRef.current.size });
+      const nextIndex = computeDestinationIndex(event);
+      context.updateOver({ droppableId, index: nextIndex });
     },
-    [context, droppableId, type]
+    [computeDestinationIndex, context, droppableId, type]
   );
 
   const handleDrop = useCallback(
@@ -214,13 +251,10 @@ export function Droppable({
       if (context.activeType && context.activeType !== type) {
         return;
       }
-      const destination =
-        context.over && context.over.droppableId === droppableId
-          ? context.over
-          : { droppableId, index: itemsRef.current.size };
-      context.finishDrag(destination);
+      const nextIndex = computeDestinationIndex(event);
+      context.finishDrag({ droppableId, index: nextIndex });
     },
-    [context, droppableId, type]
+    [computeDestinationIndex, context, droppableId, type]
   );
 
   useEffect(() => {
@@ -311,31 +345,27 @@ export function Draggable({
   const handleDragOver = useCallback(
     (event: ReactDragEvent) => {
       event.preventDefault();
-      event.stopPropagation();
       if (context.activeType && context.activeType !== droppable.type) {
         return;
       }
       if (event.dataTransfer) {
         event.dataTransfer.dropEffect = 'move';
       }
-      context.updateOver({ droppableId: droppable.droppableId, index });
     },
-    [context, droppable.droppableId, droppable.type, index]
+    [context, droppable.type]
   );
 
   const handleDragEnter = useCallback(
     (event: ReactDragEvent) => {
       event.preventDefault();
-      event.stopPropagation();
       if (context.activeType && context.activeType !== droppable.type) {
         return;
       }
       if (event.dataTransfer) {
         event.dataTransfer.dropEffect = 'move';
       }
-      context.updateOver({ droppableId: droppable.droppableId, index });
     },
-    [context, droppable.droppableId, droppable.type, index]
+    [context, droppable.type]
   );
 
   const provided: DraggableProvided = {
