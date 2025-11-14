@@ -2,10 +2,12 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
 import { useToastStore } from '../../components/ui/ToastProvider';
 import { useSupabaseUserId } from '../../hooks/useSupabaseUser';
-import { useThemeStore } from '../../store/theme';
+import { ThemeMode, useThemeStore } from '../../store/theme';
 import { Profile, ProfilePayload } from './types';
 import { fetchProfile, saveProfile } from './api';
 import { OFFLINE_USER_ID } from '../../lib/supabase';
+
+let lastAppliedProfileTheme: ThemeMode | null = null;
 
 export function useProfile() {
   const userId = useSupabaseUserId();
@@ -22,10 +24,16 @@ export function useProfile() {
   });
 
   useEffect(() => {
-    const preference = query.data?.theme_preference;
+    const preference = query.data?.theme_preference as ThemeMode | undefined;
     if (!preference) {
       return;
     }
+
+    if (lastAppliedProfileTheme === preference) {
+      return;
+    }
+
+    lastAppliedProfileTheme = preference;
 
     const currentTheme = useThemeStore.getState().theme;
     if (currentTheme !== preference) {
