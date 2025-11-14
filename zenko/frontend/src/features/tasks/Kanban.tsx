@@ -431,7 +431,7 @@ export default function Kanban() {
 
   const handleDragEnd = useCallback(
     (result: DropResult) => {
-      const { destination, source, draggableId } = result;
+      const { destination, source, draggableId, type } = result;
       if (!destination) {
         return;
       }
