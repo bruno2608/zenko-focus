@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
 import { useToastStore } from '../../components/ui/ToastProvider';
 import { useSupabaseUserId } from '../../hooks/useSupabaseUser';
-import { THEME_STORAGE_KEY, useThemeStore } from '../../store/theme';
+import { useThemeStore } from '../../store/theme';
 import { Profile, ProfilePayload } from './types';
 import { fetchProfile, saveProfile } from './api';
 import { OFFLINE_USER_ID } from '../../lib/supabase';
@@ -25,20 +25,6 @@ export function useProfile() {
     const preference = query.data?.theme_preference;
     if (!preference) {
       return;
-    }
-
-    const storedTheme =
-      typeof window !== 'undefined'
-        ? window.localStorage.getItem(THEME_STORAGE_KEY)
-        : null;
-
-    if (storedTheme === 'light' || storedTheme === 'dark') {
-      if (storedTheme !== preference) {
-        if (useThemeStore.getState().theme !== storedTheme) {
-          setTheme(storedTheme);
-        }
-        return;
-      }
     }
 
     const currentTheme = useThemeStore.getState().theme;
