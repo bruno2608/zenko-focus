@@ -285,6 +285,7 @@ export function Draggable({
 
   const handleDragStart = useCallback(
     (event: ReactDragEvent) => {
+      event.stopPropagation();
       event.dataTransfer?.setData('text/plain', draggableId);
       if (event.dataTransfer) {
         event.dataTransfer.effectAllowed = 'move';
@@ -301,6 +302,7 @@ export function Draggable({
   const handleDragEnd = useCallback(
     (event: ReactDragEvent) => {
       event.preventDefault();
+      event.stopPropagation();
       context.finishDrag(context.over ?? null);
     },
     [context]
@@ -309,6 +311,7 @@ export function Draggable({
   const handleDragOver = useCallback(
     (event: ReactDragEvent) => {
       event.preventDefault();
+      event.stopPropagation();
       if (context.activeType && context.activeType !== droppable.type) {
         return;
       }
@@ -323,6 +326,7 @@ export function Draggable({
   const handleDragEnter = useCallback(
     (event: ReactDragEvent) => {
       event.preventDefault();
+      event.stopPropagation();
       if (context.activeType && context.activeType !== droppable.type) {
         return;
       }
