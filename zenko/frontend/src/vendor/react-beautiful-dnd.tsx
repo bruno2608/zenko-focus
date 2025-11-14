@@ -28,10 +28,16 @@ interface DragDropContextProps {
   children: ReactNode;
 }
 
+interface DragDimensions {
+  width: number;
+  height: number;
+}
+
 interface ActiveDrag {
   draggableId: string;
   source: DraggableLocation;
   type: string;
+  dimensions: DragDimensions | null;
 }
 
 interface InternalDndContext {
@@ -41,6 +47,8 @@ interface InternalDndContext {
   clearDrag: () => void;
   activeId: string | null;
   activeType: string | null;
+  activeSource: DraggableLocation | null;
+  activeDimensions: DragDimensions | null;
   over: DraggableLocation | null;
 }
 
@@ -57,6 +65,11 @@ interface DroppableContextValue {
   getCount: () => number;
 }
 
+interface DroppablePlaceholder {
+  index: number;
+  dimensions: DragDimensions;
+}
+
 interface DroppableProvided {
   innerRef: (element: HTMLElement | null) => void;
   droppableProps: {
@@ -69,6 +82,7 @@ interface DroppableProvided {
 
 interface DroppableSnapshot {
   isDraggingOver: boolean;
+  placeholder: DroppablePlaceholder | null;
 }
 
 interface DraggableProvided {
@@ -98,12 +112,16 @@ export function DragDropContext({ onDragEnd, children }: DragDropContextProps) {
   const activeRef = useRef<ActiveDrag | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [activeType, setActiveType] = useState<string | null>(null);
+  const [activeSource, setActiveSource] = useState<DraggableLocation | null>(null);
+  const [activeDimensions, setActiveDimensions] = useState<DragDimensions | null>(null);
   const [over, setOver] = useState<DraggableLocation | null>(null);
 
   const startDrag = useCallback((active: ActiveDrag) => {
     activeRef.current = active;
     setActiveId(active.draggableId);
     setActiveType(active.type);
+    setActiveSource(active.source);
+    setActiveDimensions(active.dimensions);
     setOver(active.source);
   }, []);
 
@@ -111,6 +129,8 @@ export function DragDropContext({ onDragEnd, children }: DragDropContextProps) {
     activeRef.current = null;
     setActiveId(null);
     setActiveType(null);
+    setActiveSource(null);
+    setActiveDimensions(null);
     setOver(null);
   }, []);
 
@@ -140,9 +160,11 @@ export function DragDropContext({ onDragEnd, children }: DragDropContextProps) {
       clearDrag,
       activeId,
       activeType,
+      activeSource,
+      activeDimensions,
       over
     }),
-    [activeId, activeType, finishDrag, over, startDrag]
+    [activeDimensions, activeId, activeSource, activeType, finishDrag, over, startDrag]
   );
 
   return <DndContext.Provider value={value}>{children}</DndContext.Provider>;
@@ -176,6 +198,34 @@ export function Droppable({
   }, []);
 
   const getCount = useCallback(() => itemsRef.current.size, []);
+
+  const resolvePlaceholderIndex = useCallback(() => {
+    if (!context.activeId || context.activeType !== type) {
+      return null;
+    }
+
+    if (context.over && context.over.droppableId === droppableId) {
+      return Math.min(context.over.index, getCount());
+    }
+
+    if (!context.over && context.activeSource?.droppableId === droppableId) {
+      return Math.min(context.activeSource.index, getCount());
+    }
+
+    return null;
+  }, [context.activeId, context.activeSource, context.activeType, context.over, droppableId, getCount, type]);
+
+  const placeholder = useMemo<DroppablePlaceholder | null>(() => {
+    const index = resolvePlaceholderIndex();
+    if (index === null || !context.activeDimensions) {
+      return null;
+    }
+
+    return {
+      index,
+      dimensions: context.activeDimensions
+    };
+  }, [context.activeDimensions, resolvePlaceholderIndex]);
 
   const getSortedItems = useCallback(() => {
     return Array.from(itemsRef.current.entries())
@@ -272,11 +322,24 @@ export function Droppable({
       onDragEnter: handleDragEnter,
       onDrop: handleDrop
     },
-    placeholder: null
+    placeholder:
+      placeholder && context.activeType === type
+        ? (
+            <div
+              aria-hidden="true"
+              style={{
+                width: direction === 'horizontal' ? `${placeholder.dimensions.width}px` : '100%',
+                height: direction === 'horizontal' ? '100%' : `${placeholder.dimensions.height}px`,
+                flex: direction === 'horizontal' ? '0 0 auto' : undefined
+              }}
+            />
+          )
+        : null
   };
 
   const snapshot: DroppableSnapshot = {
-    isDraggingOver: context.over?.droppableId === droppableId
+    isDraggingOver: context.over?.droppableId === droppableId,
+    placeholder: context.activeType === type ? placeholder : null
   };
 
   const droppableValue = useMemo<DroppableContextValue>(
@@ -324,10 +387,17 @@ export function Draggable({
       if (event.dataTransfer) {
         event.dataTransfer.effectAllowed = 'move';
       }
+      const rect = elementRef.current?.getBoundingClientRect() ?? null;
       context.startDrag({
         draggableId,
         source: { droppableId: droppable.droppableId, index },
-        type: droppable.type
+        type: droppable.type,
+        dimensions: rect
+          ? {
+              width: rect.width,
+              height: rect.height
+            }
+          : null
       });
     },
     [context, draggableId, droppable.droppableId, droppable.type, index]
@@ -368,6 +438,8 @@ export function Draggable({
     [context, droppable.type]
   );
 
+  const isDragging = context.activeId === draggableId;
+
   const provided: DraggableProvided = {
     innerRef: (element) => {
       elementRef.current = element;
@@ -380,13 +452,18 @@ export function Draggable({
       onDragStart: handleDragStart,
       onDragEnd: handleDragEnd,
       onDragOver: handleDragOver,
-      onDragEnter: handleDragEnter
+      onDragEnter: handleDragEnter,
+      style: isDragging
+        ? {
+            opacity: 0
+          }
+        : undefined
     },
     dragHandleProps: {}
   };
 
   const snapshot: DraggableSnapshot = {
-    isDragging: context.activeId === draggableId
+    isDragging
   };
 
   return children(provided, snapshot);
