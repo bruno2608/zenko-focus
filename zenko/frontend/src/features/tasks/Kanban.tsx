@@ -1,5 +1,5 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { KeyboardEvent as ReactKeyboardEvent } from 'react';
+import type { KeyboardEvent as ReactKeyboardEvent, TouchEvent as ReactTouchEvent } from 'react';
 import { DragDropContext, Draggable, Droppable, type DropResult } from 'react-beautiful-dnd';
 import Button from '../../components/ui/Button';
 import Card from '../../components/ui/Card';
@@ -22,6 +22,16 @@ import { useTaskListsStore, DEFAULT_LISTS } from './listsStore';
 const COLUMN_ACCENT =
   'from-slate-200/70 via-slate-200/40 to-slate-200/20 dark:from-white/15 dark:via-white/10 dark:to-white/5';
 const BOARD_COLUMNS_DROPPABLE_ID = 'board-columns';
+const MOBILE_SWIPE_THRESHOLD = 56;
+const MOBILE_SWIPE_MAX_OFF_AXIS = 42;
+const MOBILE_SWIPE_MAX_DURATION = 600;
+
+type SwipeState = {
+  startX: number;
+  startY: number;
+  startTime: number;
+  hasMoved: boolean;
+};
 
 function useLabelDefinitionMap() {
   const labelsLibrary = useTasksStore((state) => state.labelsLibrary);
@@ -92,7 +102,8 @@ export default function Kanban() {
     updateTask,
     deleteTask,
     createTaskIsPending,
-    updateTaskIsPending
+    updateTaskIsPending,
+    reorderTasksIsPending
   } = useTasks();
   const lists = useTaskListsStore((state) => state.lists);
   const ensureTaskLists = useTaskListsStore((state) => state.ensureStatuses);
@@ -187,9 +198,11 @@ export default function Kanban() {
     }));
   }, [columnsMap, lists]);
 
-  const isMutationPending = createTaskIsPending || updateTaskIsPending;
+  const isMutationPending = createTaskIsPending || updateTaskIsPending || reorderTasksIsPending;
 
   const columnRefs = useRef<Record<string, HTMLElement | null>>({});
+  const swipeStateRef = useRef<Record<string, SwipeState>>({});
+  const suppressClickRef = useRef<Record<string, boolean>>({});
 
   const focusColumn = useCallback(
     (status: TaskStatus) => {
@@ -419,6 +432,97 @@ export default function Kanban() {
     },
     [getAdjacentStatus, placeTaskInStatus]
   );
+
+  const handleTaskTouchStart = useCallback(
+    (taskId: string, event: ReactTouchEvent<HTMLDivElement>) => {
+      if (event.touches.length !== 1) {
+        return;
+      }
+      const touch = event.touches[0];
+      swipeStateRef.current[taskId] = {
+        startX: touch.clientX,
+        startY: touch.clientY,
+        startTime: Date.now(),
+        hasMoved: false
+      };
+    },
+    []
+  );
+
+  const handleTaskTouchMove = useCallback((taskId: string, event: ReactTouchEvent<HTMLDivElement>) => {
+    const state = swipeStateRef.current[taskId];
+    if (!state || event.touches.length !== 1) {
+      return;
+    }
+    const touch = event.touches[0];
+    const deltaX = touch.clientX - state.startX;
+    const deltaY = touch.clientY - state.startY;
+    if (!state.hasMoved) {
+      state.hasMoved = Math.abs(deltaX) > 6 || Math.abs(deltaY) > 6;
+    }
+    if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > 14) {
+      event.preventDefault();
+    }
+  }, []);
+
+  const handleTaskTouchEnd = useCallback(
+    (task: Task, event: ReactTouchEvent<HTMLDivElement>) => {
+      const state = swipeStateRef.current[task.id];
+      if (!state) {
+        return;
+      }
+      delete swipeStateRef.current[task.id];
+      if (event.changedTouches.length === 0) {
+        return;
+      }
+      const touch = event.changedTouches[0];
+      const deltaX = touch.clientX - state.startX;
+      const deltaY = touch.clientY - state.startY;
+      const elapsed = Date.now() - state.startTime;
+      if (
+        Math.abs(deltaX) < MOBILE_SWIPE_THRESHOLD ||
+        Math.abs(deltaY) > MOBILE_SWIPE_MAX_OFF_AXIS ||
+        elapsed > MOBILE_SWIPE_MAX_DURATION
+      ) {
+        return;
+      }
+
+      suppressClickRef.current[task.id] = true;
+      if (typeof window !== 'undefined') {
+        window.setTimeout(() => {
+          delete suppressClickRef.current[task.id];
+        }, 220);
+      }
+
+      if (deltaX < 0) {
+        const nextStatus = getAdjacentStatus(task.status, 'next');
+        if (nextStatus) {
+          placeTaskInStatus(task, nextStatus, 'end');
+          toast({
+            title: 'Tarefa movida',
+            description: `${task.title} foi para ${getListTitle(nextStatus)}.`,
+            type: 'success'
+          });
+        }
+      } else if (deltaX > 0) {
+        const previousStatus = getAdjacentStatus(task.status, 'previous');
+        if (previousStatus) {
+          placeTaskInStatus(task, previousStatus, 'end');
+          toast({
+            title: 'Tarefa movida',
+            description: `${task.title} foi para ${getListTitle(previousStatus)}.`,
+            type: 'success'
+          });
+        }
+      }
+    },
+    [getAdjacentStatus, getListTitle, placeTaskInStatus, toast]
+  );
+
+  const handleTaskTouchCancel = useCallback((taskId: string) => {
+    delete swipeStateRef.current[taskId];
+    delete suppressClickRef.current[taskId];
+  }, []);
 
   const handleDragEnd = useCallback(
     (result: DropResult) => {
@@ -721,7 +825,7 @@ export default function Kanban() {
               <div
                 ref={boardProvided.innerRef}
                 {...boardProvided.droppableProps}
-                className="flex h-full min-h-0 snap-x snap-mandatory gap-2.5 overflow-x-auto overflow-y-hidden pb-3 md:snap-none"
+                className="flex h-full min-h-0 snap-x snap-mandatory gap-3 overflow-x-auto overflow-y-hidden pb-4 pr-4 md:snap-none lg:gap-4"
               >
 
                 {columnsData.map((column, columnIndex) => {
@@ -740,7 +844,7 @@ export default function Kanban() {
                             }}
                             {...columnProvided.draggableProps}
                             style={columnProvided.draggableProps.style}
-                            className={`group relative flex h-full min-h-[20rem] w-[272px] flex-none snap-start flex-col rounded-[20px] bg-gradient-to-br p-[1px] transition-transform transition-shadow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/60 ${column.accent} ${columnSnapshot.isDragging ? 'scale-[1.01]' : ''}`}
+                            className={`group relative flex h-full min-h-[20rem] w-[82vw] min-w-[260px] max-w-[360px] flex-none snap-start flex-col rounded-[20px] bg-gradient-to-br p-[1px] transition-transform transition-shadow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/60 sm:w-[68vw] md:w-[320px] lg:w-[340px] xl:w-[360px] ${column.accent} ${columnSnapshot.isDragging ? 'scale-[1.01]' : ''}`}
                             role="region"
                             aria-labelledby={`column-${column.key}`}
                             aria-describedby={`column-${column.key}-meta`}
@@ -763,7 +867,7 @@ export default function Kanban() {
                                       taskProvided.innerRef(node);
                                     }}
                                     {...taskProvided.droppableProps}
-                                    className={`flex h-full min-h-0 flex-col overflow-hidden rounded-[14px] border border-slate-200/70 bg-white/95 p-2 backdrop-blur dark:border-white/10 dark:bg-slate-900/70 ${highlightClasses}`}
+                                    className={`flex h-full min-h-0 flex-col overflow-hidden rounded-[14px] border border-slate-200/70 bg-white/95 p-2 backdrop-blur dark:border-white/10 dark:bg-slate-900/70 sm:p-2.5 md:p-3 ${highlightClasses}`}
                                   >
                                     <header>
                                       <div
@@ -787,7 +891,7 @@ export default function Kanban() {
                                       </div>
                                     </header>
                                     <div
-                                      className="mt-1.5 flex-1 min-h-0 space-y-1.5 overflow-y-auto pr-1"
+                                      className="mt-1.5 flex-1 min-h-0 space-y-2 overflow-y-auto pr-1.5"
                                       role="list"
                                       aria-label={`Tarefas em ${column.title}`}
                                     >
@@ -810,6 +914,7 @@ export default function Kanban() {
                                           : 0;
                                         const isRecentlyCreated = Boolean(recentlyCreatedMap[task.id]);
                                         const isMenuOpen = openMenuTaskId === task.id;
+                                        const isTaskPending = isMutationPending && highlightedTaskId === task.id;
 
                                         return (
                                           <Draggable key={task.id} draggableId={task.id} index={index}>
@@ -825,8 +930,8 @@ export default function Kanban() {
                                                 <Card
                                                   {...dragProvided.dragHandleProps}
                                                   variant="board"
-                                                  className={`group overflow-hidden border-slate-200/70 bg-white/90 transition-all hover:-translate-y-0.5 hover:border-zenko-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-zenko-primary/60 dark:border-white/5 dark:bg-slate-900/70 ${
-                                                    dragSnapshot.isDragging ? 'border-zenko-primary/60 shadow-lg opacity-0' : 'cursor-grab'
+                                                  className={`group cursor-pointer overflow-hidden border-slate-200/60 bg-white/95 transition-all hover:-translate-y-0.5 hover:border-zenko-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-zenko-primary/60 dark:border-white/10 dark:bg-slate-900/80 ${
+                                                    dragSnapshot.isDragging ? 'border-zenko-primary/60 shadow-lg opacity-0' : 'sm:cursor-grab'
                                                   } ${
                                                     highlightedTaskId === task.id
                                                       ? 'ring-2 ring-inset ring-zenko-primary/60'
@@ -836,13 +941,42 @@ export default function Kanban() {
                                                   }`}
                                                   tabIndex={0}
                                                   aria-label={`Tarefa ${task.title}. Status atual: ${getListTitle(task.status)}. ${ariaInstruction}`}
+                                                  aria-busy={isTaskPending || undefined}
                                                   onFocus={() => {
                                                     setHighlightedTaskId(task.id);
                                                     setFocusedColumn(task.status);
                                                   }}
                                                   onKeyDown={(event) => handleCardKeyDown(event, task)}
-                                                  onClick={() => openTask(task)}
+                                                  onClick={(event) => {
+                                                    if (suppressClickRef.current[task.id]) {
+                                                      event.preventDefault();
+                                                      return;
+                                                    }
+                                                    openTask(task);
+                                                  }}
+                                                  onTouchStart={(event) => handleTaskTouchStart(task.id, event)}
+                                                  onTouchMove={(event) => handleTaskTouchMove(task.id, event)}
+                                                  onTouchEnd={(event) => handleTaskTouchEnd(task, event)}
+                                                  onTouchCancel={() => handleTaskTouchCancel(task.id)}
                                                 >
+                                                  {isTaskPending ? (
+                                                    <span className="pointer-events-none absolute right-3 top-3 inline-flex h-6 w-6 items-center justify-center rounded-full bg-white/80 text-zenko-primary shadow-sm dark:bg-slate-900/80">
+                                                      <svg
+                                                        className="h-3.5 w-3.5 animate-spin"
+                                                        viewBox="0 0 24 24"
+                                                        fill="none"
+                                                        stroke="currentColor"
+                                                        strokeWidth="2"
+                                                        strokeLinecap="round"
+                                                        strokeLinejoin="round"
+                                                        aria-hidden="true"
+                                                      >
+                                                        <circle cx="12" cy="12" r="10" className="opacity-25" />
+                                                        <path d="M4 12a8 8 0 018-8" className="opacity-70" />
+                                                      </svg>
+                                                      <span className="sr-only">Processando tarefa...</span>
+                                                    </span>
+                                                  ) : null}
                                                   <div className="grid grid-cols-[auto,1fr] items-start gap-1.5">
                                                     <label
                                                       className={`mt-0 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white/80 text-zenko-primary shadow-sm transition focus-within:ring-2 focus-within:ring-zenko-primary/50 dark:border-white/20 dark:bg-white/10 ${
@@ -883,7 +1017,7 @@ export default function Kanban() {
                                                     <div className="flex min-w-0 flex-1 flex-col gap-1.5">
                                                       <div className="flex flex-wrap items-start justify-between gap-x-1.5 gap-y-1">
                                                         <div
-                                                          className="flex min-w-0 flex-1 flex-wrap gap-0.5"
+                                                          className="flex min-w-0 flex-1 flex-wrap gap-1"
                                                           aria-label={task.labels.length > 0 ? 'Etiquetas da tarefa' : undefined}
                                                         >
                                                           {task.labels.length === 0 ? (
@@ -899,13 +1033,14 @@ export default function Kanban() {
                                                               return (
                                                                 <span
                                                                   key={`${task.id}-label-${definition?.id ?? labelIndex}`}
-                                                                  className="inline-flex h-2 w-10 items-center rounded-sm border border-black/10 shadow-sm dark:border-white/20"
+                                                                  className="inline-flex max-w-full items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] shadow-sm"
                                                                   style={{
-                                                                    backgroundColor: colors.background
+                                                                    backgroundColor: colors.background,
+                                                                    color: colors.foreground
                                                                   }}
                                                                   title={definition?.value ?? label}
                                                                 >
-                                                                  <span className="sr-only">{definition?.value ?? label}</span>
+                                                                  <span className="max-w-[8rem] truncate">{definition?.value ?? label}</span>
                                                                 </span>
                                                               );
                                                             })
@@ -1073,11 +1208,11 @@ export default function Kanban() {
                                                         </div>
                                                       </div>
                                                       <div className="space-y-1">
-                                                        <h4 className="break-words text-[12px] font-semibold leading-[16px] text-slate-900 dark:text-white">
+                                                        <h4 className="board-card-title break-words text-[12px] font-semibold leading-[18px] text-slate-900 dark:text-white">
                                                           {task.title}
                                                         </h4>
                                                         {task.due_date ? (
-                                                          <p className="inline-flex min-w-0 max-w-full items-center gap-1 rounded-full bg-zenko-primary/10 px-2 py-0.5 text-[10px] font-medium text-zenko-primary dark:bg-zenko-primary/15">
+                                                          <p className="inline-flex min-w-0 max-w-full items-center gap-1 rounded-full bg-zenko-primary/10 px-2 py-0.5 text-[10px] font-medium text-zenko-primary dark:bg-zenko-primary/15 whitespace-nowrap">
                                                             <svg
                                                               className="h-3 w-3"
                                                               viewBox="0 0 24 24"
@@ -1184,7 +1319,7 @@ export default function Kanban() {
                   );
                 })}
                 {boardProvided.placeholder}
-                <div className="w-[272px] flex-none self-start">
+                <div className="w-[82vw] min-w-[260px] max-w-[360px] flex-none self-start sm:w-[68vw] md:w-[320px] lg:w-[340px] xl:w-[360px]">
                   {isAddingList ? (
                     <div className="rounded-xl border border-slate-300/80 bg-white/80 p-3 shadow-sm backdrop-blur dark:border-white/15 dark:bg-white/10">
                       <label htmlFor="board-new-list" className="sr-only">

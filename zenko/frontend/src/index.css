@@ -57,3 +57,10 @@ body {
 .animate-taskHighlight {
   animation: taskHighlight 2s ease-out forwards;
 }
+
+.board-card-title {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
