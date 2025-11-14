@@ -1379,14 +1379,16 @@ export default function Kanban() {
           </Droppable>
         </DragDropContext>
       </div>
-      <Button
-        className="fixed bottom-6 right-6 z-30 shadow-lg shadow-zenko-primary/40 sm:hidden"
-        onClick={() => openCreate(focusedColumn ?? defaultStatus)}
-        title="Adicionar nova tarefa"
-        aria-label="Adicionar nova tarefa"
-      >
-        + Nova tarefa
-      </Button>
+      <div className="hidden sm:block">
+        <Button
+          className="shadow-lg shadow-zenko-primary/40 sm:fixed sm:bottom-6 sm:right-6 sm:z-30"
+          onClick={() => openCreate(focusedColumn ?? defaultStatus)}
+          title="Adicionar nova tarefa"
+          aria-label="Adicionar nova tarefa"
+        >
+          + Nova tarefa
+        </Button>
+      </div>
       <Modal
         open={isModalVisible}
         onClose={closeModal}
