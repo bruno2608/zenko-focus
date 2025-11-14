@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef } from 'react';
 import { OFFLINE_USER_ID, isOfflineMode, supabase } from '../../lib/supabase';
 import { useToastStore } from '../../components/ui/ToastProvider';
 import { useTasksStore } from './store';
+import { useTaskListsStore } from './listsStore';
 import { Task, TaskPayload, TaskStatus } from './types';
 import {
   createTask,
@@ -20,6 +21,8 @@ export function useTasks() {
   const setFilter = useTasksStore((state) => state.setFilter);
   const filters = useTasksStore((state) => state.filters);
   const registerLabels = useTasksStore((state) => state.registerLabels);
+  const ensureTaskLists = useTaskListsStore((state) => state.ensureStatuses);
+  const getListTitle = useTaskListsStore((state) => state.getListTitle);
   const toast = useToastStore((state) => state.show);
   const queryClient = useQueryClient();
   const recentMutationsRef = useRef<Map<string, number>>(new Map());
@@ -47,6 +50,12 @@ export function useTasks() {
   });
 
   useEffect(() => {
+    if (query.data) {
+      ensureTaskLists(query.data.map((task) => task.status));
+    }
+  }, [ensureTaskLists, query.data]);
+
+  useEffect(() => {
     if (!userId || isOfflineMode(userId)) return;
     const channel = supabase
       .channel('tasks-changes')
@@ -67,19 +76,16 @@ export function useTasks() {
           }
           if (payload.eventType === 'INSERT') {
             const created = payload.new as Task;
+            ensureTaskLists([created.status]);
             toast({ title: 'Nova tarefa criada', description: created?.title, type: 'info' });
           } else if (payload.eventType === 'UPDATE') {
             const updated = payload.new as Task;
             const previous = payload.old as Task | null;
             if (previous && updated.status !== previous.status) {
-              const statusLabels: Record<TaskStatus, string> = {
-                todo: 'A Fazer',
-                doing: 'Fazendo',
-                done: 'Concluídas'
-              };
+              ensureTaskLists([updated.status]);
               toast({
                 title: 'Tarefa movida',
-                description: `${updated.title} agora está em ${statusLabels[updated.status]}.`,
+                description: `${updated.title} agora está em ${getListTitle(updated.status)}.`,
                 type: 'info'
               });
             } else {
@@ -95,13 +101,14 @@ export function useTasks() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [queryClient, userId]);
+  }, [ensureTaskLists, getListTitle, queryClient, userId]);
 
   const createMutation = useMutation({
     mutationFn: (payload: TaskPayload) => createTask(userId ?? OFFLINE_USER_ID, payload),
     onSuccess: (task, variables) => {
       queryClient.setQueryData<Task[]>(['tasks', userId], (old) => (old ? [...old, task] : [task]));
       registerLabels(variables.labels ?? task.labels ?? []);
+      ensureTaskLists([task.status]);
       toast({ title: 'Tarefa criada', type: 'success' });
       markLocalMutation(task.id);
     },
@@ -114,6 +121,9 @@ export function useTasks() {
     onSuccess: (result, { id, payload }) => {
       if (payload.labels) {
         registerLabels(payload.labels);
+      }
+      if (payload.status) {
+        ensureTaskLists([payload.status]);
       }
       queryClient.invalidateQueries({ queryKey: ['tasks', userId] });
       toast({ title: 'Tarefa atualizada', type: 'success' });
@@ -143,7 +153,8 @@ export function useTasks() {
       );
       return { prevTasks };
     },
-    onSuccess: (_result, { id }) => {
+    onSuccess: (_result, { id, status }) => {
+      ensureTaskLists([status]);
       markLocalMutation(id);
     },
     onError: (_error, _variables, context) => {

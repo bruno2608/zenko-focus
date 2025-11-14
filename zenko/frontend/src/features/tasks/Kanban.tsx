@@ -4,7 +4,6 @@ import { DragDropContext, Draggable, Droppable, type DropResult } from 'react-be
 import Button from '../../components/ui/Button';
 import Card from '../../components/ui/Card';
 import Modal from '../../components/ui/Modal';
-import Select from '../../components/ui/Select';
 import { useTasks } from './hooks';
 import { Task, TaskPayload, TaskStatus } from './types';
 import TaskForm from './TaskForm';
@@ -18,6 +17,7 @@ import createMousetrap from 'mousetrap';
 import type { TaskPositionChange } from './api';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useToastStore } from '../../components/ui/ToastProvider';
+import { useTaskListsStore, DEFAULT_LISTS } from './listsStore';
 
 const columnTitles: Record<TaskStatus, string> = {
   todo: 'A Fazer',
@@ -92,15 +92,6 @@ function useLabelDefinitionMap() {
   }, [labelsLibrary]);
 }
 
-const getAdjacentStatus = (current: TaskStatus, direction: 'next' | 'previous'): TaskStatus | null => {
-  const index = statusOrder.indexOf(current);
-  if (index === -1) return null;
-  if (direction === 'next') {
-    return statusOrder[index + 1] ?? null;
-  }
-  return statusOrder[index - 1] ?? null;
-};
-
 function arrayMove<T>(items: T[], from: number, to: number) {
   const list = [...items];
   const startIndex = from < 0 ? list.length + from : from;
@@ -156,8 +147,6 @@ export default function Kanban() {
     tasks,
     isLoading,
     reorderTasks,
-    filters,
-    setFilter,
     userId,
     createTask,
     updateTask,
@@ -168,6 +157,11 @@ export default function Kanban() {
     updateStatusIsPending,
     pendingTaskIds
   } = useTasks();
+  const lists = useTaskListsStore((state) => state.lists);
+  const ensureTaskLists = useTaskListsStore((state) => state.ensureStatuses);
+  const addList = useTaskListsStore((state) => state.addList);
+  const reorderLists = useTaskListsStore((state) => state.reorderLists);
+  const getListTitle = useTaskListsStore((state) => state.getListTitle);
   const { profile } = useProfile();
   const params = useParams<{ taskId?: string }>();
   const location = useLocation();
@@ -177,11 +171,6 @@ export default function Kanban() {
   const isCreateRoute = rawTaskParam === 'new' || location.pathname.endsWith('/task/new');
   const selectedTaskId = !rawTaskParam || isCreateRoute ? null : rawTaskParam;
   const isModalVisible = isCreateRoute || Boolean(rawTaskParam);
-  const [focusedColumn, setFocusedColumn] = useState<TaskStatus | null>(null);
-  const [highlightedTaskId, setHighlightedTaskId] = useState<string | null>(null);
-  const [draftStatus, setDraftStatus] = useState<TaskStatus>('todo');
-  const [recentlyCreatedMap, setRecentlyCreatedMap] = useState<Record<string, true>>({});
-  const [openMenuTaskId, setOpenMenuTaskId] = useState<string | null>(null);
   const connectivityStatus = useConnectivityStore((state) => state.status);
   const showOffline = connectivityStatus === 'limited' || isOfflineMode(userId);
   const autoMoveToDone = profile?.auto_move_done ?? true;
@@ -190,6 +179,30 @@ export default function Kanban() {
   const creationTimeouts = useRef<Map<string, number>>(new Map());
   const touchSwipeRef = useRef<{ id: string; x: number; y: number; time: number } | null>(null);
 
+  const statusOrder = useMemo(() => lists.map((list) => list.id), [lists]);
+  const columnTitleMap = useMemo(() => {
+    const map: Record<TaskStatus, string> = {};
+    lists.forEach((list) => {
+      map[list.id] = list.name;
+    });
+    return map;
+  }, [lists]);
+  const todoStatus = useMemo(
+    () => statusOrder.find((status) => status === 'todo') ?? statusOrder[0] ?? 'todo',
+    [statusOrder]
+  );
+  const doneStatus = useMemo(
+    () => statusOrder.find((status) => status === 'done') ?? statusOrder[statusOrder.length - 1] ?? null,
+    [statusOrder]
+  );
+  const defaultStatus = useMemo(() => todoStatus ?? statusOrder[0] ?? 'todo', [statusOrder, todoStatus]);
+  const [focusedColumn, setFocusedColumn] = useState<TaskStatus | null>(null);
+  const [highlightedTaskId, setHighlightedTaskId] = useState<string | null>(null);
+  const [draftStatus, setDraftStatus] = useState<TaskStatus>(defaultStatus);
+  const [recentlyCreatedMap, setRecentlyCreatedMap] = useState<Record<string, true>>({});
+  const [openMenuTaskId, setOpenMenuTaskId] = useState<string | null>(null);
+  const [isAddingList, setIsAddingList] = useState(false);
+  const [newListTitle, setNewListTitle] = useState('');
   const tasksById = useMemo(() => {
     const map = new Map<string, Task>();
     tasks.forEach((task) => {
@@ -203,31 +216,39 @@ export default function Kanban() {
   const draftStatusFromQuery = searchParams.get('status');
 
   const columnsMap = useMemo(() => {
-    const map: Record<TaskStatus, Task[]> = {
-      todo: [],
-      doing: [],
-      done: []
-    };
+    const map: Record<TaskStatus, Task[]> = {};
+
+    statusOrder.forEach((status) => {
+      map[status] = [];
+    });
+
     tasks.forEach((task) => {
+      if (!map[task.status]) {
+        map[task.status] = [];
+      }
       map[task.status].push(task);
     });
-    statusOrder.forEach((status) => {
-      map[status].sort((a, b) => {
+
+    Object.keys(map).forEach((status) => {
+      map[status]?.sort((a, b) => {
         if (a.sort_order !== b.sort_order) {
           return a.sort_order - b.sort_order;
         }
         return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
       });
     });
+
     return map;
-  }, [tasks]);
+  }, [statusOrder, tasks]);
 
   const columnsData = useMemo(() => {
-    return columns.map((column) => ({
-      ...column,
-      tasks: columnsMap[column.key]
+    return lists.map((column) => ({
+      key: column.id,
+      title: column.name,
+      accent: COLUMN_ACCENT,
+      tasks: columnsMap[column.id] ?? []
     }));
-  }, [columnsMap]);
+  }, [columnsMap, lists]);
 
   const isBoardMutating =
     createTaskIsPending || updateTaskIsPending || reorderTasksIsPending || updateStatusIsPending;
@@ -242,6 +263,9 @@ export default function Kanban() {
   const focusColumn = useCallback(
     (status: TaskStatus) => {
       setFocusedColumn(status);
+      if (!statusOrder.includes(status)) {
+        return;
+      }
       const node = columnRefs.current[status];
       if (!node || typeof window === 'undefined') {
         return;
@@ -271,7 +295,19 @@ export default function Kanban() {
         scroller.scrollTo({ left: scroller.scrollLeft + offset, behavior });
       }
     },
-    []
+    [statusOrder]
+  );
+
+  const getAdjacentStatus = useCallback(
+    (current: TaskStatus, direction: 'next' | 'previous'): TaskStatus | null => {
+      const index = statusOrder.indexOf(current);
+      if (index === -1) return null;
+      if (direction === 'next') {
+        return statusOrder[index + 1] ?? null;
+      }
+      return statusOrder[index - 1] ?? null;
+    },
+    [statusOrder]
   );
 
   const ensureHighlight = useCallback(
@@ -296,8 +332,41 @@ export default function Kanban() {
   );
 
   useEffect(() => {
+    ensureTaskLists(tasks.map((task) => task.status));
+  }, [ensureTaskLists, tasks]);
+
+  useEffect(() => {
+    setDraftStatus((current) => (statusOrder.includes(current) ? current : defaultStatus));
+  }, [defaultStatus, statusOrder]);
+
+  useEffect(() => {
+    setFocusedColumn((current) => {
+      if (current && statusOrder.includes(current)) {
+        return current;
+      }
+      return statusOrder.includes(defaultStatus) ? defaultStatus : current;
+    });
+  }, [defaultStatus, statusOrder]);
+
+  useEffect(() => {
     ensureHighlight(focusedColumn);
   }, [columnsMap, focusedColumn, ensureHighlight]);
+
+  useEffect(() => {
+    if (!focusedColumn) return;
+    if (!statusOrder.includes(focusedColumn)) return;
+    const node = columnRefs.current[focusedColumn];
+    if (node && typeof document !== 'undefined' && document.activeElement !== node) {
+      node.focus();
+    }
+  }, [focusedColumn, statusOrder]);
+
+  useEffect(() => {
+    if (isAddingList && addListInputRef.current) {
+      addListInputRef.current.focus();
+      addListInputRef.current.select();
+    }
+  }, [isAddingList]);
 
   useEffect(() => {
     if (selectedTask) {
@@ -320,12 +389,14 @@ export default function Kanban() {
     if (!isCreateRoute) {
       return;
     }
-    if (draftStatusFromQuery && ['todo', 'doing', 'done'].includes(draftStatusFromQuery)) {
+    if (draftStatusFromQuery) {
       const status = draftStatusFromQuery as TaskStatus;
-      setDraftStatus(status);
-      setFocusedColumn(status);
+      if (statusOrder.includes(status)) {
+        setDraftStatus(status);
+        setFocusedColumn(status);
+      }
     }
-  }, [draftStatusFromQuery, isCreateRoute]);
+  }, [draftStatusFromQuery, isCreateRoute, statusOrder]);
 
   useEffect(() => {
     if (!highlightedTaskId) return;
@@ -362,20 +433,24 @@ export default function Kanban() {
   );
 
   const closeModal = useCallback(() => {
-    setDraftStatus('todo');
+    setDraftStatus(defaultStatus);
     setOpenMenuTaskId(null);
+    setFocusedColumn(defaultStatus);
     const state = location.state as { fromBoard?: boolean } | null;
     if (state?.fromBoard) {
       navigate(-1);
     } else {
       navigate('/', { replace: true });
     }
-  }, [location.state, navigate]);
+  }, [defaultStatus, location.state, navigate]);
 
   const placeTaskInStatus = useCallback(
     (task: Task, targetStatus: TaskStatus, position: 'start' | 'end' = 'end') => {
       if (task.status === targetStatus) {
         return;
+      }
+      if (!statusOrder.includes(targetStatus)) {
+        ensureTaskLists([targetStatus]);
       }
       const sourceTasks = columnsMap[task.status] ?? [];
       const destinationTasks = columnsMap[targetStatus] ?? [];
@@ -391,22 +466,24 @@ export default function Kanban() {
         ...destinationIds.map((id, index) => ({ id, status: targetStatus, sort_order: index }))
       ];
       reorderTasks(updates);
-      focusColumn(targetStatus);
+      if (statusOrder.includes(targetStatus)) {
+        focusColumn(targetStatus);
+      }
       setHighlightedTaskId(task.id);
       setDraftStatus(targetStatus);
     },
-    [columnsMap, focusColumn, reorderTasks]
+    [columnsMap, ensureTaskLists, focusColumn, reorderTasks, statusOrder]
   );
 
   const handleToggleComplete = useCallback(
     (task: Task, checked: boolean) => {
-      if (checked) {
-        placeTaskInStatus(task, 'done');
-      } else {
-        placeTaskInStatus(task, 'todo', 'start');
+      if (checked && doneStatus) {
+        placeTaskInStatus(task, doneStatus);
+      } else if (!checked && todoStatus) {
+        placeTaskInStatus(task, todoStatus, 'start');
       }
     },
-    [placeTaskInStatus]
+    [doneStatus, placeTaskInStatus, todoStatus]
   );
 
   const handleCardKeyDown = useCallback(
@@ -420,7 +497,7 @@ export default function Kanban() {
         placeTaskInStatus(task, nextStatus);
       }
     },
-    [placeTaskInStatus]
+    [getAdjacentStatus, placeTaskInStatus]
   );
 
   const handleTouchStart = useCallback(
@@ -491,8 +568,26 @@ export default function Kanban() {
 
   const handleDragEnd = useCallback(
     (result: DropResult) => {
-      const { destination, source, draggableId } = result;
+      const { destination, source, draggableId, type } = result;
       if (!destination) {
+        return;
+      }
+      if (type === 'COLUMN') {
+        const movedColumnId = draggableId.startsWith('column:')
+          ? (draggableId.slice('column:'.length) as TaskStatus)
+          : (draggableId as TaskStatus);
+        if (source.index === destination.index) {
+          focusColumn(movedColumnId);
+          ensureHighlight(movedColumnId);
+          setDraftStatus(movedColumnId);
+          return;
+        }
+        reorderLists(source.index, destination.index);
+        if (movedColumnId) {
+          focusColumn(movedColumnId);
+          ensureHighlight(movedColumnId);
+          setDraftStatus(movedColumnId);
+        }
         return;
       }
       const sourceStatus = source.droppableId as TaskStatus;
@@ -513,9 +608,14 @@ export default function Kanban() {
           updates.push({ id, status: destinationStatus, sort_order: index });
         });
       } else {
-        const sourceIds = sourceTasks.map((task) => task.id).filter((id, index) => index !== source.index);
-        const destinationIds = destinationTasks.map((task) => task.id);
-        destinationIds.splice(destination.index, 0, draggableId);
+        const sourceIds = sourceTasks
+          .map((task) => task.id)
+          .filter((id) => id !== draggableId);
+        const destinationIds = destinationTasks
+          .map((task) => task.id)
+          .filter((id) => id !== draggableId);
+        const targetIndex = Math.min(destination.index, destinationIds.length);
+        destinationIds.splice(targetIndex, 0, draggableId);
         sourceIds.forEach((id, index) => {
           updates.push({ id, status: sourceStatus, sort_order: index });
         });
@@ -530,8 +630,35 @@ export default function Kanban() {
         setDraftStatus(destinationStatus);
       }
     },
-    [columnsMap, focusColumn, reorderTasks]
+    [columnsMap, ensureHighlight, focusColumn, reorderLists, reorderTasks]
   );
+
+  const handleSubmitNewList = useCallback(() => {
+    const result = addList(newListTitle);
+    if (!result) {
+      toast({ title: 'Informe um nome para a lista', type: 'warning' });
+      return;
+    }
+    const { list, created } = result;
+    if (created) {
+      toast({ title: 'Lista criada', description: list.name, type: 'success' });
+      setNewListTitle('');
+      setIsAddingList(false);
+    } else {
+      toast({ title: 'Lista já existe', description: list.name, type: 'info' });
+    }
+    focusColumn(list.id);
+    ensureHighlight(list.id);
+    setDraftStatus(list.id);
+    if (!created && addListInputRef.current) {
+      addListInputRef.current.select();
+    }
+  }, [addList, addListInputRef, ensureHighlight, focusColumn, newListTitle, toast]);
+
+  const handleCancelNewList = useCallback(() => {
+    setIsAddingList(false);
+    setNewListTitle('');
+  }, []);
 
   useEffect(() => {
     if (!openMenuTaskId) return;
@@ -578,7 +705,7 @@ export default function Kanban() {
     });
   }, [tasksById]);
 
-  const handleCreateTask = useCallback(
+  const handleCreateTaskAndHighlight = useCallback(
     async (payload: TaskPayload) => {
       const created = (await createTask(payload)) as Task;
       if (created?.id) {
@@ -634,7 +761,7 @@ export default function Kanban() {
     const handleNew = (event: KeyboardEvent) => {
       if (shouldIgnore(event) || isModalVisible) return;
       event.preventDefault();
-      openCreate(focusedColumn ?? 'todo');
+      openCreate(focusedColumn ?? defaultStatus);
     };
 
     const handleEdit = (event: KeyboardEvent) => {
@@ -658,18 +785,24 @@ export default function Kanban() {
     trap.bind('esc', handleEscape);
     trap.bind('1', (event: KeyboardEvent) => {
       if (shouldIgnore(event)) return;
+      const status = statusOrder[0];
+      if (!status) return;
       event.preventDefault();
-      focusColumn('todo');
+      focusColumn(status);
     });
     trap.bind('2', (event: KeyboardEvent) => {
       if (shouldIgnore(event)) return;
+      const status = statusOrder[1];
+      if (!status) return;
       event.preventDefault();
-      focusColumn('doing');
+      focusColumn(status);
     });
     trap.bind('3', (event: KeyboardEvent) => {
       if (shouldIgnore(event)) return;
+      const status = statusOrder[2];
+      if (!status) return;
       event.preventDefault();
-      focusColumn('done');
+      focusColumn(status);
     });
 
     return () => {
@@ -683,6 +816,8 @@ export default function Kanban() {
     isModalVisible,
     openCreate,
     openTask,
+    defaultStatus,
+    statusOrder,
     tasksById
   ]);
 
@@ -722,7 +857,7 @@ export default function Kanban() {
           Salvando alterações...
         </div>
       ) : null}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between flex-shrink-0">
         <div>
           <h2 className="text-2xl font-semibold text-slate-900 dark:text-white">Quadro de tarefas</h2>
           <p className="text-sm text-slate-600 dark:text-slate-300">Arraste e solte para mover prioridades rapidamente.</p>
@@ -807,6 +942,8 @@ export default function Kanban() {
                       : 'shadow-[0_18px_40px_-22px_rgba(15,23,42,0.12)] dark:shadow-[0_18px_40px_-32px_rgba(15,23,42,0.8)]';
                   const columnIsPending = column.tasks.some((task) => pendingTaskIds.has(task.id));
 
+                {columnsData.map((column, columnIndex) => {
+                  const columnDraggableId = `column:${column.key}`;
                   return (
                     <section
                       ref={(node) => {
@@ -994,189 +1131,19 @@ export default function Kanban() {
                                         className="hidden min-w-0 flex-1 flex-wrap gap-1 md:flex"
                                         aria-label={task.labels.length > 0 ? 'Etiquetas da tarefa' : undefined}
                                       >
-                                        {task.labels.length === 0 ? (
-                                          <span className="sr-only">Sem etiquetas</span>
-                                        ) : (
-                                          task.labels.map((label, labelIndex) => {
-                                            const normalized = label.toLocaleLowerCase();
-                                            const definition = labelDefinitionMap.get(normalized);
-                                            const colors = getLabelColors(label, {
-                                              colorId: definition?.colorId,
-                                              fallbackIndex: labelIndex
-                                            });
-                                            return (
-                                              <span
-                                                key={`${task.id}-label-${definition?.id ?? labelIndex}`}
-                                                className="inline-flex max-w-full items-center rounded-md px-2 py-1 text-[10px] font-semibold uppercase tracking-wide shadow-sm"
-                                                style={{
-                                                  backgroundColor: colors.background,
-                                                  color: colors.foreground
-                                                }}
-                                              >
-                                                <span className="block max-w-full truncate">{definition?.value ?? label}</span>
-                                              </span>
-                                            );
-                                          })
-                                        )}
-                                      </div>
-                                      <div
-                                        className="relative flex-shrink-0 self-start"
-                                        ref={(node) => {
-                                          if (node) {
-                                            menuRefs.current[task.id] = node;
-                                          } else {
-                                            delete menuRefs.current[task.id];
-                                          }
-                                        }}
-                                      >
-                                        <button
-                                          type="button"
-                                          className={`h-11 w-11 rounded-full border border-transparent bg-transparent text-slate-500 opacity-0 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/60 focus-visible:opacity-100 focus-visible:border-zenko-primary/40 focus-visible:bg-white/70 group-focus-within:opacity-100 group-hover:opacity-100 group-hover:border-slate-200/70 group-hover:bg-white/70 group-hover:text-slate-600 hover:border-zenko-primary/30 hover:bg-white/70 hover:text-zenko-primary dark:text-slate-300 dark:hover:border-white/20 dark:hover:bg-slate-900/60 dark:hover:text-white dark:group-hover:border-white/20 dark:group-hover:bg-slate-900/60 dark:group-hover:text-white ${
-                                            isMenuOpen ? 'opacity-100 border-zenko-primary/40 bg-white/70 text-zenko-primary dark:bg-slate-900/70' : ''
-                                          }`}
-                                          aria-haspopup="menu"
-                                          aria-expanded={isMenuOpen}
-                                          aria-controls={`task-menu-${task.id}`}
-                                          onClick={(event) => {
-                                            event.stopPropagation();
-                                            setOpenMenuTaskId((current) => (current === task.id ? null : task.id));
-                                          }}
-                                          title="Ações rápidas"
+                                        <h3
+                                          id={`column-${column.key}`}
+                                          className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-600 dark:text-slate-200"
                                         >
-                                          <span className="sr-only">Abrir ações rápidas para {task.title}</span>
-                                          <svg
-                                            className="mx-auto h-5 w-5"
-                                            viewBox="0 0 24 24"
-                                            fill="none"
-                                            stroke="currentColor"
-                                            strokeWidth="2"
-                                            strokeLinecap="round"
-                                            strokeLinejoin="round"
-                                            aria-hidden="true"
-                                          >
-                                            <circle cx="5" cy="12" r="1" />
-                                            <circle cx="12" cy="12" r="1" />
-                                            <circle cx="19" cy="12" r="1" />
-                                          </svg>
-                                        </button>
-                                        <div
-                                          id={`task-menu-${task.id}`}
-                                          role="menu"
-                                          className={`absolute right-0 top-12 z-30 w-48 rounded-xl border border-slate-200 bg-white/95 p-1.5 text-xs shadow-2xl transition focus:outline-none dark:border-white/10 dark:bg-slate-900/95 ${
-                                            isMenuOpen
-                                              ? 'visible translate-y-0 opacity-100'
-                                              : 'invisible pointer-events-none -translate-y-1 opacity-0'
-                                          }`}
+                                          {column.title}
+                                        </h3>
+                                        <span className="sr-only">Arraste para reorganizar a lista</span>
+                                        <span
+                                          id={`column-${column.key}-meta`}
+                                          className="rounded-full bg-zenko-primary/10 px-1.5 py-0.5 text-[11px] text-zenko-primary dark:bg-white/10"
                                         >
-                                          <button
-                                            type="button"
-                                            role="menuitem"
-                                            className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-slate-700 transition hover:bg-zenko-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/60 dark:text-slate-200 dark:hover:bg-white/10"
-                                            onClick={(event) => {
-                                              event.stopPropagation();
-                                              setOpenMenuTaskId(null);
-                                              openTask(task);
-                                            }}
-                                            autoFocus={isMenuOpen}
-                                          >
-                                            <svg
-                                              className="h-4 w-4"
-                                              viewBox="0 0 24 24"
-                                              fill="none"
-                                              stroke="currentColor"
-                                              strokeWidth="2"
-                                              strokeLinecap="round"
-                                              strokeLinejoin="round"
-                                              aria-hidden="true"
-                                            >
-                                              <path d="M12 20h9" />
-                                              <path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4 12.5-12.5z" />
-                                            </svg>
-                                            Editar tarefa
-                                          </button>
-                                          {nextStatus ? (
-                                            <button
-                                              type="button"
-                                              role="menuitem"
-                                            className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-slate-700 transition hover:bg-zenko-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/60 dark:text-slate-200 dark:hover:bg-white/10"
-                                              onClick={(event) => {
-                                                event.stopPropagation();
-                                                setOpenMenuTaskId(null);
-                                                placeTaskInStatus(task, nextStatus, 'end');
-                                              }}
-                                            >
-                                              <svg
-                                                className="h-4 w-4"
-                                                viewBox="0 0 24 24"
-                                                fill="none"
-                                                stroke="currentColor"
-                                                strokeWidth="2"
-                                                strokeLinecap="round"
-                                                strokeLinejoin="round"
-                                                aria-hidden="true"
-                                              >
-                                                <path d="M5 12h14" />
-                                                <path d="M12 5l7 7-7 7" />
-                                              </svg>
-                                              Mover para {columnTitles[nextStatus]}
-                                            </button>
-                                          ) : null}
-                                          {previousStatus ? (
-                                            <button
-                                              type="button"
-                                              role="menuitem"
-                                            className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-slate-700 transition hover:bg-zenko-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/60 dark:text-slate-200 dark:hover:bg-white/10"
-                                              onClick={(event) => {
-                                                event.stopPropagation();
-                                                setOpenMenuTaskId(null);
-                                                placeTaskInStatus(task, previousStatus, 'end');
-                                              }}
-                                            >
-                                              <svg
-                                                className="h-4 w-4"
-                                                viewBox="0 0 24 24"
-                                                fill="none"
-                                                stroke="currentColor"
-                                                strokeWidth="2"
-                                                strokeLinecap="round"
-                                                strokeLinejoin="round"
-                                                aria-hidden="true"
-                                              >
-                                                <path d="M19 12H5" />
-                                                <path d="M12 19l-7-7 7-7" />
-                                              </svg>
-                                              Mover para {columnTitles[previousStatus]}
-                                            </button>
-                                          ) : null}
-                                          <button
-                                            type="button"
-                                            role="menuitem"
-                                            className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left font-semibold text-rose-600 transition hover:bg-rose-500/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500/60 dark:text-rose-300 dark:hover:bg-rose-400/10"
-                                            onClick={(event) => {
-                                              event.stopPropagation();
-                                              setOpenMenuTaskId(null);
-                                              void deleteTask(task.id);
-                                            }}
-                                          >
-                                            <svg
-                                              className="h-4 w-4"
-                                              viewBox="0 0 24 24"
-                                              fill="none"
-                                              stroke="currentColor"
-                                              strokeWidth="2"
-                                              strokeLinecap="round"
-                                              strokeLinejoin="round"
-                                              aria-hidden="true"
-                                            >
-                                              <polyline points="3 6 5 6 21 6" />
-                                              <path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" />
-                                              <path d="M10 11v6" />
-                                              <path d="M14 11v6" />
-                                              <path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2" />
-                                            </svg>
-                                            Excluir tarefa
-                                          </button>
-                                        </div>
+                                          {column.tasks.length}
+                                        </span>
                                       </div>
                                     </div>
                                     <div className="space-y-2">
@@ -1259,46 +1226,93 @@ export default function Kanban() {
                                         Mover para próxima coluna
                                       </button>
                                     </div>
+                                    <button
+                                      type="button"
+                                      className="mt-2 inline-flex w-full min-h-[40px] items-center justify-center gap-1.5 rounded-lg border border-dashed border-slate-300/80 bg-white/70 px-3 py-2 text-[12px] font-semibold text-slate-600 transition hover:border-slate-400 hover:bg-white/90 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/60 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:border-white/15 dark:bg-white/10 dark:text-slate-200 dark:hover:border-white/25 dark:hover:bg-white/15 dark:hover:text-white dark:focus-visible:ring-offset-slate-950"
+                                      onClick={(event) => {
+                                        event.stopPropagation();
+                                        openCreate(column.key);
+                                      }}
+                                      title="Adicionar nova tarefa"
+                                      aria-label={`Adicionar tarefa na coluna ${column.title}`}
+                                    >
+                                      <span className="text-sm leading-none">+</span>
+                                      <span>Adicionar tarefa</span>
+                                    </button>
                                   </div>
-                                </div>
-                              </Card>
-                            </div>
-                          )}
-                        </Draggable>
-                      );
-                          })}
-                          {column.tasks.length === 0 ? (
-                            <p className="rounded-2xl border border-dashed border-slate-200 bg-white/70 px-4 py-6 text-center text-xs text-slate-500 dark:border-white/10 dark:bg-white/5 dark:text-slate-400">
-                              Arraste tarefas para esta coluna
-                            </p>
-                          ) : null}
-                          {provided.placeholder}
-                          <button
-                            type="button"
-                            className="mt-3 inline-flex w-full min-h-[44px] items-center justify-center gap-2 rounded-2xl border border-dashed border-slate-300/80 bg-white/70 px-4 py-3 text-xs font-semibold text-slate-600 transition hover:border-slate-400 hover:bg-white/90 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/60 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:border-white/15 dark:bg-white/10 dark:text-slate-200 dark:hover:border-white/25 dark:hover:bg-white/15 dark:hover:text-white dark:focus-visible:ring-offset-slate-950"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              openCreate(column.key);
-                            }}
-                            title="Adicionar nova tarefa"
-                            aria-label={`Adicionar tarefa na coluna ${column.title}`}
-                          >
-                            <span className="text-base leading-none">+</span>
-                            <span>Adicionar tarefa</span>
-                          </button>
-                        </div>
-                      </div>
-                    </section>
+                                );
+                              }}
+                            </Droppable>
+                          </section>
+                        );
+                      }}
+                    </Draggable>
                   );
-                }}
-              </Droppable>
-            ))}
-          </div>
+                })}
+                {boardProvided.placeholder}
+                <div className="w-[272px] flex-none self-start">
+                  {isAddingList ? (
+                    <div className="rounded-xl border border-slate-300/80 bg-white/80 p-3 shadow-sm backdrop-blur dark:border-white/15 dark:bg-white/10">
+                      <label htmlFor="board-new-list" className="sr-only">
+                        Nome da lista
+                      </label>
+                      <input
+                        id="board-new-list"
+                        ref={addListInputRef}
+                        value={newListTitle}
+                        onChange={(event) => setNewListTitle(event.target.value)}
+                        onKeyDown={(event) => {
+                          if (event.key === 'Enter') {
+                            event.preventDefault();
+                            handleSubmitNewList();
+                          }
+                          if (event.key === 'Escape') {
+                            event.preventDefault();
+                            handleCancelNewList();
+                          }
+                        }}
+                        placeholder="Nova lista"
+                        className="w-full rounded-lg border border-slate-300/80 bg-white/95 px-2.5 py-2 text-sm font-medium text-slate-800 shadow-sm outline-none transition focus:border-zenko-primary/50 focus:ring-2 focus:ring-zenko-primary/40 dark:border-white/15 dark:bg-slate-900/70 dark:text-white"
+                      />
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <Button type="button" variant="primary" onClick={handleSubmitNewList}>
+                          Adicionar lista
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          className="text-sm"
+                          onClick={handleCancelNewList}
+                        >
+                          Cancelar
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      className="flex min-h-[40px] w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-slate-300/80 bg-white/60 px-3 py-2 text-sm font-semibold text-slate-600 transition hover:border-slate-400 hover:bg-white/80 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/50 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:border-white/15 dark:bg-white/10 dark:text-slate-200 dark:hover:border-white/25 dark:hover:bg-white/15 dark:hover:text-white dark:focus-visible:ring-offset-slate-950"
+                      onClick={() => {
+                        setIsAddingList(true);
+                        setNewListTitle('');
+                      }}
+                      title="Adicionar outra lista"
+                      aria-expanded={isAddingList}
+                      aria-controls="board-new-list"
+                    >
+                      <span className="text-sm leading-none">+</span>
+                      <span>Adicionar outra lista</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+          </Droppable>
         </DragDropContext>
       </div>
       <Button
         className="fixed bottom-6 right-6 z-30 shadow-lg shadow-zenko-primary/40 sm:hidden"
-        onClick={() => openCreate(focusedColumn ?? 'todo')}
+        onClick={() => openCreate(focusedColumn ?? defaultStatus)}
         title="Adicionar nova tarefa"
         aria-label="Adicionar nova tarefa"
       >
@@ -1319,7 +1333,7 @@ export default function Kanban() {
         <TaskForm
           task={selectedTask ?? undefined}
           onClose={closeModal}
-          createTask={handleCreateTask}
+          createTask={handleCreateTaskAndHighlight}
           updateTask={updateTask}
           deleteTask={deleteTask}
           isCreatePending={createTaskIsPending}
