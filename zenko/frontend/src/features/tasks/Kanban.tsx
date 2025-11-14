@@ -237,18 +237,38 @@ export default function Kanban() {
     doing: null,
     done: null
   });
+  const boardScrollRef = useRef<HTMLDivElement | null>(null);
 
   const focusColumn = useCallback(
     (status: TaskStatus) => {
       setFocusedColumn(status);
       const node = columnRefs.current[status];
-      if (node && typeof window !== 'undefined') {
-        const target = node;
-        window.requestAnimationFrame(() => {
-          if (typeof document !== 'undefined' && target && document.activeElement !== target) {
+      if (!node || typeof window === 'undefined') {
+        return;
+      }
+
+      const target = node;
+      const prefersReducedMotion =
+        typeof window !== 'undefined'
+          ? window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches ?? false
+          : false;
+      const behavior: ScrollBehavior = prefersReducedMotion ? 'auto' : 'smooth';
+
+      window.requestAnimationFrame(() => {
+        if (typeof document !== 'undefined' && target) {
+          if (document.activeElement !== target) {
             target.focus();
           }
-        });
+          target.scrollIntoView({ behavior, block: 'nearest', inline: 'center' });
+        }
+      });
+
+      const scroller = boardScrollRef.current;
+      if (scroller) {
+        const { left: columnLeft, width: columnWidth } = target.getBoundingClientRect();
+        const { left: scrollerLeft, width: scrollerWidth } = scroller.getBoundingClientRect();
+        const offset = columnLeft - scrollerLeft - (scrollerWidth - columnWidth) / 2;
+        scroller.scrollTo({ left: scroller.scrollLeft + offset, behavior });
       }
     },
     []
@@ -313,14 +333,6 @@ export default function Kanban() {
       setHighlightedTaskId(null);
     }
   }, [tasksById, highlightedTaskId]);
-
-  useEffect(() => {
-    if (!focusedColumn) return;
-    const ref = columnRefs.current[focusedColumn];
-    if (ref) {
-      ref.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
-    }
-  }, [focusedColumn]);
 
   const getNextSortOrder = useCallback(
     (status: TaskStatus) => columnsMap[status]?.length ?? 0,
@@ -678,8 +690,15 @@ export default function Kanban() {
     return <BoardSkeleton />;
   }
 
+  const hasAnyTask = columnsData.some((column) => column.tasks.length > 0);
+
   return (
-    <div className="flex h-full min-h-0 flex-col gap-6" aria-live="polite" aria-busy={isBoardMutating}>
+    <div
+      className="flex h-full min-h-0 flex-col gap-6"
+      aria-live="polite"
+      aria-busy={isBoardMutating}
+      aria-label="Quadro Kanban"
+    >
       {showOffline ? <OfflineNotice feature="Tarefas" /> : null}
       {isBoardMutating ? (
         <div
@@ -736,14 +755,51 @@ export default function Kanban() {
           </Select>
         </label>
       </div>
+      {!hasAnyTask ? (
+        <div className="rounded-3xl border border-dashed border-slate-300/70 bg-white/70 px-6 py-8 text-center text-sm text-slate-500 shadow-inner backdrop-blur dark:border-white/15 dark:bg-slate-900/40 dark:text-slate-300">
+          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full border border-slate-300/70 bg-white/80 text-zenko-primary shadow-sm dark:border-white/10 dark:bg-white/10">
+            <svg
+              className="h-5 w-5"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.6"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M12 5v14" />
+              <path d="M5 12h14" />
+            </svg>
+          </div>
+          <p className="mb-4 font-medium text-slate-600 dark:text-slate-200">Organize suas próximas tarefas</p>
+          <p className="mx-auto mb-5 max-w-xs text-xs text-slate-500 dark:text-slate-300">
+            Crie sua primeira tarefa e arraste para as colunas conforme o progresso. Tudo fica sincronizado automaticamente.
+          </p>
+          <Button
+            type="button"
+            onClick={() => openCreate('todo')}
+            className="mx-auto w-full max-w-xs"
+            aria-label="Criar primeira tarefa"
+          >
+            Adicionar tarefa
+          </Button>
+        </div>
+      ) : null}
       <div className="flex-1 min-h-0">
         <DragDropContext onDragEnd={handleDragEnd}>
-          <div className="kanban-scroll flex h-full min-h-0 snap-x snap-mandatory gap-4 overflow-x-auto overflow-y-hidden pb-4 md:snap-none">
+          <div
+            ref={boardScrollRef}
+            className="kanban-scroll flex h-full min-h-0 snap-x snap-mandatory gap-4 overflow-x-auto overflow-y-hidden pb-4 md:snap-none"
+            role="list"
+            aria-label="Colunas do quadro"
+          >
             {columnsData.map((column) => (
               <Droppable droppableId={column.key} key={column.key}>
                 {(provided, snapshot) => {
                   const isFocused = focusedColumn === column.key;
                   const columnTabIndex = focusedColumn ? (isFocused ? 0 : -1) : 0;
+                  const columnTitleId = `column-${column.key}`;
                   const highlightClasses = snapshot.isDraggingOver
                     ? 'ring-2 ring-zenko-primary/60 shadow-xl'
                     : isFocused
@@ -759,9 +815,9 @@ export default function Kanban() {
                       }}
                       {...provided.droppableProps}
                       className={`kanban-column group relative flex h-full min-h-[20rem] snap-start flex-col rounded-[26px] bg-gradient-to-br p-[1px] transition-shadow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/60 ${column.accent}`}
-                      role="region"
-                      aria-labelledby={`column-${column.key}`}
-                      aria-describedby={`column-${column.key}-meta`}
+                      role="group"
+                      aria-labelledby={columnTitleId}
+                      aria-describedby={`${columnTitleId}-meta`}
                       tabIndex={columnTabIndex}
                       onFocus={() => {
                         focusColumn(column.key);
@@ -773,13 +829,13 @@ export default function Kanban() {
                       >
                         <header className="flex items-center justify-between">
                           <h3
-                            id={`column-${column.key}`}
+                            id={columnTitleId}
                             className="text-sm font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-200"
                           >
                             {column.title}
                           </h3>
                           <span
-                            id={`column-${column.key}-meta`}
+                            id={`${columnTitleId}-meta`}
                             className={`rounded-full px-2 py-1 text-xs font-semibold ${column.badge}`}
                           >
                             {column.tasks.length}
