@@ -435,7 +435,9 @@ export default function Kanban() {
         return;
       }
       if (type === 'COLUMN') {
-        const movedColumnId = draggableId as TaskStatus;
+        const movedColumnId = draggableId.startsWith('column:')
+          ? (draggableId.slice('column:'.length) as TaskStatus)
+          : (draggableId as TaskStatus);
         if (source.index === destination.index) {
           focusColumn(movedColumnId);
           ensureHighlight(movedColumnId);
@@ -753,13 +755,15 @@ export default function Kanban() {
                 {...boardProvided.droppableProps}
                 className="flex h-full min-h-0 snap-x snap-mandatory gap-2.5 overflow-x-auto overflow-y-hidden pb-3 md:snap-none"
               >
-                {columnsData.map((column, columnIndex) => (
-                  <Draggable draggableId={column.key} index={columnIndex} key={column.key}>
-                    {(columnProvided, columnSnapshot) => {
-                      const isFocused = focusedColumn === column.key;
-                      const columnTabIndex = focusedColumn ? (isFocused ? 0 : -1) : 0;
+                {columnsData.map((column, columnIndex) => {
+                  const columnDraggableId = `column:${column.key}`;
+                  return (
+                    <Draggable draggableId={columnDraggableId} index={columnIndex} key={column.key}>
+                      {(columnProvided, columnSnapshot) => {
+                        const isFocused = focusedColumn === column.key;
+                        const columnTabIndex = focusedColumn ? (isFocused ? 0 : -1) : 0;
 
-                      return (
+                        return (
                         <section
                           ref={(node) => {
                             columnProvided.innerRef(node);
@@ -839,12 +843,12 @@ export default function Kanban() {
                             <div
                               ref={dragProvided.innerRef}
                               {...dragProvided.draggableProps}
-                              {...dragProvided.dragHandleProps}
                               className="space-y-1.5"
                               role="listitem"
                               aria-current={highlightedTaskId === task.id ? 'true' : undefined}
                             >
                               <Card
+                                {...dragProvided.dragHandleProps}
                                 variant="board"
                                 className={`group cursor-grab overflow-hidden border-slate-200/70 bg-white/90 transition-all hover:-translate-y-0.5 hover:border-zenko-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-zenko-primary/60 dark:border-white/5 dark:bg-slate-900/70 ${
                                   dragSnapshot.isDragging ? 'border-zenko-primary/60 shadow-lg' : ''
@@ -1206,7 +1210,8 @@ export default function Kanban() {
                       );
                     }}
                   </Draggable>
-                ))}
+                  );
+                })}
                 {boardProvided.placeholder}
                 <div className="w-[272px] flex-none self-start">
                   {isAddingList ? (
