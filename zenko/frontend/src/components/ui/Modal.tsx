@@ -141,6 +141,20 @@ export default function Modal({
         }
         shouldCloseOnPointerUp.current = false;
       }}
+      onTouchStart={(event) => {
+        if (event.target === event.currentTarget) {
+          shouldCloseOnPointerUp.current = true;
+        }
+      }}
+      onTouchEnd={(event) => {
+        if (shouldCloseOnPointerUp.current && event.target === event.currentTarget) {
+          onClose();
+        }
+        shouldCloseOnPointerUp.current = false;
+      }}
+      onTouchCancel={() => {
+        shouldCloseOnPointerUp.current = false;
+      }}
       role="presentation"
     >
       <div

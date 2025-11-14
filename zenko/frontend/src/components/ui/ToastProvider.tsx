@@ -6,7 +6,7 @@ interface Toast {
   id: string;
   title: string;
   description?: string;
-  type?: 'success' | 'error' | 'info';
+  type?: 'success' | 'error' | 'info' | 'warning';
 }
 
 interface ToastState {
@@ -44,7 +44,9 @@ const typeStyles: Record<NonNullable<Toast['type']>, string> = {
   success:
     'border-emerald-400/50 bg-emerald-50 text-emerald-700 dark:border-zenko-accent/40 dark:bg-zenko-accent/15 dark:text-zenko-accent',
   info:
-    'border-sky-400/50 bg-sky-50 text-sky-700 dark:border-zenko-secondary/40 dark:bg-zenko-secondary/15 dark:text-zenko-secondary'
+    'border-sky-400/50 bg-sky-50 text-sky-700 dark:border-zenko-secondary/40 dark:bg-zenko-secondary/15 dark:text-zenko-secondary',
+  warning:
+    'border-amber-400/60 bg-amber-50 text-amber-700 dark:border-amber-300/40 dark:bg-amber-400/10 dark:text-amber-200'
 };
 
 export function ToastProvider({ children }: { children: ReactNode }) {
