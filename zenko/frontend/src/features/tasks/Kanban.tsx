@@ -435,7 +435,7 @@ export default function Kanban() {
       if (!destination) {
         return;
       }
-      if (source.droppableId === BOARD_COLUMNS_DROPPABLE_ID) {
+      if (type === 'COLUMN') {
         const movedColumnId = draggableId.startsWith('column:')
           ? (draggableId.slice('column:'.length) as TaskStatus)
           : (draggableId as TaskStatus);
