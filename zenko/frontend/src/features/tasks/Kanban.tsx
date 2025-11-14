@@ -4,7 +4,6 @@ import { DragDropContext, Draggable, Droppable, type DropResult } from 'react-be
 import Button from '../../components/ui/Button';
 import Card from '../../components/ui/Card';
 import Modal from '../../components/ui/Modal';
-import Select from '../../components/ui/Select';
 import { useTasks } from './hooks';
 import { Task, TaskPayload, TaskStatus } from './types';
 import TaskForm from './TaskForm';
@@ -88,8 +87,6 @@ export default function Kanban() {
     tasks,
     isLoading,
     reorderTasks,
-    filters,
-    setFilter,
     userId,
     createTask,
     updateTask,
@@ -312,12 +309,6 @@ export default function Kanban() {
       }
     }
   }, [draftStatusFromQuery, isCreateRoute, statusOrder]);
-
-  useEffect(() => {
-    if (filters.status !== 'all' && !statusOrder.includes(filters.status as TaskStatus)) {
-      setFilter({ status: 'all' });
-    }
-  }, [filters.status, setFilter, statusOrder]);
 
   useEffect(() => {
     if (!highlightedTaskId) return;
@@ -722,35 +713,6 @@ export default function Kanban() {
           <h2 className="text-2xl font-semibold text-slate-900 dark:text-white">Quadro de tarefas</h2>
           <p className="text-sm text-slate-600 dark:text-slate-300">Arraste e solte para mover prioridades rapidamente.</p>
         </div>
-      </div>
-      <div className="flex flex-wrap gap-2.5 text-[11px] text-slate-600 dark:text-slate-200 flex-shrink-0">
-        <label className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white/80 px-2.5 py-1.5 backdrop-blur dark:border-white/10 dark:bg-white/5">
-          <span className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-300">Status</span>
-          <Select
-            className="w-28 min-w-[7rem] text-[11px]"
-            value={filters.status}
-            onChange={(e) => setFilter({ status: e.target.value as any })}
-          >
-            <option value="all">Todos</option>
-            {lists.map((list) => (
-              <option key={list.id} value={list.id}>
-                {list.name}
-              </option>
-            ))}
-          </Select>
-        </label>
-        <label className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white/80 px-2.5 py-1.5 backdrop-blur dark:border-white/10 dark:bg-white/5">
-          <span className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-300">Prazo</span>
-          <Select
-            className="w-28 min-w-[7rem] text-[11px]"
-            value={filters.due}
-            onChange={(e) => setFilter({ due: e.target.value as any })}
-          >
-            <option value="all">Todos</option>
-            <option value="today">Hoje</option>
-            <option value="week">Esta semana</option>
-          </Select>
-        </label>
       </div>
       <div className="flex-1 min-h-0 overflow-hidden">
         <DragDropContext onDragEnd={handleDragEnd}>
