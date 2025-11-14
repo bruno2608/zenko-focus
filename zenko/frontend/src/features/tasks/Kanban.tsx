@@ -22,6 +22,7 @@ import { useTaskListsStore, DEFAULT_LISTS } from './listsStore';
 
 const COLUMN_ACCENT =
   'from-slate-200/70 via-slate-200/40 to-slate-200/20 dark:from-white/15 dark:via-white/10 dark:to-white/5';
+const BOARD_COLUMNS_DROPPABLE_ID = 'board-columns';
 
 function useLabelDefinitionMap() {
   const labelsLibrary = useTasksStore((state) => state.labelsLibrary);
@@ -434,7 +435,7 @@ export default function Kanban() {
       if (!destination) {
         return;
       }
-      if (type === 'COLUMN') {
+      if (source.droppableId === BOARD_COLUMNS_DROPPABLE_ID) {
         const movedColumnId = draggableId.startsWith('column:')
           ? (draggableId.slice('column:'.length) as TaskStatus)
           : (draggableId as TaskStatus);
@@ -748,7 +749,7 @@ export default function Kanban() {
       </div>
       <div className="flex-1 min-h-0 overflow-hidden">
         <DragDropContext onDragEnd={handleDragEnd}>
-          <Droppable droppableId="board-columns" direction="horizontal" type="COLUMN">
+          <Droppable droppableId={BOARD_COLUMNS_DROPPABLE_ID} direction="horizontal" type="COLUMN">
             {(boardProvided) => (
               <div
                 ref={boardProvided.innerRef}
@@ -764,20 +765,21 @@ export default function Kanban() {
                         const columnTabIndex = focusedColumn ? (isFocused ? 0 : -1) : 0;
 
                         return (
-                        <section
-                          ref={(node) => {
-                            columnProvided.innerRef(node);
-                            columnRefs.current[column.key] = node;
-                          }}
-                          {...columnProvided.draggableProps}
-                          className={`group relative flex h-full min-h-[20rem] w-[272px] flex-none snap-start flex-col rounded-[20px] bg-gradient-to-br p-[1px] transition-transform transition-shadow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/60 ${column.accent} ${columnSnapshot.isDragging ? 'scale-[1.01]' : ''}`}
-                          role="region"
-                          aria-labelledby={`column-${column.key}`}
-                          aria-describedby={`column-${column.key}-meta`}
-                          tabIndex={columnTabIndex}
-                          onFocus={() => {
-                            focusColumn(column.key);
-                          }}
+                          <section
+                            ref={(node) => {
+                              columnProvided.innerRef(node);
+                              columnRefs.current[column.key] = node;
+                            }}
+                            {...columnProvided.draggableProps}
+                            style={columnProvided.draggableProps.style}
+                            className={`group relative flex h-full min-h-[20rem] w-[272px] flex-none snap-start flex-col rounded-[20px] bg-gradient-to-br p-[1px] transition-transform transition-shadow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zenko-primary/60 ${column.accent} ${columnSnapshot.isDragging ? 'scale-[1.01]' : ''}`}
+                            role="region"
+                            aria-labelledby={`column-${column.key}`}
+                            aria-describedby={`column-${column.key}-meta`}
+                            tabIndex={columnTabIndex}
+                            onFocus={() => {
+                              focusColumn(column.key);
+                            }}
                         >
                           <Droppable droppableId={column.key} type="TASK">
                             {(taskProvided, taskSnapshot) => {
@@ -843,6 +845,7 @@ export default function Kanban() {
                             <div
                               ref={dragProvided.innerRef}
                               {...dragProvided.draggableProps}
+                              style={dragProvided.draggableProps.style}
                               className="space-y-1.5"
                               role="listitem"
                               aria-current={highlightedTaskId === task.id ? 'true' : undefined}
