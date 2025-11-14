@@ -22,6 +22,7 @@ import { useTaskListsStore, DEFAULT_LISTS } from './listsStore';
 
 const COLUMN_ACCENT =
   'from-slate-200/70 via-slate-200/40 to-slate-200/20 dark:from-white/15 dark:via-white/10 dark:to-white/5';
+const BOARD_COLUMNS_DROPPABLE_ID = 'board-columns';
 
 function useLabelDefinitionMap() {
   const labelsLibrary = useTasksStore((state) => state.labelsLibrary);
@@ -430,11 +431,11 @@ export default function Kanban() {
 
   const handleDragEnd = useCallback(
     (result: DropResult) => {
-      const { destination, source, draggableId, type } = result;
+      const { destination, source, draggableId } = result;
       if (!destination) {
         return;
       }
-      if (type === 'COLUMN') {
+      if (source.droppableId === BOARD_COLUMNS_DROPPABLE_ID) {
         const movedColumnId = draggableId.startsWith('column:')
           ? (draggableId.slice('column:'.length) as TaskStatus)
           : (draggableId as TaskStatus);
@@ -748,7 +749,7 @@ export default function Kanban() {
       </div>
       <div className="flex-1 min-h-0 overflow-hidden">
         <DragDropContext onDragEnd={handleDragEnd}>
-          <Droppable droppableId="board-columns" direction="horizontal" type="COLUMN">
+          <Droppable droppableId={BOARD_COLUMNS_DROPPABLE_ID} direction="horizontal" type="COLUMN">
             {(boardProvided) => (
               <div
                 ref={boardProvided.innerRef}
