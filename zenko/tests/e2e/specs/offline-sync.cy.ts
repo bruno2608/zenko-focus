@@ -11,7 +11,7 @@ describe('Offline synchronization queue', () => {
   it('persists creations offline and syncs when connectivity returns', () => {
     cy.contains('Modo offline ativo');
 
-    cy.contains('Nova tarefa').click();
+    cy.contains('button', 'Adicionar tarefa').first().click();
     cy.get('input[name="title"]').type('Sincronizar depois');
     cy.get('form').contains('Salvar').click();
 

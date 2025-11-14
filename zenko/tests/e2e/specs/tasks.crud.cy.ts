@@ -7,7 +7,7 @@ describe('Kanban Tasks CRUD', () => {
   });
 
   it('creates and moves a task across columns using mobile controls', () => {
-    cy.contains('Nova tarefa').click();
+    cy.contains('button', 'Adicionar tarefa').first().click();
     cy.get('input[name="title"]').type('Teste Cypress');
     cy.get('form').contains('Salvar').click();
 

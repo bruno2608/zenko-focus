@@ -2,27 +2,22 @@ import { useConnectivityStore } from '../store/connectivity';
 
 export default function OfflineNotice({ feature }: { feature: string }) {
   const { lastError } = useConnectivityStore((state) => state);
+  const hint =
+    lastError ??
+    'Defina VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY no .env e habilite "Enable anonymous sign-ins" para sincronizar.';
+
   return (
-    <div className="rounded-3xl border border-slate-200 bg-gradient-to-r from-zenko-primary/5 via-zenko-secondary/5 to-zenko-accent/5 p-5 backdrop-blur dark:border-white/10 dark:from-zenko-primary/15 dark:via-zenko-secondary/10 dark:to-zenko-accent/10">
-      <div className="flex items-start gap-3">
-        <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white text-zenko-primary shadow-sm dark:bg-white/10">⚠️</span>
-        <div className="space-y-1 text-sm text-slate-700 dark:text-slate-200">
-          <h2 className="text-base font-semibold text-slate-900 dark:text-white">Modo offline ativo</h2>
-          <p>
-            Alguns recursos de {feature} estão usando dados locais temporários.
-            {lastError ? (
-              <span className="mt-2 block text-xs text-slate-600 dark:text-slate-300">{lastError}</span>
-            ) : (
-              <>
-                {' '}
-                Configure o Supabase no arquivo
-                <code className="ml-1 rounded-md bg-slate-200 px-1 py-px text-xs text-slate-700 dark:bg-black/40 dark:text-slate-200">.env</code>{' '}
-                e garanta que "Enable anonymous sign-ins" esteja ativo em Auth {'>'} Providers.
-              </>
-            )}
-          </p>
-        </div>
-      </div>
+    <div
+      className="inline-flex max-w-full items-center gap-2 rounded-full border border-amber-300/60 bg-amber-50/90 px-3 py-1.5 text-xs font-medium text-amber-700 shadow-sm ring-1 ring-inset ring-amber-300/30 dark:border-amber-500/40 dark:bg-amber-500/15 dark:text-amber-100 dark:ring-amber-500/20"
+      role="status"
+      aria-live="polite"
+      title={hint}
+    >
+      <span aria-hidden className="text-base leading-none">⚠️</span>
+      <span className="truncate">
+        Modo offline ativo — {feature} usa dados locais temporários.
+      </span>
+      <span className="sr-only">{hint}</span>
     </div>
   );
 }
