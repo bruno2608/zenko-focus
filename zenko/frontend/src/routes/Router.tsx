@@ -6,6 +6,8 @@ import RemindersPage from '../features/reminders/RemindersPage';
 import DashboardPage from '../features/dashboard/DashboardPage';
 import ProfilePage from '../features/profile/ProfilePage';
 import PreferencesPage from '../features/preferences/PreferencesPage';
+import MindmapsDashboard from '../features/mindmaps';
+import MindmapEditor from '../features/mindmaps/editor';
 
 const router = createBrowserRouter([
   {
@@ -18,6 +20,8 @@ const router = createBrowserRouter([
       { path: 'pomodoro', element: <PomodoroTimer /> },
       { path: 'reminders', element: <RemindersPage /> },
       { path: 'dashboard', element: <DashboardPage /> },
+      { path: 'mindmaps', element: <MindmapsDashboard /> },
+      { path: 'mindmaps/:id', element: <MindmapEditor /> },
       { path: 'perfil', element: <ProfilePage /> },
       { path: 'preferencias', element: <PreferencesPage /> }
     ]
