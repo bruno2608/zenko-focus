@@ -85,6 +85,34 @@ const tabs = [
     )
   },
   {
+    to: '/mindmaps',
+    label: 'Mapas mentais',
+    icon: (
+      <svg
+        className="h-5 w-5"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden="true"
+      >
+        <path d="M9 9a3 3 0 0 1 6 0" />
+        <path d="M12 5V3" />
+        <path d="M12 21v-2" />
+        <path d="M7 9H5" />
+        <path d="M19 9h-2" />
+        <path d="M8 18h2" />
+        <path d="M14 18h2" />
+        <path d="m7.8 7.8-1.4-1.4" />
+        <path d="m17.6 17.6-1.4-1.4" />
+        <path d="m7.8 18.2-1.4 1.4" />
+        <path d="m17.6 6.4-1.4 1.4" />
+      </svg>
+    )
+  },
+  {
     to: '/perfil',
     label: 'Perfil',
     icon: (
