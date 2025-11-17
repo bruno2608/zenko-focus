@@ -85,6 +85,34 @@ const tabs = [
     )
   },
   {
+    to: '/mindmaps',
+    label: 'Mapas mentais',
+    icon: (
+      <svg
+        className="h-5 w-5"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden="true"
+      >
+        <path d="M9 9a3 3 0 0 1 6 0" />
+        <path d="M12 5V3" />
+        <path d="M12 21v-2" />
+        <path d="M7 9H5" />
+        <path d="M19 9h-2" />
+        <path d="M8 18h2" />
+        <path d="M14 18h2" />
+        <path d="m7.8 7.8-1.4-1.4" />
+        <path d="m17.6 17.6-1.4-1.4" />
+        <path d="m7.8 18.2-1.4 1.4" />
+        <path d="m17.6 6.4-1.4 1.4" />
+      </svg>
+    )
+  },
+  {
     to: '/perfil',
     label: 'Perfil',
     icon: (
@@ -201,26 +229,38 @@ export default function TabsLayout() {
               <p className="text-base font-semibold text-slate-900 dark:text-white">Produtividade unificada</p>
             </div>
           </div>
-          <nav className="order-last hidden w-full flex-wrap justify-center gap-2 xl:order-none xl:flex xl:w-full xl:flex-nowrap xl:items-center xl:justify-center xl:gap-3 xl:overflow-hidden">
-            {tabs.map((tab) => (
-              <NavLink
-                key={`top-${tab.to}`}
-                to={tab.to}
-                end={tab.to === '/'}
-                className={({ isActive }) =>
-                  `group inline-flex items-center gap-2 rounded-2xl border px-3 py-2 text-sm font-medium transition-all whitespace-nowrap ${
-                    isActive
-                      ? 'border-zenko-primary/60 bg-gradient-to-r from-zenko-primary/15 via-zenko-secondary/20 to-zenko-primary/15 text-zenko-primary dark:border-zenko-primary/50 dark:text-white'
-                      : 'border-transparent bg-white/60 text-slate-500 hover:border-zenko-primary/40 hover:bg-white/80 hover:text-slate-900 dark:bg-white/10 dark:text-slate-300 dark:hover:border-white/20 dark:hover:bg-white/15 dark:hover:text-white'
-                  }`
-                }
-              >
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-zenko-primary/10 text-zenko-primary transition dark:bg-white/10 dark:text-white">
-                  {tab.icon}
-                </span>
-                {tab.label}
-              </NavLink>
-            ))}
+          <nav className="order-last hidden w-full flex-wrap justify-center xl:order-none xl:flex xl:w-full xl:flex-nowrap xl:items-center xl:justify-center xl:overflow-hidden">
+            <div className="flex w-full items-center justify-center gap-2 rounded-[28px] border border-slate-200/70 bg-slate-900/85 p-2 text-white shadow-[0_20px_70px_-35px_rgba(8,15,30,0.85)] ring-1 ring-white/5 backdrop-blur-lg transition dark:border-white/10 dark:bg-slate-900/80">
+              {tabs.map((tab) => (
+                <NavLink
+                  key={`top-${tab.to}`}
+                  to={tab.to}
+                  end={tab.to === '/'}
+                  className={({ isActive }) =>
+                    `group inline-flex items-center gap-2 rounded-2xl border px-4 py-2 text-sm font-semibold transition-all whitespace-nowrap ${
+                      isActive
+                        ? 'border-white/20 bg-gradient-to-r from-zenko-primary/50 via-zenko-secondary/40 to-zenko-primary/45 text-white shadow-[0_14px_45px_-18px_rgba(59,130,246,0.85)]'
+                        : 'border-white/10 bg-white/5 text-white/80 hover:border-white/25 hover:bg-white/10 hover:text-white'
+                    }`
+                  }
+                >
+                  {({ isActive }) => (
+                    <>
+                      <span
+                        className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border text-base transition ${
+                          isActive
+                            ? 'border-white/30 bg-white/15 text-white shadow-inner'
+                            : 'border-white/5 bg-white/10 text-white/85 group-hover:border-white/20'
+                        }`}
+                      >
+                        {tab.icon}
+                      </span>
+                      {tab.label}
+                    </>
+                  )}
+                </NavLink>
+              ))}
+            </div>
           </nav>
           <div className="flex items-center justify-end" />
         </header>
